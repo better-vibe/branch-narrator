@@ -1,0 +1,242 @@
+# Finding Types
+
+All findings use a discriminated union pattern with `type` as the discriminator.
+
+## Finding Union
+
+```typescript
+type Finding =
+  | FileSummaryFinding
+  | FileCategoryFinding
+  | DependencyChangeFinding
+  | RouteChangeFinding
+  | EnvVarFinding
+  | DbMigrationFinding
+  | CloudflareChangeFinding
+  | TestChangeFinding
+  | RiskFlagFinding
+  | SecurityFileFinding;
+```
+
+## Class Diagram
+
+```mermaid
+classDiagram
+    Finding <|-- FileSummaryFinding
+    Finding <|-- FileCategoryFinding
+    Finding <|-- DependencyChangeFinding
+    Finding <|-- RouteChangeFinding
+    Finding <|-- EnvVarFinding
+    Finding <|-- DbMigrationFinding
+    Finding <|-- CloudflareChangeFinding
+    Finding <|-- TestChangeFinding
+    Finding <|-- RiskFlagFinding
+    Finding <|-- SecurityFileFinding
+
+    class Finding {
+        <<discriminated union>>
+        type: string
+    }
+```
+
+---
+
+## FileSummaryFinding
+
+```typescript
+interface FileSummaryFinding {
+  type: "file-summary";
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  renamed: Array<{ from: string; to: string }>;
+}
+```
+
+---
+
+## FileCategoryFinding
+
+```typescript
+type FileCategory =
+  | "product"
+  | "tests"
+  | "ci"
+  | "infra"
+  | "docs"
+  | "dependencies"
+  | "config"
+  | "other";
+
+interface FileCategoryFinding {
+  type: "file-category";
+  categories: Record<FileCategory, string[]>;
+  summary: Array<{
+    category: FileCategory;
+    count: number;
+  }>;
+}
+```
+
+---
+
+## DependencyChangeFinding
+
+```typescript
+interface DependencyChangeFinding {
+  type: "dependency-change";
+  name: string;
+  section: "dependencies" | "devDependencies";
+  from?: string;
+  to?: string;
+  impact?: "major" | "minor" | "patch" | "new" | "removed" | "unknown";
+  riskCategory?: "auth" | "database" | "native" | "payment";
+}
+```
+
+---
+
+## RouteChangeFinding
+
+```typescript
+type RouteType = "page" | "layout" | "endpoint" | "error" | "unknown";
+
+interface RouteChangeFinding {
+  type: "route-change";
+  routeId: string;
+  file: string;
+  change: FileStatus;
+  routeType: RouteType;
+  methods?: string[];
+}
+```
+
+---
+
+## EnvVarFinding
+
+```typescript
+type EnvVarChange = "added" | "touched";
+
+interface EnvVarFinding {
+  type: "env-var";
+  name: string;
+  change: EnvVarChange;
+  evidenceFiles: string[];
+}
+```
+
+---
+
+## DbMigrationFinding
+
+```typescript
+type MigrationRisk = "high" | "medium" | "low";
+
+interface DbMigrationFinding {
+  type: "db-migration";
+  tool: "supabase";
+  files: string[];
+  risk: MigrationRisk;
+  reasons: string[];
+}
+```
+
+---
+
+## CloudflareChangeFinding
+
+```typescript
+type CloudflareArea = "wrangler" | "pages" | "workers" | "ci";
+
+interface CloudflareChangeFinding {
+  type: "cloudflare-change";
+  area: CloudflareArea;
+  files: string[];
+}
+```
+
+---
+
+## TestChangeFinding
+
+```typescript
+interface TestChangeFinding {
+  type: "test-change";
+  framework: "vitest";
+  files: string[];
+}
+```
+
+---
+
+## RiskFlagFinding
+
+```typescript
+type RiskLevel = "high" | "medium" | "low";
+
+interface RiskFlagFinding {
+  type: "risk-flag";
+  risk: RiskLevel;
+  evidence: string;
+}
+```
+
+---
+
+## SecurityFileFinding
+
+```typescript
+type SecurityFileReason =
+  | "auth-path"
+  | "session-path"
+  | "permission-path"
+  | "middleware"
+  | "guard"
+  | "policy";
+
+interface SecurityFileFinding {
+  type: "security-file";
+  files: string[];
+  reasons: SecurityFileReason[];
+}
+```
+
+---
+
+## JSON Example
+
+```json
+{
+  "findings": [
+    {
+      "type": "file-summary",
+      "added": ["src/routes/login/+page.svelte"],
+      "modified": ["package.json"],
+      "deleted": [],
+      "renamed": []
+    },
+    {
+      "type": "route-change",
+      "routeId": "/login",
+      "file": "src/routes/login/+page.svelte",
+      "change": "added",
+      "routeType": "page"
+    },
+    {
+      "type": "dependency-change",
+      "name": "lucia",
+      "section": "dependencies",
+      "to": "^3.0.0",
+      "impact": "new",
+      "riskCategory": "auth"
+    },
+    {
+      "type": "risk-flag",
+      "risk": "medium",
+      "evidence": "New Authentication/Security package: lucia"
+    }
+  ]
+}
+```
+
