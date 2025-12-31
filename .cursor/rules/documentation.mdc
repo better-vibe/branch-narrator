@@ -1,0 +1,147 @@
+---
+description: Documentation maintenance rules. This rule reminds AI agents to update docs when making significant codebase changes.
+alwaysApply: true
+---
+
+# Documentation Maintenance
+
+**After making significant changes, update the relevant documentation in `docs/`.**
+
+## Quick Reference
+
+| Change Type | Docs to Update |
+|-------------|----------------|
+| New analyzer | `docs/03-analyzers/{name}.md`, `docs/07-profiles/` |
+| Finding type | `docs/04-types/findings.md` |
+| CLI option | `docs/05-cli/options.md`, `docs/05-cli/commands.md` |
+| Profile change | `docs/07-profiles/{profile}.md` |
+| Risk scoring | `docs/08-rendering/risk-scoring.md` |
+| Markdown output | `docs/08-rendering/markdown.md` |
+| Architecture | `docs/02-architecture/overview.md` |
+| New feature | `docs/01-product/roadmap.md` |
+| Bug fix | `docs/01-product/roadmap.md` |
+| Core types | `docs/04-types/core-types.md` |
+
+## Documentation Structure
+
+```
+docs/
+├── README.md                    # Index and quick start
+├── 01-product/
+│   ├── overview.md              # Product overview
+│   └── roadmap.md               # Roadmap and known issues
+├── 02-architecture/
+│   ├── overview.md              # System design
+│   ├── project-structure.md     # Directory layout
+│   └── data-flow.md             # Data flow diagrams
+├── 03-analyzers/
+│   ├── file-summary.md
+│   ├── file-category.md
+│   ├── route-detector.md
+│   ├── supabase.md
+│   ├── env-var.md
+│   ├── dependencies.md
+│   ├── security-files.md
+│   ├── cloudflare.md
+│   └── vitest.md
+├── 04-types/
+│   ├── findings.md              # Finding type definitions
+│   └── core-types.md            # Core type definitions
+├── 05-cli/
+│   ├── commands.md              # CLI commands
+│   ├── options.md               # CLI options
+│   └── examples.md              # Usage examples
+├── 06-development/
+│   ├── getting-started.md       # Setup guide
+│   ├── testing.md               # Testing guide
+│   └── coding-standards.md      # Code style
+├── 07-profiles/
+│   ├── overview.md              # Profile system
+│   ├── sveltekit.md             # SvelteKit profile
+│   └── default.md               # Default profile
+└── 08-rendering/
+    ├── markdown.md              # Markdown output
+    ├── json.md                  # JSON output
+    └── risk-scoring.md          # Risk computation
+```
+
+## When Making Changes
+
+1. **Before**: Read relevant docs to understand current state
+2. **During**: Note what needs updating
+3. **After**: Update docs to reflect your changes
+4. **Roadmap**: Mark completed features, add discovered issues
+
+## What to Document
+
+### New Analyzer
+- Create `docs/03-analyzers/{name}.md` with:
+  - File location and finding type
+  - Detection patterns/rules
+  - Example output
+  - Usage in markdown
+- Update profile docs in `docs/07-profiles/`
+- Add finding type to `docs/04-types/findings.md`
+
+### New Finding Type
+- Add to `docs/04-types/findings.md`:
+  - TypeScript interface
+  - JSON example
+- Update analyzer doc that produces it
+
+### CLI Changes
+- Update `docs/05-cli/options.md` for new options
+- Update `docs/05-cli/commands.md` for new commands
+- Add examples to `docs/05-cli/examples.md`
+
+### Risk Scoring Changes
+- Update `docs/08-rendering/risk-scoring.md`:
+  - Scoring table
+  - Evidence bullet formats
+  - Threshold changes
+
+### New Profile
+- Create `docs/07-profiles/{name}.md`:
+  - Detection logic
+  - Included analyzers
+  - Framework-specific features
+- Update `docs/07-profiles/overview.md`
+
+## Mermaid Diagrams
+
+Use Mermaid for all diagrams:
+
+```markdown
+# Flowchart
+```mermaid
+flowchart TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Action]
+    B -->|No| D[Other]
+```
+
+# Class Diagram
+```mermaid
+classDiagram
+    class Finding {
+        type: string
+    }
+```
+
+# Sequence
+```mermaid
+sequenceDiagram
+    CLI->>Git: collect diff
+    Git-->>CLI: ChangeSet
+```
+```
+
+## Quality Checklist
+
+Before committing documentation changes:
+
+- [ ] Code examples are accurate
+- [ ] Type definitions match actual code
+- [ ] Mermaid diagrams render correctly
+- [ ] Links between docs are valid
+- [ ] Tables are properly formatted

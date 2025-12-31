@@ -22,10 +22,23 @@ npm install -D branch-narrator
 
 ## Usage
 
+### Preview Changes (for Humans)
+
+```bash
+# Colorized summary of changes
+branch-narrator pretty
+
+# Include uncommitted work
+branch-narrator pretty -u
+
+# Compare specific branches
+branch-narrator pretty --base develop --head feature/auth
+```
+
 ### Generate PR Description
 
 ```bash
-# Compare main to current HEAD
+# Raw markdown for GitHub PRs
 branch-narrator pr-body
 
 # With custom refs
@@ -34,26 +47,42 @@ branch-narrator pr-body --base develop --head feature/my-feature
 # Interactive mode (prompts for context)
 branch-narrator pr-body --interactive
 
-# Explicit profile
-branch-narrator pr-body --profile sveltekit
+# Pipe to clipboard (macOS)
+branch-narrator pr-body | pbcopy
 ```
 
 ### Generate JSON Facts
 
 ```bash
-branch-narrator facts --base main --head HEAD
+# Machine-readable output
+branch-narrator facts
+
+# Parse with jq
+branch-narrator facts | jq '.riskScore.level'
 ```
 
-## CLI Options
+## CLI Commands
 
-### `pr-body` Command
+### `pretty` Command
 
-Generate a Markdown PR description.
+Display a colorized summary of changes in the terminal.
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--base <ref>` | `main` | Base git reference |
 | `--head <ref>` | `HEAD` | Head git reference |
+| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+
+### `pr-body` Command
+
+Generate a raw Markdown PR description.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--base <ref>` | `main` | Base git reference |
+| `--head <ref>` | `HEAD` | Head git reference |
+| `-u, --uncommitted` | `false` | Include uncommitted changes |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
 | `--interactive` | `false` | Prompt for additional context |
 
@@ -65,6 +94,7 @@ Output JSON findings for programmatic use.
 |--------|---------|-------------|
 | `--base <ref>` | `main` | Base git reference |
 | `--head <ref>` | `HEAD` | Head git reference |
+| `-u, --uncommitted` | `false` | Include uncommitted changes |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
 
 ## Sample Output
@@ -249,7 +279,9 @@ bun run build
 bun run typecheck
 
 # Run locally
+bun src/cli.ts pretty -u
 bun src/cli.ts pr-body --base main --head HEAD
+bun src/cli.ts facts -u | jq '.riskScore'
 ```
 
 ## Requirements

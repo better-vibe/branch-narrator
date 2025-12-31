@@ -7,7 +7,9 @@ Detailed documentation for each CLI option.
 Base git reference to compare against.
 
 ```bash
+branch-narrator pretty --base <ref>
 branch-narrator pr-body --base <ref>
+branch-narrator facts --base <ref>
 ```
 
 ### Values

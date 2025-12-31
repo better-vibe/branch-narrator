@@ -1,10 +1,50 @@
 # CLI Commands
 
-branch-narrator provides two main commands.
+branch-narrator provides three commands for different use cases.
+
+## pretty
+
+Display a colorized summary of changes in the terminal. This is the primary command for humans to review changes.
+
+```bash
+branch-narrator pretty [options]
+```
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--base <ref>` | `main` | Base git reference |
+| `--head <ref>` | `HEAD` | Head git reference |
+| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+
+### Features
+
+- Colorized output with risk indicators
+- Formatted tables for routes, dependencies, env vars
+- Section boxes and visual separators
+- Progress spinner during analysis
+- File status colors (green=added, red=deleted, cyan=modified)
+
+### Examples
+
+```bash
+# Review current branch changes
+branch-narrator pretty
+
+# Include uncommitted work
+branch-narrator pretty -u
+
+# Compare specific branches
+branch-narrator pretty --base develop --head feature/auth
+```
+
+---
 
 ## pr-body
 
-Generate a Markdown PR description.
+Generate a raw Markdown PR description. Use this to create GitHub PR descriptions.
 
 ```bash
 branch-narrator pr-body [options]
@@ -46,7 +86,7 @@ branch-narrator pr-body | pbcopy
 
 ## facts
 
-Output JSON findings for programmatic use.
+Output JSON findings for programmatic use. Pipe to other tools like `jq`.
 
 ```bash
 branch-narrator facts [options]
@@ -93,10 +133,10 @@ branch-narrator facts | jq -r '.riskScore.level'
 ```bash
 # Show help
 branch-narrator --help
+branch-narrator pretty --help
 branch-narrator pr-body --help
 branch-narrator facts --help
 
 # Show version
 branch-narrator --version
 ```
-
