@@ -11,6 +11,67 @@ import type {
 } from "../core/types.js";
 import { getAdditions } from "../git/parser.js";
 
+// File extensions that should be scanned for env vars (actual code files)
+const CODE_FILE_EXTENSIONS = new Set([
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".svelte",
+  ".vue",
+  ".astro",
+]);
+
+// Config files that might contain env var references
+const CONFIG_FILE_PATTERNS = [
+  /\.env(\..+)?$/, // .env, .env.local, .env.production
+  /vite\.config\.(ts|js|mjs)$/,
+  /svelte\.config\.(ts|js|mjs)$/,
+  /next\.config\.(ts|js|mjs)$/,
+  /nuxt\.config\.(ts|js|mjs)$/,
+  /astro\.config\.(ts|js|mjs)$/,
+];
+
+/**
+ * Check if a file should be scanned for env vars.
+ * Only scan actual code files and config files, not documentation or tests.
+ */
+function shouldScanForEnvVars(path: string): boolean {
+  // Skip documentation
+  if (path.endsWith(".md") || path.startsWith("docs/")) {
+    return false;
+  }
+
+  // Skip test files (they often contain example env vars)
+  if (
+    path.includes("/tests/") ||
+    path.includes("/__tests__/") ||
+    path.includes(".test.") ||
+    path.includes(".spec.") ||
+    path.startsWith("tests/")
+  ) {
+    return false;
+  }
+
+  // Skip fixture files
+  if (path.includes("/fixtures/") || path.includes("/__fixtures__/")) {
+    return false;
+  }
+
+  // Check if it's a config file
+  for (const pattern of CONFIG_FILE_PATTERNS) {
+    if (pattern.test(path)) {
+      return true;
+    }
+  }
+
+  // Check if it has a code file extension
+  const ext = path.substring(path.lastIndexOf("."));
+  return CODE_FILE_EXTENSIONS.has(ext);
+}
+
 // Patterns for env var detection
 const ENV_PATTERNS = {
   // process.env.VAR_NAME
@@ -98,10 +159,15 @@ export const envVarAnalyzer: Analyzer = {
     const findings: Finding[] = [];
     const varToFiles = new Map<string, Set<string>>();
 
-    // Scan all diffs for env vars in additions
+    // Scan code files for env vars in additions
     for (const diff of changeSet.diffs) {
       // Skip build artifacts and generated files
       if (shouldExcludeFile(diff.path)) {
+        continue;
+      }
+
+      // Only scan actual code files (not docs, tests, fixtures)
+      if (!shouldScanForEnvVars(diff.path)) {
         continue;
       }
 
