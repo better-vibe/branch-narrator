@@ -271,8 +271,13 @@ program
 program
   .command("facts")
   .description("Output structured JSON facts (agent-grade output)")
-  .option("--base <ref>", "Base git reference", "main")
-  .option("--head <ref>", "Head git reference", "HEAD")
+  .option(
+    "--mode <type>",
+    "Diff mode: branch|unstaged|staged|all",
+    "branch"
+  )
+  .option("--base <ref>", "Base git reference (branch mode only)", "main")
+  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit)",
@@ -312,6 +317,24 @@ program
       // Import buildFacts dynamically to avoid circular dependencies
       const { buildFacts } = await import("./facts/index.js");
 
+      // Validate mode
+      const mode = options.mode as DiffMode;
+      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
+        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      // Warn if base/head provided with non-branch mode
+      if (mode !== "branch") {
+        const baseProvided = options.base !== "main";
+        const headProvided = options.head !== "HEAD";
+        if (baseProvided || headProvided) {
+          console.error(
+            `Warning: --base and --head are ignored when --mode is "${mode}"`
+          );
+        }
+      }
+
       // Validate format
       if (options.format !== "json") {
         console.error(`Invalid format: ${options.format}. Only json is supported.`);
@@ -325,10 +348,12 @@ program
         ? parseInt(options.maxFindings, 10)
         : undefined;
 
-      // Collect git data
+      // Collect git data using mode-based options
       const changeSet = await collectChangeSet({
-        base: options.base,
-        head: options.head,
+        mode,
+        base: mode === "branch" ? options.base : undefined,
+        head: mode === "branch" ? options.head : undefined,
+        includeUntracked: mode === "all",
       });
 
       // Resolve profile
@@ -481,8 +506,13 @@ program
 program
   .command("risk-report")
   .description("Analyze git diff and emit risk score (0-100) with evidence-backed flags")
-  .option("--base <ref>", "Base git reference", "main")
-  .option("--head <ref>", "Head git reference", "HEAD")
+  .option(
+    "--mode <type>",
+    "Diff mode: branch|unstaged|staged|all",
+    "branch"
+  )
+  .option("--base <ref>", "Base git reference (branch mode only)", "main")
+  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
   .option("--format <type>", "Output format: json|md|text", "json")
   .option("--out <path>", "Write output to file instead of stdout")
   .option("--fail-on-score <n>", "Exit with code 2 if risk score >= threshold")
@@ -495,6 +525,24 @@ program
     try {
       // Import risk report dynamically
       const { generateRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./risk/index.js");
+
+      // Validate mode
+      const mode = options.mode as DiffMode;
+      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
+        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      // Warn if base/head provided with non-branch mode
+      if (mode !== "branch") {
+        const baseProvided = options.base !== "main";
+        const headProvided = options.head !== "HEAD";
+        if (baseProvided || headProvided) {
+          console.error(
+            `Warning: --base and --head are ignored when --mode is "${mode}"`
+          );
+        }
+      }
 
       // Validate format
       const format = options.format as "json" | "md" | "text";
@@ -525,10 +573,12 @@ program
         ? options.exclude.split(",").map((s: string) => s.trim())
         : undefined;
 
-      // Collect git data
+      // Collect git data using mode-based options
       const changeSet = await collectChangeSet({
-        base: options.base,
-        head: options.head,
+        mode,
+        base: mode === "branch" ? options.base : undefined,
+        head: mode === "branch" ? options.head : undefined,
+        includeUntracked: mode === "all",
       });
 
       // Generate risk report
