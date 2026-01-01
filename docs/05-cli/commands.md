@@ -115,6 +115,9 @@ branch-narrator facts [options]
 | `--base <ref>` | `main` | Base git reference (branch mode only) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--out <path>` | stdout | Write output to file |
+| `--format <type>` | `json` | Output format: `json` or `compact` |
+| `--dry-run` | `false` | Preview analysis without full output |
 
 ### Diff Modes
 
@@ -124,6 +127,49 @@ branch-narrator facts [options]
 | `unstaged` | Working tree vs index (uncommitted) | `git diff` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
 | `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+
+### Output Formats
+
+| Format | Description |
+|--------|-------------|
+| `json` | Pretty-printed JSON with metadata (default) |
+| `compact` | Minified JSON without whitespace |
+
+### Output Schema
+
+When using the enhanced output format (default), the JSON follows this schema:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "mode": "branch",
+  "base": "main",
+  "head": "HEAD",
+  "profile": "auto",
+  "riskScore": {
+    "score": 35,
+    "level": "medium",
+    "evidenceBullets": [
+      "⚠️ Major version bump: @sveltejs/kit ^1.0.0 → ^2.0.0"
+    ]
+  },
+  "findings": [...],
+  "stats": {
+    "totalFindings": 5,
+    "findingsByType": {
+      "file-summary": 1,
+      "route-change": 2,
+      "dependency-change": 1,
+      "env-var": 1
+    }
+  }
+}
+```
+
+**Notes:**
+- For non-branch modes, `base` and `head` are `null`
+- `stats.findingsByType` provides a quick summary of findings by type
+- Legacy format (without metadata) is used when calling renderJson without options
 
 ### Examples
 
@@ -140,11 +186,26 @@ branch-narrator facts --mode staged
 # Analyze all uncommitted changes
 branch-narrator facts --mode all
 
+# Write to file
+branch-narrator facts --out analysis.json
+
+# Compact format (no whitespace)
+branch-narrator facts --format compact
+
+# Dry run - preview without full output
+branch-narrator facts --dry-run
+
+# Compare specific branches
+branch-narrator facts --base develop --head feature/auth
+
 # Parse with jq
 branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
 
 # Get risk level
 branch-narrator facts | jq -r '.riskScore.level'
+
+# Get findings summary
+branch-narrator facts | jq '.stats.findingsByType'
 ```
 
 ---

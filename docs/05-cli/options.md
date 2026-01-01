@@ -145,6 +145,59 @@ This PR implements user authentication using Supabase Auth.
 
 ---
 
+## facts Specific Options
+
+The following options are only available on the `facts` command.
+
+### --out
+
+Write output to a file instead of stdout.
+
+```bash
+branch-narrator facts --out analysis.json
+```
+
+Creates parent directories as needed.
+
+---
+
+### --format
+
+Output format for the JSON facts.
+
+```bash
+branch-narrator facts --format <type>
+```
+
+| Format | Description |
+|--------|-------------|
+| `json` | Pretty-printed JSON with indentation (default) |
+| `compact` | Minified JSON without whitespace |
+
+---
+
+### --dry-run
+
+Preview analysis without generating full output.
+
+```bash
+branch-narrator facts --dry-run
+```
+
+Shows:
+- Mode and profile used
+- Number of findings
+- Risk score
+- Breakdown of findings by type
+- Where output would be written
+
+Useful for:
+- Checking analysis before committing to full output
+- Quick verification of changes
+- Testing different modes and profiles
+
+---
+
 ## dump-diff Specific Options
 
 The following options are only available on the `dump-diff` command.

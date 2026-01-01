@@ -1,17 +1,40 @@
 # JSON Rendering
 
-The JSON renderer generates machine-readable output.
+The JSON renderer generates machine-readable output for the `facts` command.
 
 ## Entry Point
 
 ```typescript
-function renderJson(context: RenderContext): string;
+function renderJson(
+  context: RenderContext,
+  options?: RenderJsonOptions
+): string;
 ```
 
 ## Output Structure
 
+### Enhanced Format (with options)
+
 ```typescript
-interface JsonOutput {
+interface EnhancedFactsOutput {
+  schemaVersion: string;
+  mode: DiffMode;
+  base: string | null;
+  head: string | null;
+  profile: string;
+  riskScore: RiskScore;
+  findings: Finding[];
+  stats: {
+    totalFindings: number;
+    findingsByType: Record<string, number>;
+  };
+}
+```
+
+### Legacy Format (without options)
+
+```typescript
+interface FactsOutput {
   profile: ProfileName;
   riskScore: RiskScore;
   findings: Finding[];
@@ -20,8 +43,14 @@ interface JsonOutput {
 
 ## Example Output
 
+### Enhanced Format (Default)
+
 ```json
 {
+  "schemaVersion": "1.0",
+  "mode": "branch",
+  "base": "main",
+  "head": "HEAD",
   "profile": "sveltekit",
   "riskScore": {
     "score": 45,
@@ -72,7 +101,16 @@ interface JsonOutput {
       "to": "^2.0.0",
       "impact": "major"
     }
-  ]
+  ],
+  "stats": {
+    "totalFindings": 4,
+    "findingsByType": {
+      "file-summary": 1,
+      "file-category": 1,
+      "route-change": 1,
+      "dependency-change": 1
+    }
+  }
 }
 ```
 
@@ -118,6 +156,47 @@ branch-narrator facts | jq '.findings[] | select(.type == "file-category") | .ca
 branch-narrator facts | jq -r '.riskScore.evidenceBullets[]'
 ```
 
+### Statistics
+
+```bash
+# Get total number of findings
+branch-narrator facts | jq '.stats.totalFindings'
+
+# Get findings breakdown
+branch-narrator facts | jq '.stats.findingsByType'
+
+# Count specific finding type
+branch-narrator facts | jq '.stats.findingsByType["route-change"]'
+```
+
+## Output Format Options
+
+### JSON Format (Default)
+
+Pretty-printed with 2-space indentation:
+
+```bash
+branch-narrator facts --format json
+```
+
+### Compact Format
+
+Minified without whitespace (useful for piping):
+
+```bash
+branch-narrator facts --format compact | jq '.riskScore.level'
+```
+
+## Writing to File
+
+```bash
+# Write to file
+branch-narrator facts --out analysis.json
+
+# Compact to file
+branch-narrator facts --format compact --out analysis.min.json
+```
+
 ## Programmatic Usage
 
 ```typescript
@@ -130,6 +209,10 @@ const facts = JSON.parse(output);
 console.log(`Risk: ${facts.riskScore.level}`);
 console.log(`Score: ${facts.riskScore.score}/100`);
 
+// Access stats
+console.log(`Total findings: ${facts.stats.totalFindings}`);
+console.log(`Route changes: ${facts.stats.findingsByType["route-change"] || 0}`);
+
 // Filter findings
 const routes = facts.findings.filter(f => f.type === "route-change");
 const deps = facts.findings.filter(f => f.type === "dependency-change");
@@ -140,4 +223,8 @@ const deps = facts.findings.filter(f => f.type === "dependency-change");
 The JSON output follows the TypeScript types exactly. Each finding has a `type` discriminator field that determines its structure.
 
 See [Types: Findings](../04-types/findings.md) for complete type definitions.
+
+## Backward Compatibility
+
+The legacy format (without metadata) is still available when using the renderer without options, ensuring backward compatibility with existing integrations.
 

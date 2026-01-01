@@ -283,12 +283,26 @@ program
     "Profile to use (auto|sveltekit)",
     "auto"
   )
+  .option("--out <path>", "Write output to file (creates directories as needed)")
+  .option(
+    "--format <type>",
+    "Output format: json|compact",
+    "json"
+  )
+  .option("--dry-run", "Preview analysis without full output", false)
   .action(async (options) => {
     try {
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
         console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      // Validate format
+      const format = options.format as "json" | "compact";
+      if (!["json", "compact"].includes(format)) {
+        console.error(`Invalid format: ${options.format}. Use json or compact.`);
         process.exit(1);
       }
 
@@ -308,10 +322,43 @@ program
         base: mode === "branch" ? options.base : undefined,
         head: mode === "branch" ? options.head : undefined,
         profile: options.profile as ProfileName,
-        showSpinner: false,
+        showSpinner: !options.dryRun,
       });
 
       const riskScore = computeRiskScore(findings);
+
+      // Dry run - just show what would be output
+      if (options.dryRun) {
+        console.log("=== Dry Run ===\n");
+        console.log(`Mode: ${mode}`);
+        if (mode === "branch") {
+          console.log(`Base: ${options.base}`);
+          console.log(`Head: ${options.head}`);
+        }
+        console.log(`Profile: ${resolvedProfile}`);
+        console.log(`Format: ${format}`);
+        console.log(`\nFindings: ${findings.length}`);
+        console.log(`Risk Score: ${riskScore.score}/100 (${riskScore.level})`);
+        
+        // Group findings by type
+        const findingsByType = findings.reduce((acc, finding) => {
+          acc[finding.type] = (acc[finding.type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log("\nFindings by type:");
+        for (const [type, count] of Object.entries(findingsByType)) {
+          console.log(`  - ${type}: ${count}`);
+        }
+        
+        if (options.out) {
+          console.log(`\nOutput would be written to: ${options.out}`);
+        } else {
+          console.log("\nOutput would be written to: stdout");
+        }
+        
+        process.exit(0);
+      }
 
       const renderContext: RenderContext = {
         findings,
@@ -319,7 +366,24 @@ program
         profile: resolvedProfile,
       };
 
-      console.log(renderJson(renderContext));
+      const output = renderJson(renderContext, {
+        mode,
+        base: mode === "branch" ? options.base : null,
+        head: mode === "branch" ? options.head : null,
+        format,
+      });
+
+      if (options.out) {
+        const { mkdir, writeFile } = await import("node:fs/promises");
+        const { dirname } = await import("node:path");
+        const dir = dirname(options.out);
+        await mkdir(dir, { recursive: true });
+        await writeFile(options.out, output, "utf-8");
+        console.error(`Wrote ${format} output to ${options.out}`);
+      } else {
+        console.log(output);
+      }
+      
       process.exit(0);
     } catch (error) {
       handleError(error);

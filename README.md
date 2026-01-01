@@ -59,6 +59,21 @@ branch-narrator facts
 
 # Parse with jq
 branch-narrator facts | jq '.riskScore.level'
+
+# Write to file
+branch-narrator facts --out analysis.json
+
+# Compact format (no whitespace)
+branch-narrator facts --format compact
+
+# Dry run - preview analysis
+branch-narrator facts --dry-run
+
+# Analyze unstaged changes
+branch-narrator facts --mode unstaged
+
+# Get statistics
+branch-narrator facts | jq '.stats.findingsByType'
 ```
 
 ### Dump Diff for AI Agents
@@ -123,10 +138,23 @@ Output JSON findings for programmatic use.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
-| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--mode <type>` | `branch` | Mode: `branch`, `unstaged`, `staged`, or `all` |
+| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--out <path>` | stdout | Write output to file |
+| `--format <type>` | `json` | Format: `json` or `compact` |
+| `--dry-run` | `false` | Preview analysis without full output |
+
+**Modes:**
+- `branch` (default): Compare `--base` to `--head` refs
+- `unstaged`: Working tree vs index (uncommitted changes)
+- `staged`: Index vs HEAD (staged changes)
+- `all`: Working tree vs HEAD (all uncommitted changes)
+
+**Output formats:**
+- `json` (default): Pretty-printed with metadata
+- `compact`: Minified without whitespace
 
 ### `dump-diff` Command
 
@@ -216,6 +244,10 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 
 ```json
 {
+  "schemaVersion": "1.0",
+  "mode": "branch",
+  "base": "main",
+  "head": "HEAD",
   "profile": "sveltekit",
   "riskScore": {
     "score": 35,
@@ -247,7 +279,15 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
       "to": "^2.0.0",
       "impact": "major"
     }
-  ]
+  ],
+  "stats": {
+    "totalFindings": 3,
+    "findingsByType": {
+      "file-summary": 1,
+      "route-change": 1,
+      "dependency-change": 1
+    }
+  }
 }
 ```
 
