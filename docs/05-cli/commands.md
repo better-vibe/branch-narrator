@@ -1,6 +1,6 @@
 # CLI Commands
 
-branch-narrator provides four commands for different use cases.
+branch-narrator provides five commands for different use cases.
 
 ## pretty
 
@@ -293,6 +293,81 @@ When using `--format json`, the output follows this schema (v1.1):
 
 ---
 
+## risk-report
+
+Analyze git diff and emit a risk score (0-100) with evidence-backed flags.
+
+```bash
+branch-narrator risk-report [options]
+```
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--mode <type>` | `branch` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
+| `--format <type>` | `json` | Output format: `json`, `md`, or `text` |
+| `--out <path>` | (stdout) | Write output to file instead of stdout |
+| `--fail-on-score <n>` | (none) | Exit with code 2 if risk score >= threshold |
+| `--only <categories>` | (all) | Only include these categories (comma-separated) |
+| `--exclude <categories>` | (none) | Exclude these categories (comma-separated) |
+| `--max-evidence-lines <n>` | `5` | Max evidence lines per flag |
+| `--redact` | `false` | Redact secret values in evidence |
+| `--explain-score` | `false` | Include score breakdown in output |
+
+### Diff Modes
+
+| Mode | Description | Git Command |
+|------|-------------|-------------|
+| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
+| `unstaged` | Working tree vs index (uncommitted) | `git diff` |
+| `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
+| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+
+### Examples
+
+```bash
+# Basic usage (branch mode, JSON output)
+branch-narrator risk-report
+
+# Analyze unstaged changes
+branch-narrator risk-report --mode unstaged
+
+# Analyze staged changes
+branch-narrator risk-report --mode staged
+
+# Analyze all uncommitted changes
+branch-narrator risk-report --mode all
+
+# Use Markdown format
+branch-narrator risk-report --format md
+
+# Use text format
+branch-narrator risk-report --format text
+
+# Write to file
+branch-narrator risk-report --out risk-report.json
+
+# Fail CI if risk score is too high
+branch-narrator risk-report --fail-on-score 50
+
+# Only analyze security and database categories
+branch-narrator risk-report --only security,db
+
+# Exclude tests category
+branch-narrator risk-report --exclude tests
+
+# Redact secrets in evidence
+branch-narrator risk-report --redact
+
+# Include score breakdown
+branch-narrator risk-report --explain-score
+```
+
+---
+
 ## Exit Codes
 
 | Code | Description |
@@ -311,6 +386,7 @@ branch-narrator pretty --help
 branch-narrator pr-body --help
 branch-narrator facts --help
 branch-narrator dump-diff --help
+branch-narrator risk-report --help
 
 # Show version
 branch-narrator --version
