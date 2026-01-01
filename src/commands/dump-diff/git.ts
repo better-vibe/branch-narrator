@@ -8,7 +8,15 @@ import {
   InvalidRefError,
   NotAGitRepoError,
 } from "../../core/errors.js";
-import type { DiffStatus, FileEntry } from "./core.js";
+import {
+  buildNameStatusArgs,
+  buildPerFileDiffArgs,
+  buildUntrackedDiffArgs,
+  parsePorcelainZForUntracked,
+  type DiffMode,
+  type DiffStatus,
+  type FileEntry,
+} from "./core.js";
 
 /**
  * Check if the current directory is inside a git repository.
@@ -79,66 +87,89 @@ export function parseNameStatus(output: string): FileEntry[] {
   return entries;
 }
 
+export interface GetNameStatusListOptions {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  cwd?: string;
+}
+
 /**
  * Get file list with status from git diff.
  */
 export async function getNameStatusList(
-  base: string,
-  head: string,
-  cwd: string = process.cwd()
+  options: GetNameStatusListOptions
 ): Promise<FileEntry[]> {
+  const cwd = options.cwd ?? process.cwd();
+
   // Validate git repo
   if (!(await isGitRepo(cwd))) {
     throw new NotAGitRepoError(cwd);
   }
 
-  // Validate refs
-  if (!(await refExists(base, cwd))) {
-    throw new InvalidRefError(base);
-  }
-  if (!(await refExists(head, cwd))) {
-    throw new InvalidRefError(head);
+  // Validate refs only for branch mode
+  if (options.mode === "branch") {
+    if (!options.base || !(await refExists(options.base, cwd))) {
+      throw new InvalidRefError(options.base ?? "undefined");
+    }
+    if (!options.head || !(await refExists(options.head, cwd))) {
+      throw new InvalidRefError(options.head ?? "undefined");
+    }
   }
 
+  const args = buildNameStatusArgs({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+  });
+
   try {
-    const result = await execa(
-      "git",
-      ["diff", "--name-status", "--find-renames", `${base}..${head}`],
-      { cwd }
-    );
+    const result = await execa("git", args, { cwd });
     return parseNameStatus(result.stdout);
   } catch (error) {
     if (error instanceof Error && "stderr" in error) {
       throw new GitCommandError(
-        `git diff --name-status ${base}..${head}`,
+        `git ${args.join(" ")}`,
         String((error as { stderr: unknown }).stderr)
       );
     }
     throw error;
   }
+}
+
+export interface GetFileDiffOptions {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  path: string;
+  oldPath?: string;
+  unified?: number;
+  cwd?: string;
 }
 
 /**
  * Get unified diff for a single file.
  */
-export async function getFileDiff(
-  base: string,
-  head: string,
-  path: string,
-  unified: number = 0,
-  cwd: string = process.cwd()
-): Promise<string> {
+export async function getFileDiff(options: GetFileDiffOptions): Promise<string> {
+  const cwd = options.cwd ?? process.cwd();
+  const unified = options.unified ?? 0;
+
+  const args = buildPerFileDiffArgs({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    unified,
+    path: options.path,
+    oldPath: options.oldPath,
+  });
+
   try {
-    const result = await execa(
-      "git",
-      ["diff", `--unified=${unified}`, "--find-renames", `${base}..${head}`, "--", path],
-      { cwd }
-    );
+    const result = await execa("git", args, { cwd });
     return result.stdout;
   } catch (error) {
     if (error instanceof Error && "stderr" in error) {
       throw new GitCommandError(
-        `git diff ${base}..${head} -- ${path}`,
+        `git ${args.join(" ")}`,
         String((error as { stderr: unknown }).stderr)
       );
     }
@@ -146,60 +177,42 @@ export async function getFileDiff(
   }
 }
 
-/**
- * Get unified diff for a renamed file (need to use old path).
- */
-export async function getRenamedFileDiff(
-  base: string,
-  head: string,
-  oldPath: string,
-  newPath: string,
-  unified: number = 0,
-  cwd: string = process.cwd()
-): Promise<string> {
-  try {
-    // For renames, we need to specify both paths or use the old path
-    const result = await execa(
-      "git",
-      [
-        "diff",
-        `--unified=${unified}`,
-        "--find-renames",
-        `${base}..${head}`,
-        "--",
-        oldPath,
-        newPath,
-      ],
-      { cwd }
-    );
-    return result.stdout;
-  } catch (error) {
-    if (error instanceof Error && "stderr" in error) {
-      throw new GitCommandError(
-        `git diff ${base}..${head} -- ${oldPath} ${newPath}`,
-        String((error as { stderr: unknown }).stderr)
-      );
-    }
-    throw error;
-  }
+export interface IsBinaryFileOptions {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  path: string;
+  cwd?: string;
 }
 
 /**
  * Check if a file is binary using git diff --numstat.
  * Binary files show "-" for additions/deletions.
  */
-export async function isBinaryFile(
-  base: string,
-  head: string,
-  path: string,
-  cwd: string = process.cwd()
-): Promise<boolean> {
+export async function isBinaryFile(options: IsBinaryFileOptions): Promise<boolean> {
+  const cwd = options.cwd ?? process.cwd();
+
+  // Build args similar to name-status but with --numstat
+  const args = ["diff", "--numstat", "--find-renames"];
+
+  switch (options.mode) {
+    case "branch":
+      args.push(`${options.base}..${options.head}`);
+      break;
+    case "unstaged":
+      break;
+    case "staged":
+      args.push("--staged");
+      break;
+    case "all":
+      args.push("HEAD");
+      break;
+  }
+
+  args.push("--", options.path);
+
   try {
-    const result = await execa(
-      "git",
-      ["diff", "--numstat", "--find-renames", `${base}..${head}`, "--", path],
-      { cwd, reject: false }
-    );
+    const result = await execa("git", args, { cwd, reject: false });
 
     // Binary files show: -\t-\tfilename
     const line = result.stdout.trim();
@@ -213,41 +226,110 @@ export async function isBinaryFile(
 }
 
 /**
- * Get the full unified diff for all files (used for text output).
+ * Get list of untracked files.
  */
-export async function getFullDiff(
-  base: string,
-  head: string,
-  paths: string[],
-  unified: number = 0,
+export async function getUntrackedFiles(
   cwd: string = process.cwd()
-): Promise<string> {
-  if (paths.length === 0) {
-    return "";
-  }
-
+): Promise<string[]> {
   try {
     const result = await execa(
       "git",
-      [
-        "diff",
-        `--unified=${unified}`,
-        "--find-renames",
-        `${base}..${head}`,
-        "--",
-        ...paths,
-      ],
+      ["status", "--porcelain=v1", "-z"],
       { cwd }
     );
+    return parsePorcelainZForUntracked(result.stdout);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get diff for an untracked file using --no-index.
+ */
+export async function getUntrackedFileDiff(
+  path: string,
+  unified: number = 0,
+  cwd: string = process.cwd()
+): Promise<string> {
+  const args = buildUntrackedDiffArgs(path, unified);
+
+  try {
+    // git diff --no-index returns exit code 1 when there are differences
+    const result = await execa("git", args, { cwd, reject: false });
+    return result.stdout;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Check if an untracked file is binary.
+ * We check by trying to get the diff - if it contains "Binary files" it's binary.
+ */
+export async function isUntrackedBinaryFile(
+  path: string,
+  cwd: string = process.cwd()
+): Promise<boolean> {
+  try {
+    const result = await execa(
+      "git",
+      ["diff", "--no-index", "--", "/dev/null", path],
+      { cwd, reject: false }
+    );
+    return result.stdout.includes("Binary files");
+  } catch {
+    return false;
+  }
+}
+
+export interface GetFullDiffOptions {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  paths: string[];
+  unified?: number;
+  cwd?: string;
+}
+
+/**
+ * Get the full unified diff for all files (used for text output).
+ */
+export async function getFullDiff(options: GetFullDiffOptions): Promise<string> {
+  const cwd = options.cwd ?? process.cwd();
+  const unified = options.unified ?? 0;
+
+  if (options.paths.length === 0) {
+    return "";
+  }
+
+  const args = ["diff", `--unified=${unified}`, "--find-renames"];
+
+  switch (options.mode) {
+    case "branch":
+      args.push(`${options.base}..${options.head}`);
+      break;
+    case "unstaged":
+      break;
+    case "staged":
+      args.push("--staged");
+      break;
+    case "all":
+      args.push("HEAD");
+      break;
+  }
+
+  args.push("--", ...options.paths);
+
+  try {
+    const result = await execa("git", args, { cwd });
     return result.stdout;
   } catch (error) {
     if (error instanceof Error && "stderr" in error) {
       throw new GitCommandError(
-        `git diff ${base}..${head}`,
+        `git ${args.join(" ")}`,
         String((error as { stderr: unknown }).stderr)
       );
     }
     throw error;
   }
 }
-

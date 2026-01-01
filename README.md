@@ -64,11 +64,23 @@ branch-narrator facts | jq '.riskScore.level'
 ### Dump Diff for AI Agents
 
 ```bash
-# Output prompt-ready diff to stdout
+# Output prompt-ready diff to stdout (branch mode, default)
 branch-narrator dump-diff
 
 # Write to file
 branch-narrator dump-diff --out .ai/diff.txt
+
+# Unstaged changes (working tree vs index)
+branch-narrator dump-diff --mode unstaged --out .ai/diff.txt
+
+# Staged changes only (index vs HEAD)
+branch-narrator dump-diff --mode staged --format md --out .ai/staged.md
+
+# All changes since HEAD (staged + unstaged + untracked)
+branch-narrator dump-diff --mode all --out .ai/all-changes.txt
+
+# Exclude untracked files
+branch-narrator dump-diff --mode all --no-untracked --out .ai/diff.txt
 
 # Chunk large diffs for context windows
 branch-narrator dump-diff --max-chars 25000 --chunk-dir .ai/diff-chunks
@@ -122,8 +134,10 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
+| `--mode <type>` | `branch` | Mode: `branch`, `unstaged`, `staged`, or `all` |
+| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
+| `--no-untracked` | (off) | Exclude untracked files (non-branch modes) |
 | `--out <path>` | stdout | Write output to file |
 | `--format <type>` | `text` | Format: `text`, `md`, or `json` |
 | `--unified <n>` | `0` | Lines of unified context |
@@ -133,6 +147,12 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 | `--chunk-dir <path>` | `.ai/diff-chunks` | Directory for chunks |
 | `--name <prefix>` | `diff` | Chunk file prefix |
 | `--dry-run` | `false` | Preview without writing |
+
+**Modes:**
+- `branch` (default): Compare `--base` to `--head` refs
+- `unstaged`: Working tree vs index (uncommitted changes)
+- `staged`: Index vs HEAD (staged changes)
+- `all`: Working tree vs HEAD (all uncommitted changes)
 
 **Default exclusions:** lockfiles, `.d.ts`, logs, `dist/`, `build/`, `.svelte-kit/`, `.next/`, minified files, sourcemaps, binaries.
 

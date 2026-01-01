@@ -14,6 +14,7 @@ import {
   renderMarkdown,
   renderText,
   type DiffFileEntry,
+  type DiffMode,
   type DumpDiffOutput,
   type FileEntry,
   type SkippedEntry,
@@ -22,8 +23,10 @@ import {
   getFileDiff,
   getFullDiff,
   getNameStatusList,
-  getRenamedFileDiff,
+  getUntrackedFileDiff,
+  getUntrackedFiles,
   isBinaryFile,
+  isUntrackedBinaryFile,
 } from "./git.js";
 
 // ============================================================================
@@ -31,6 +34,7 @@ import {
 // ============================================================================
 
 export interface DumpDiffOptions {
+  mode: DiffMode;
   base: string;
   head: string;
   out?: string;
@@ -42,6 +46,7 @@ export interface DumpDiffOptions {
   chunkDir: string;
   name: string;
   dryRun: boolean;
+  includeUntracked: boolean;
   cwd?: string;
 }
 
@@ -63,17 +68,46 @@ export interface DryRunResult {
 export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
-  // Get file list from git
-  const allFiles = await getNameStatusList(options.base, options.head, cwd);
+  // Warn if base/head provided with non-branch mode
+  if (options.mode !== "branch") {
+    const baseProvided = options.base !== "main";
+    const headProvided = options.head !== "HEAD";
+    if (baseProvided || headProvided) {
+      console.error(
+        `Warning: --base and --head are ignored when --mode is "${options.mode}"`
+      );
+    }
+  }
 
-  if (allFiles.length === 0) {
-    console.log("No changes found between refs.");
+  // Get file list from git
+  const allFiles = await getNameStatusList({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    cwd,
+  });
+
+  // Get untracked files if requested
+  let untrackedFiles: FileEntry[] = [];
+  if (options.includeUntracked && options.mode !== "branch") {
+    const untrackedPaths = await getUntrackedFiles(cwd);
+    untrackedFiles = untrackedPaths.map((path) => ({
+      path,
+      status: "A" as const,
+      untracked: true,
+    }));
+  }
+
+  const combinedFiles = [...allFiles, ...untrackedFiles];
+
+  if (combinedFiles.length === 0) {
+    console.log("No changes found.");
     return;
   }
 
   // Filter files
   const { included, skipped } = filterPaths({
-    files: allFiles,
+    files: combinedFiles,
     includeGlobs: options.include,
     excludeGlobs: options.exclude,
     defaultExcludes: DEFAULT_EXCLUDES,
@@ -84,12 +118,20 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
   const binarySkipped: SkippedEntry[] = [];
 
   for (const file of included) {
-    const isBinary = await isBinaryFile(
-      options.base,
-      options.head,
-      file.path,
-      cwd
-    );
+    let isBinary: boolean;
+
+    if (file.untracked) {
+      isBinary = await isUntrackedBinaryFile(file.path, cwd);
+    } else {
+      isBinary = await isBinaryFile({
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        path: file.path,
+        cwd,
+      });
+    }
+
     if (isBinary) {
       binarySkipped.push({ path: file.path, reason: "binary" });
     } else {
@@ -106,19 +148,13 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
   }
 
   // Fetch diffs for included files
-  const entries = await fetchDiffs(
-    options.base,
-    options.head,
-    textFiles,
-    options.unified,
-    cwd
-  );
+  const entries = await fetchDiffs(options, textFiles, cwd);
 
   // Handle output based on format
   if (options.format === "json") {
-    await handleJsonOutput(options, entries, allSkipped, allFiles.length);
+    await handleJsonOutput(options, entries, allSkipped, combinedFiles.length);
   } else {
-    await handleTextOrMdOutput(options, entries, allSkipped, allFiles.length, cwd);
+    await handleTextOrMdOutput(options, entries, allSkipped, combinedFiles.length, cwd);
   }
 }
 
@@ -130,10 +166,8 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
  * Fetch diffs for all included files.
  */
 async function fetchDiffs(
-  base: string,
-  head: string,
+  options: DumpDiffOptions,
   files: FileEntry[],
-  unified: number,
   cwd: string
 ): Promise<DiffFileEntry[]> {
   const entries: DiffFileEntry[] = [];
@@ -141,17 +175,18 @@ async function fetchDiffs(
   for (const file of files) {
     let diff: string;
 
-    if (file.status === "R" && file.oldPath) {
-      diff = await getRenamedFileDiff(
-        base,
-        head,
-        file.oldPath,
-        file.path,
-        unified,
-        cwd
-      );
+    if (file.untracked) {
+      diff = await getUntrackedFileDiff(file.path, options.unified, cwd);
     } else {
-      diff = await getFileDiff(base, head, file.path, unified, cwd);
+      diff = await getFileDiff({
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        path: file.path,
+        oldPath: file.oldPath,
+        unified: options.unified,
+        cwd,
+      });
     }
 
     entries.push({
@@ -159,6 +194,7 @@ async function fetchDiffs(
       oldPath: file.oldPath,
       status: file.status,
       diff,
+      untracked: file.untracked,
     });
   }
 
@@ -178,32 +214,47 @@ async function handleDryRun(
   let estimatedChars = 0;
 
   if (included.length > 0) {
-    // For estimation, get the full diff which is faster than per-file
-    const paths = included.map((f) => f.path);
-    const fullDiff = await getFullDiff(
-      options.base,
-      options.head,
-      paths,
-      options.unified,
-      cwd
-    );
-    estimatedChars = fullDiff.length;
+    // For tracked files, get the full diff which is faster than per-file
+    const trackedPaths = included.filter((f) => !f.untracked).map((f) => f.path);
+    if (trackedPaths.length > 0) {
+      const fullDiff = await getFullDiff({
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        paths: trackedPaths,
+        unified: options.unified,
+        cwd,
+      });
+      estimatedChars += fullDiff.length;
+    }
+
+    // For untracked files, estimate based on file count (rough estimate)
+    const untrackedCount = included.filter((f) => f.untracked).length;
+    if (untrackedCount > 0) {
+      // Rough estimate: ~500 chars per untracked file on average
+      estimatedChars += untrackedCount * 500;
+    }
   }
 
   const wouldChunk =
     options.maxChars !== undefined && estimatedChars > options.maxChars;
 
   console.log("=== Dry Run ===\n");
-  console.log(`Base: ${options.base}`);
-  console.log(`Head: ${options.head}`);
+  console.log(`Mode: ${options.mode}`);
+  if (options.mode === "branch") {
+    console.log(`Base: ${options.base}`);
+    console.log(`Head: ${options.head}`);
+  }
   console.log(`Format: ${options.format}`);
   console.log(`Unified context: ${options.unified} lines`);
+  console.log(`Include untracked: ${options.includeUntracked}`);
   console.log("");
 
   console.log(`Files included (${included.length}):`);
   for (const file of included) {
     const status = getStatusEmoji(file.status);
-    console.log(`  ${status} ${file.path}`);
+    const untrackedLabel = file.untracked ? " [untracked]" : "";
+    console.log(`  ${status} ${file.path}${untrackedLabel}`);
   }
   console.log("");
 
@@ -254,9 +305,10 @@ async function handleJsonOutput(
   }
 
   const output: DumpDiffOutput = {
-    schemaVersion: "1.0",
-    base: options.base,
-    head: options.head,
+    schemaVersion: "1.1",
+    mode: options.mode,
+    base: options.mode === "branch" ? options.base : null,
+    head: options.mode === "branch" ? options.head : null,
     unified: options.unified,
     included: entries,
     skipped: skipped,
@@ -289,8 +341,9 @@ async function handleTextOrMdOutput(
   _cwd: string
 ): Promise<void> {
   const renderOpts = {
-    base: options.base,
-    head: options.head,
+    mode: options.mode,
+    base: options.mode === "branch" ? options.base : null,
+    head: options.mode === "branch" ? options.head : null,
     unified: options.unified,
     excludePatterns: [...DEFAULT_EXCLUDES, ...options.exclude],
   };
@@ -315,10 +368,16 @@ async function handleTextOrMdOutput(
 
       let content: string;
       if (options.format === "md") {
-        content = renderMarkdown(chunk, {
+        // For chunked markdown, update the header to indicate chunk number
+        const chunkRenderOpts = {
           ...renderOpts,
-          base: `${options.base} (chunk ${i + 1}/${chunks.length})`,
-        });
+          // Append chunk info if branch mode
+          base:
+            options.mode === "branch"
+              ? `${options.base} (chunk ${i + 1}/${chunks.length})`
+              : null,
+        };
+        content = renderMarkdown(chunk, chunkRenderOpts);
       } else {
         content = renderText(chunk);
       }
@@ -377,10 +436,14 @@ function getStatusEmoji(status: string): string {
 
 // Re-export types and utilities for testing
 export {
+  buildNameStatusArgs,
+  buildPerFileDiffArgs,
+  buildUntrackedDiffArgs,
   calculateTotalChars,
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
+  parsePorcelainZForUntracked,
   renderJson,
   renderMarkdown,
   renderText,
@@ -388,9 +451,9 @@ export {
 export { parseNameStatus } from "./git.js";
 export type {
   DiffFileEntry,
+  DiffMode,
   DumpDiffOutput,
   FileEntry,
   FilterResult,
   SkippedEntry,
 } from "./core.js";
-

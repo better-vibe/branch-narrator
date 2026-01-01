@@ -5,15 +5,20 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  buildNameStatusArgs,
+  buildPerFileDiffArgs,
+  buildUntrackedDiffArgs,
   calculateTotalChars,
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
   parseNameStatus,
+  parsePorcelainZForUntracked,
   renderJson,
   renderMarkdown,
   renderText,
   type DiffFileEntry,
+  type DiffMode,
   type DumpDiffOutput,
   type FileEntry,
 } from "../src/commands/dump-diff/index.js";
@@ -25,19 +30,219 @@ import {
 function createFileEntry(
   path: string,
   status: "A" | "M" | "D" | "R" = "M",
-  oldPath?: string
+  oldPath?: string,
+  untracked?: boolean
 ): FileEntry {
-  return { path, status, oldPath };
+  return { path, status, oldPath, untracked };
 }
 
 function createDiffEntry(
   path: string,
   diff: string,
   status: "A" | "M" | "D" | "R" = "M",
-  oldPath?: string
+  oldPath?: string,
+  untracked?: boolean
 ): DiffFileEntry {
-  return { path, status, diff, oldPath };
+  return { path, status, diff, oldPath, untracked };
 }
+
+// ============================================================================
+// buildNameStatusArgs Tests
+// ============================================================================
+
+describe("buildNameStatusArgs", () => {
+  it("should return correct args for branch mode", () => {
+    const result = buildNameStatusArgs({
+      mode: "branch",
+      base: "main",
+      head: "feature",
+    });
+
+    expect(result).toEqual([
+      "diff",
+      "--name-status",
+      "--find-renames",
+      "main..feature",
+    ]);
+  });
+
+  it("should return correct args for unstaged mode", () => {
+    const result = buildNameStatusArgs({ mode: "unstaged" });
+
+    expect(result).toEqual(["diff", "--name-status", "--find-renames"]);
+  });
+
+  it("should return correct args for staged mode", () => {
+    const result = buildNameStatusArgs({ mode: "staged" });
+
+    expect(result).toEqual([
+      "diff",
+      "--name-status",
+      "--find-renames",
+      "--staged",
+    ]);
+  });
+
+  it("should return correct args for all mode", () => {
+    const result = buildNameStatusArgs({ mode: "all" });
+
+    expect(result).toEqual(["diff", "--name-status", "--find-renames", "HEAD"]);
+  });
+});
+
+// ============================================================================
+// buildPerFileDiffArgs Tests
+// ============================================================================
+
+describe("buildPerFileDiffArgs", () => {
+  it("should return correct args for branch mode", () => {
+    const result = buildPerFileDiffArgs({
+      mode: "branch",
+      base: "main",
+      head: "feature",
+      unified: 3,
+      path: "src/index.ts",
+    });
+
+    expect(result).toEqual([
+      "diff",
+      "--unified=3",
+      "--find-renames",
+      "main..feature",
+      "--",
+      "src/index.ts",
+    ]);
+  });
+
+  it("should return correct args for unstaged mode", () => {
+    const result = buildPerFileDiffArgs({
+      mode: "unstaged",
+      unified: 0,
+      path: "src/index.ts",
+    });
+
+    expect(result).toEqual([
+      "diff",
+      "--unified=0",
+      "--find-renames",
+      "--",
+      "src/index.ts",
+    ]);
+  });
+
+  it("should return correct args for staged mode", () => {
+    const result = buildPerFileDiffArgs({
+      mode: "staged",
+      unified: 5,
+      path: "src/index.ts",
+    });
+
+    expect(result).toEqual([
+      "diff",
+      "--unified=5",
+      "--find-renames",
+      "--staged",
+      "--",
+      "src/index.ts",
+    ]);
+  });
+
+  it("should return correct args for all mode", () => {
+    const result = buildPerFileDiffArgs({
+      mode: "all",
+      unified: 0,
+      path: "src/index.ts",
+    });
+
+    expect(result).toEqual([
+      "diff",
+      "--unified=0",
+      "--find-renames",
+      "HEAD",
+      "--",
+      "src/index.ts",
+    ]);
+  });
+
+  it("should include oldPath for renames", () => {
+    const result = buildPerFileDiffArgs({
+      mode: "branch",
+      base: "main",
+      head: "HEAD",
+      unified: 0,
+      path: "src/new-name.ts",
+      oldPath: "src/old-name.ts",
+    });
+
+    expect(result).toEqual([
+      "diff",
+      "--unified=0",
+      "--find-renames",
+      "main..HEAD",
+      "--",
+      "src/old-name.ts",
+      "src/new-name.ts",
+    ]);
+  });
+});
+
+// ============================================================================
+// buildUntrackedDiffArgs Tests
+// ============================================================================
+
+describe("buildUntrackedDiffArgs", () => {
+  it("should return correct args for untracked file", () => {
+    const result = buildUntrackedDiffArgs("src/new-file.ts", 0);
+
+    expect(result).toEqual([
+      "diff",
+      "--no-index",
+      "--unified=0",
+      "--",
+      "/dev/null",
+      "src/new-file.ts",
+    ]);
+  });
+
+  it("should use specified unified context", () => {
+    const result = buildUntrackedDiffArgs("src/new-file.ts", 5);
+
+    expect(result).toContain("--unified=5");
+  });
+});
+
+// ============================================================================
+// parsePorcelainZForUntracked Tests
+// ============================================================================
+
+describe("parsePorcelainZForUntracked", () => {
+  it("should parse untracked files from porcelain output", () => {
+    // NUL-separated output with ?? prefix for untracked
+    const output = "?? src/new-file.ts\0?? docs/readme.md\0";
+    const result = parsePorcelainZForUntracked(output);
+
+    expect(result).toEqual(["src/new-file.ts", "docs/readme.md"]);
+  });
+
+  it("should ignore non-untracked entries", () => {
+    // Mix of tracked and untracked
+    const output = "M  src/modified.ts\0?? src/new-file.ts\0A  src/added.ts\0";
+    const result = parsePorcelainZForUntracked(output);
+
+    expect(result).toEqual(["src/new-file.ts"]);
+  });
+
+  it("should handle empty output", () => {
+    expect(parsePorcelainZForUntracked("")).toEqual([]);
+  });
+
+  it("should handle output with no untracked files", () => {
+    const output = "M  src/modified.ts\0A  src/added.ts\0";
+    const result = parsePorcelainZForUntracked(output);
+
+    expect(result).toEqual([]);
+  });
+});
 
 // ============================================================================
 // Default Exclusion Matching Tests
@@ -231,6 +436,27 @@ describe("filterPaths - include/exclude precedence", () => {
 
     expect(result.included.map((f) => f.path)).toEqual(["a.ts", "m.ts", "z.ts"]);
   });
+
+  it("should filter untracked files same as tracked files", () => {
+    const files = [
+      createFileEntry("src/index.ts", "A", undefined, true), // untracked
+      createFileEntry("pnpm-lock.yaml", "A", undefined, true), // untracked lockfile
+      createFileEntry("src/utils.ts", "M"), // tracked
+    ];
+
+    const result = filterPaths({
+      files,
+      includeGlobs: [],
+      excludeGlobs: [],
+      defaultExcludes: DEFAULT_EXCLUDES,
+    });
+
+    expect(result.included).toHaveLength(2);
+    expect(result.included.map((f) => f.path)).toContain("src/index.ts");
+    expect(result.included.map((f) => f.path)).toContain("src/utils.ts");
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]!.path).toBe("pnpm-lock.yaml");
+  });
 });
 
 // ============================================================================
@@ -312,13 +538,14 @@ describe("chunkByBudget", () => {
 });
 
 // ============================================================================
-// JSON Schema Tests
+// JSON Schema Tests (v1.1)
 // ============================================================================
 
 describe("renderJson - schema validation", () => {
-  it("should produce valid JSON with all required fields", () => {
+  it("should produce valid JSON with schemaVersion 1.1 and mode", () => {
     const output: DumpDiffOutput = {
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
+      mode: "branch",
       base: "main",
       head: "HEAD",
       unified: 3,
@@ -344,7 +571,8 @@ describe("renderJson - schema validation", () => {
     const json = renderJson(output);
     const parsed = JSON.parse(json);
 
-    expect(parsed.schemaVersion).toBe("1.0");
+    expect(parsed.schemaVersion).toBe("1.1");
+    expect(parsed.mode).toBe("branch");
     expect(parsed.base).toBe("main");
     expect(parsed.head).toBe("HEAD");
     expect(parsed.unified).toBe(3);
@@ -359,9 +587,61 @@ describe("renderJson - schema validation", () => {
     expect(parsed.stats.chars).toBe(50);
   });
 
+  it("should have null base/head for non-branch modes", () => {
+    const output: DumpDiffOutput = {
+      schemaVersion: "1.1",
+      mode: "unstaged",
+      base: null,
+      head: null,
+      unified: 0,
+      included: [],
+      skipped: [],
+      stats: {
+        filesConsidered: 0,
+        filesIncluded: 0,
+        filesSkipped: 0,
+        chars: 0,
+      },
+    };
+
+    const json = renderJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.mode).toBe("unstaged");
+    expect(parsed.base).toBeNull();
+    expect(parsed.head).toBeNull();
+  });
+
+  it("should handle all mode values", () => {
+    const modes: DiffMode[] = ["branch", "unstaged", "staged", "all"];
+
+    for (const mode of modes) {
+      const output: DumpDiffOutput = {
+        schemaVersion: "1.1",
+        mode,
+        base: mode === "branch" ? "main" : null,
+        head: mode === "branch" ? "HEAD" : null,
+        unified: 0,
+        included: [],
+        skipped: [],
+        stats: {
+          filesConsidered: 0,
+          filesIncluded: 0,
+          filesSkipped: 0,
+          chars: 0,
+        },
+      };
+
+      const json = renderJson(output);
+      const parsed = JSON.parse(json);
+      expect(parsed.mode).toBe(mode);
+    }
+  });
+
   it("should handle renamed files with oldPath", () => {
     const output: DumpDiffOutput = {
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
+      mode: "branch",
       base: "main",
       head: "feature",
       unified: 0,
@@ -389,9 +669,40 @@ describe("renderJson - schema validation", () => {
     expect(parsed.included[0].status).toBe("R");
   });
 
+  it("should include untracked flag for untracked files", () => {
+    const output: DumpDiffOutput = {
+      schemaVersion: "1.1",
+      mode: "all",
+      base: null,
+      head: null,
+      unified: 0,
+      included: [
+        {
+          path: "src/new-file.ts",
+          status: "A",
+          diff: "new file diff",
+          untracked: true,
+        },
+      ],
+      skipped: [],
+      stats: {
+        filesConsidered: 1,
+        filesIncluded: 1,
+        filesSkipped: 0,
+        chars: 13,
+      },
+    };
+
+    const json = renderJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.included[0].untracked).toBe(true);
+  });
+
   it("should include all skip reasons", () => {
     const output: DumpDiffOutput = {
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
+      mode: "branch",
       base: "main",
       head: "HEAD",
       unified: 0,
@@ -508,9 +819,10 @@ describe("renderText", () => {
 });
 
 describe("renderMarkdown", () => {
-  it("should include header with base and head", () => {
+  it("should include mode-specific header for branch mode", () => {
     const entries = [createDiffEntry("a.ts", "diff content")];
     const result = renderMarkdown(entries, {
+      mode: "branch",
       base: "main",
       head: "feature",
       unified: 3,
@@ -518,7 +830,50 @@ describe("renderMarkdown", () => {
     });
 
     expect(result).toContain("# Git Diff: main..feature");
+    expect(result).toContain("**Mode:** branch");
     expect(result).toContain("**Unified context:** 3 lines");
+  });
+
+  it("should show unstaged mode header", () => {
+    const entries = [createDiffEntry("a.ts", "diff content")];
+    const result = renderMarkdown(entries, {
+      mode: "unstaged",
+      base: null,
+      head: null,
+      unified: 0,
+      excludePatterns: [],
+    });
+
+    expect(result).toContain("# Git Diff: Unstaged Changes (working tree vs index)");
+    expect(result).toContain("**Mode:** unstaged");
+  });
+
+  it("should show staged mode header", () => {
+    const entries = [createDiffEntry("a.ts", "diff content")];
+    const result = renderMarkdown(entries, {
+      mode: "staged",
+      base: null,
+      head: null,
+      unified: 0,
+      excludePatterns: [],
+    });
+
+    expect(result).toContain("# Git Diff: Staged Changes (index vs HEAD)");
+    expect(result).toContain("**Mode:** staged");
+  });
+
+  it("should show all mode header", () => {
+    const entries = [createDiffEntry("a.ts", "diff content")];
+    const result = renderMarkdown(entries, {
+      mode: "all",
+      base: null,
+      head: null,
+      unified: 0,
+      excludePatterns: [],
+    });
+
+    expect(result).toContain("# Git Diff: All Changes (working tree vs HEAD)");
+    expect(result).toContain("**Mode:** all");
   });
 
   it("should list files with status", () => {
@@ -530,6 +885,7 @@ describe("renderMarkdown", () => {
     ];
 
     const result = renderMarkdown(entries, {
+      mode: "branch",
       base: "main",
       head: "HEAD",
       unified: 0,
@@ -542,9 +898,26 @@ describe("renderMarkdown", () => {
     expect(result).toContain("`src/renamed.ts` (renamed)");
   });
 
+  it("should mark untracked files", () => {
+    const entries = [
+      createDiffEntry("src/new-file.ts", "diff", "A", undefined, true),
+    ];
+
+    const result = renderMarkdown(entries, {
+      mode: "all",
+      base: null,
+      head: null,
+      unified: 0,
+      excludePatterns: [],
+    });
+
+    expect(result).toContain("`src/new-file.ts` (added [untracked])");
+  });
+
   it("should wrap diff in fenced code block", () => {
     const entries = [createDiffEntry("a.ts", "--- a/a.ts\n+++ b/a.ts")];
     const result = renderMarkdown(entries, {
+      mode: "branch",
       base: "main",
       head: "HEAD",
       unified: 0,
@@ -559,6 +932,7 @@ describe("renderMarkdown", () => {
   it("should show excluded patterns when provided", () => {
     const entries = [createDiffEntry("a.ts", "diff")];
     const result = renderMarkdown(entries, {
+      mode: "branch",
       base: "main",
       head: "HEAD",
       unified: 0,
@@ -588,4 +962,3 @@ describe("calculateTotalChars", () => {
     expect(calculateTotalChars([])).toBe(0);
   });
 });
-

@@ -10,10 +10,13 @@ import picomatch from "picomatch";
 
 export type DiffStatus = "A" | "M" | "D" | "R";
 
+export type DiffMode = "branch" | "unstaged" | "staged" | "all";
+
 export interface FileEntry {
   path: string;
   oldPath?: string;
   status: DiffStatus;
+  untracked?: boolean;
 }
 
 export interface DiffFileEntry extends FileEntry {
@@ -32,9 +35,10 @@ export interface SkippedEntry {
 }
 
 export interface DumpDiffOutput {
-  schemaVersion: "1.0";
-  base: string;
-  head: string;
+  schemaVersion: "1.1";
+  mode: DiffMode;
+  base: string | null;
+  head: string | null;
   unified: number;
   included: DiffFileEntry[];
   skipped: SkippedEntry[];
@@ -59,8 +63,9 @@ export interface FilterOptions {
 }
 
 export interface RenderOptions {
-  base: string;
-  head: string;
+  mode: DiffMode;
+  base: string | null;
+  head: string | null;
   unified: number;
   excludePatterns: string[];
 }
@@ -93,6 +98,116 @@ export const DEFAULT_EXCLUDES = [
   // Sourcemaps
   "**/*.map",
 ];
+
+// ============================================================================
+// Git Argument Builders (Pure Functions)
+// ============================================================================
+
+export interface NameStatusArgsOptions {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+}
+
+/**
+ * Build git diff --name-status arguments for a given mode.
+ */
+export function buildNameStatusArgs(opts: NameStatusArgsOptions): string[] {
+  const args = ["diff", "--name-status", "--find-renames"];
+
+  switch (opts.mode) {
+    case "branch":
+      args.push(`${opts.base}..${opts.head}`);
+      break;
+    case "unstaged":
+      // Working tree vs index (no additional args)
+      break;
+    case "staged":
+      args.push("--staged");
+      break;
+    case "all":
+      args.push("HEAD");
+      break;
+  }
+
+  return args;
+}
+
+export interface PerFileDiffArgsOptions {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  unified: number;
+  path: string;
+  oldPath?: string;
+}
+
+/**
+ * Build git diff arguments for a single file in a given mode.
+ */
+export function buildPerFileDiffArgs(opts: PerFileDiffArgsOptions): string[] {
+  const args = ["diff", `--unified=${opts.unified}`, "--find-renames"];
+
+  switch (opts.mode) {
+    case "branch":
+      args.push(`${opts.base}..${opts.head}`);
+      break;
+    case "unstaged":
+      // Working tree vs index (no additional args)
+      break;
+    case "staged":
+      args.push("--staged");
+      break;
+    case "all":
+      args.push("HEAD");
+      break;
+  }
+
+  args.push("--");
+
+  // For renames, include both old and new paths
+  if (opts.oldPath) {
+    args.push(opts.oldPath);
+  }
+  args.push(opts.path);
+
+  return args;
+}
+
+/**
+ * Build git diff --no-index arguments for untracked files.
+ */
+export function buildUntrackedDiffArgs(
+  path: string,
+  unified: number
+): string[] {
+  return ["diff", "--no-index", `--unified=${unified}`, "--", "/dev/null", path];
+}
+
+/**
+ * Parse git status --porcelain=v1 -z output for untracked files.
+ * Untracked entries start with "?? ".
+ */
+export function parsePorcelainZForUntracked(output: string): string[] {
+  if (!output) {
+    return [];
+  }
+
+  const paths: string[] = [];
+  // -z uses NUL as separator
+  const entries = output.split("\0");
+
+  for (const entry of entries) {
+    if (!entry) continue;
+
+    // Untracked files start with "?? "
+    if (entry.startsWith("?? ")) {
+      paths.push(entry.slice(3));
+    }
+  }
+
+  return paths;
+}
 
 // ============================================================================
 // Path Filtering
@@ -229,6 +344,22 @@ export function renderText(entries: DiffFileEntry[]): string {
 }
 
 /**
+ * Get header title based on mode.
+ */
+function getModeHeader(options: RenderOptions): string {
+  switch (options.mode) {
+    case "branch":
+      return `Git Diff: ${options.base}..${options.head}`;
+    case "unstaged":
+      return "Git Diff: Unstaged Changes (working tree vs index)";
+    case "staged":
+      return "Git Diff: Staged Changes (index vs HEAD)";
+    case "all":
+      return "Git Diff: All Changes (working tree vs HEAD)";
+  }
+}
+
+/**
  * Render entries as markdown with fenced code block.
  */
 export function renderMarkdown(
@@ -238,8 +369,9 @@ export function renderMarkdown(
   const lines: string[] = [];
 
   // Header
-  lines.push(`# Git Diff: ${options.base}..${options.head}`);
+  lines.push(`# ${getModeHeader(options)}`);
   lines.push("");
+  lines.push(`**Mode:** ${options.mode}`);
   lines.push(`**Unified context:** ${options.unified} lines`);
 
   if (options.excludePatterns.length > 0) {
@@ -254,7 +386,8 @@ export function renderMarkdown(
   lines.push("");
   for (const entry of entries) {
     const statusLabel = getStatusLabel(entry.status);
-    lines.push(`- \`${entry.path}\` (${statusLabel})`);
+    const untrackedLabel = entry.untracked ? " [untracked]" : "";
+    lines.push(`- \`${entry.path}\` (${statusLabel}${untrackedLabel})`);
   }
   lines.push("");
 

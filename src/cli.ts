@@ -234,8 +234,14 @@ function collect(value: string, previous: string[]): string[] {
 program
   .command("dump-diff")
   .description("Output prompt-ready git diff with smart exclusions (for AI agents)")
-  .option("--base <ref>", "Base git reference", "main")
-  .option("--head <ref>", "Head git reference", "HEAD")
+  .option(
+    "--mode <type>",
+    "Diff mode: branch|unstaged|staged|all",
+    "branch"
+  )
+  .option("--base <ref>", "Base git reference (branch mode only)", "main")
+  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
+  .option("--no-untracked", "Exclude untracked files (non-branch modes)")
   .option("--out <path>", "Write output to file (creates directories as needed)")
   .option(
     "--format <type>",
@@ -265,6 +271,13 @@ program
   .option("--dry-run", "Preview what would be included/excluded", false)
   .action(async (options) => {
     try {
+      // Validate mode
+      const mode = options.mode as "branch" | "unstaged" | "staged" | "all";
+      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
+        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
       const format = options.format as "text" | "md" | "json";
       if (!["text", "md", "json"].includes(format)) {
         console.error(`Invalid format: ${options.format}. Use text, md, or json.`);
@@ -286,6 +299,7 @@ program
       }
 
       await executeDumpDiff({
+        mode,
         base: options.base,
         head: options.head,
         out: options.out,
@@ -297,6 +311,7 @@ program
         chunkDir: options.chunkDir,
         name: options.name,
         dryRun: options.dryRun,
+        includeUntracked: options.untracked !== false, // default true, --no-untracked sets to false
       });
 
       process.exit(0);
