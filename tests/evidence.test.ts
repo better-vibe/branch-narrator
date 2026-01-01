@@ -57,14 +57,15 @@ describe("createEvidence", () => {
 
 describe("redactSecrets", () => {
   it("should redact Stripe API keys", () => {
-    const text = 'const key = "[REDACTED]"';
+    // Note: Using TESTKEY to avoid triggering secret scanners
+    const text = 'const key = "sk_live_TESTKEY1234567890ABCDEFGHIJKLMN"';
     const redacted = redactSecrets(text);
 
     expect(redacted).toBe('const key = "sk_live_***REDACTED***"');
   });
 
   it("should redact test Stripe keys", () => {
-    const text = "pk_test_FAKE12345678901234567890123";
+    const text = "pk_test_EXAMPLEKEY12345678901234567";
     const redacted = redactSecrets(text);
 
     expect(redacted).toContain("pk_test_***REDACTED***");
