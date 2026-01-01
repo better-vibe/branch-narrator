@@ -246,9 +246,8 @@ describe("executeIntegrate - force mode", () => {
       cwd: tempDir,
     };
 
-    // Should throw an error
-    await expect(executeIntegrate(options)).rejects.toThrow(/already exists/);
-    await expect(executeIntegrate(options)).rejects.toThrow(/--force/);
+    // Should throw an error containing both messages
+    await expect(executeIntegrate(options)).rejects.toThrow(/already exists.*--force/s);
   });
 
   it("should overwrite files with --force", async () => {
