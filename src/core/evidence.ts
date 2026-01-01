@@ -52,27 +52,34 @@ export function redactEvidence(evidence: Evidence): Evidence {
 export function redactSecrets(text: string): string {
   let redacted = text;
 
-  // Stripe-like keys
+  // Stripe-like keys (must be at least 24 chars after prefix)
   redacted = redacted.replace(
-    /\b(sk|pk|rk)_(live|test)_[A-Za-z0-9]{20,}/g,
+    /\b(sk|pk|rk)_(live|test)_[A-Za-z0-9]{24,}/g,
     "$1_$2_***REDACTED***"
   );
 
-  // JWT tokens
+  // JWT tokens (must have 3 base64 parts separated by dots)
   redacted = redacted.replace(
-    /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/g,
+    /\beyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}/g,
     "eyJ***REDACTED***"
   );
 
-  // AWS keys
+  // AWS keys (exactly 20 chars: AKIA + 16 alphanumeric)
   redacted = redacted.replace(
-    /\bAKIA[0-9A-Z]{16}/g,
+    /\bAKIA[0-9A-Z]{16}\b/g,
     "AKIA***REDACTED***"
   );
 
-  // Generic secret patterns (preserve key name)
+  // Generic secret patterns (only match assignment contexts)
+  // Match: password=value, secret: value, token="value", api_key='value'
   redacted = redacted.replace(
-    /(password|secret|token|key|apikey|api_key)(\s*[:=]\s*)["']?[^"'\s]+["']?/gi,
+    /(password|secret|token|apikey|api_key)(\s*[:=]\s*)(["'])([^"']+)\3/gi,
+    "$1$2$3***REDACTED***$3"
+  );
+  
+  // Also match unquoted values
+  redacted = redacted.replace(
+    /(password|secret|token|apikey|api_key)(\s*[:=]\s*)([^\s"',;)]+)/gi,
     "$1$2***REDACTED***"
   );
 
