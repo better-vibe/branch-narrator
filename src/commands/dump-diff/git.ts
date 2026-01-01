@@ -12,7 +12,7 @@ import {
   buildNameStatusArgs,
   buildPerFileDiffArgs,
   buildUntrackedDiffArgs,
-  parsePorcelainZForUntracked,
+  parseLsFilesOutput,
   type DiffMode,
   type DiffStatus,
   type FileEntry,
@@ -226,7 +226,9 @@ export async function isBinaryFile(options: IsBinaryFileOptions): Promise<boolea
 }
 
 /**
- * Get list of untracked files.
+ * Get list of untracked files (files only, not directories).
+ * Uses git ls-files which only returns file paths, avoiding the
+ * directory issue with git status --porcelain.
  */
 export async function getUntrackedFiles(
   cwd: string = process.cwd()
@@ -234,10 +236,10 @@ export async function getUntrackedFiles(
   try {
     const result = await execa(
       "git",
-      ["status", "--porcelain=v1", "-z"],
+      ["ls-files", "--others", "--exclude-standard", "-z"],
       { cwd }
     );
-    return parsePorcelainZForUntracked(result.stdout);
+    return parseLsFilesOutput(result.stdout);
   } catch {
     return [];
   }

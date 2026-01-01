@@ -27,7 +27,8 @@ export type SkipReason =
   | "excluded-by-default"
   | "excluded-by-glob"
   | "binary"
-  | "not-included";
+  | "not-included"
+  | "diff-empty";
 
 export interface SkippedEntry {
   path: string;
@@ -185,28 +186,16 @@ export function buildUntrackedDiffArgs(
 }
 
 /**
- * Parse git status --porcelain=v1 -z output for untracked files.
- * Untracked entries start with "?? ".
+ * Parse git ls-files -z output into file paths.
+ * Output is null-terminated list of file paths.
  */
-export function parsePorcelainZForUntracked(output: string): string[] {
+export function parseLsFilesOutput(output: string): string[] {
   if (!output) {
     return [];
   }
 
-  const paths: string[] = [];
   // -z uses NUL as separator
-  const entries = output.split("\0");
-
-  for (const entry of entries) {
-    if (!entry) continue;
-
-    // Untracked files start with "?? "
-    if (entry.startsWith("?? ")) {
-      paths.push(entry.slice(3));
-    }
-  }
-
-  return paths;
+  return output.split("\0").filter(Boolean);
 }
 
 // ============================================================================

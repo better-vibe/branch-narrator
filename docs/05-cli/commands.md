@@ -236,7 +236,8 @@ When using `--format json`, the output follows this schema (v1.1):
   ],
   "skipped": [
     { "path": "pnpm-lock.yaml", "reason": "excluded-by-default" },
-    { "path": "assets/logo.png", "reason": "binary" }
+    { "path": "assets/logo.png", "reason": "binary" },
+    { "path": "empty-file.ts", "reason": "diff-empty" }
   ],
   "stats": {
     "filesConsidered": 10,
@@ -252,6 +253,13 @@ When using `--format json`, the output follows this schema (v1.1):
 - For non-branch modes, `base` and `head` are `null`
 - `untracked: true` is set for untracked files (included by default in non-branch modes)
 - JSON format does not support chunking. If output exceeds `--max-chars`, an error is returned.
+
+**Skip reasons:**
+- `excluded-by-default`: File matches a default exclusion pattern (lockfiles, build artifacts, etc.)
+- `excluded-by-glob`: File matches a user-provided `--exclude` pattern
+- `binary`: File is detected as binary
+- `not-included`: File does not match any `--include` pattern (when includes are specified)
+- `diff-empty`: Diff generation returned empty content (protects agents from blind spots)
 
 ---
 

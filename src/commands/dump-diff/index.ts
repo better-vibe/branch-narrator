@@ -148,13 +148,27 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
   }
 
   // Fetch diffs for included files
-  const entries = await fetchDiffs(options, textFiles, cwd);
+  const rawEntries = await fetchDiffs(options, textFiles, cwd);
+
+  // Move empty diffs to skipped (these are likely directories or other edge cases)
+  const entries: DiffFileEntry[] = [];
+  const emptyDiffSkipped: SkippedEntry[] = [];
+
+  for (const entry of rawEntries) {
+    if (entry.diff.trim() === "") {
+      emptyDiffSkipped.push({ path: entry.path, reason: "diff-empty" });
+    } else {
+      entries.push(entry);
+    }
+  }
+
+  const finalSkipped = [...allSkipped, ...emptyDiffSkipped];
 
   // Handle output based on format
   if (options.format === "json") {
-    await handleJsonOutput(options, entries, allSkipped, combinedFiles.length);
+    await handleJsonOutput(options, entries, finalSkipped, combinedFiles.length);
   } else {
-    await handleTextOrMdOutput(options, entries, allSkipped, combinedFiles.length, cwd);
+    await handleTextOrMdOutput(options, entries, finalSkipped, combinedFiles.length, cwd);
   }
 }
 
@@ -443,7 +457,7 @@ export {
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
-  parsePorcelainZForUntracked,
+  parseLsFilesOutput,
   renderJson,
   renderMarkdown,
   renderText,

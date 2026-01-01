@@ -13,7 +13,7 @@ import {
   DEFAULT_EXCLUDES,
   filterPaths,
   parseNameStatus,
-  parsePorcelainZForUntracked,
+  parseLsFilesOutput,
   renderJson,
   renderMarkdown,
   renderText,
@@ -212,35 +212,34 @@ describe("buildUntrackedDiffArgs", () => {
 });
 
 // ============================================================================
-// parsePorcelainZForUntracked Tests
+// parseLsFilesOutput Tests
 // ============================================================================
 
-describe("parsePorcelainZForUntracked", () => {
-  it("should parse untracked files from porcelain output", () => {
-    // NUL-separated output with ?? prefix for untracked
-    const output = "?? src/new-file.ts\0?? docs/readme.md\0";
-    const result = parsePorcelainZForUntracked(output);
+describe("parseLsFilesOutput", () => {
+  it("should parse NUL-separated file paths", () => {
+    // git ls-files --others -z returns NUL-separated paths
+    const output = "src/new-file.ts\0docs/readme.md\0";
+    const result = parseLsFilesOutput(output);
 
     expect(result).toEqual(["src/new-file.ts", "docs/readme.md"]);
   });
 
-  it("should ignore non-untracked entries", () => {
-    // Mix of tracked and untracked
-    const output = "M  src/modified.ts\0?? src/new-file.ts\0A  src/added.ts\0";
-    const result = parsePorcelainZForUntracked(output);
+  it("should filter out empty entries", () => {
+    const output = "src/file.ts\0\0another.ts\0";
+    const result = parseLsFilesOutput(output);
 
-    expect(result).toEqual(["src/new-file.ts"]);
+    expect(result).toEqual(["src/file.ts", "another.ts"]);
   });
 
   it("should handle empty output", () => {
-    expect(parsePorcelainZForUntracked("")).toEqual([]);
+    expect(parseLsFilesOutput("")).toEqual([]);
   });
 
-  it("should handle output with no untracked files", () => {
-    const output = "M  src/modified.ts\0A  src/added.ts\0";
-    const result = parsePorcelainZForUntracked(output);
+  it("should handle single file", () => {
+    const output = "src/only-file.ts\0";
+    const result = parseLsFilesOutput(output);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual(["src/only-file.ts"]);
   });
 });
 
@@ -712,11 +711,12 @@ describe("renderJson - schema validation", () => {
         { path: "ignored.ts", reason: "excluded-by-glob" },
         { path: "logo.png", reason: "binary" },
         { path: "other.ts", reason: "not-included" },
+        { path: "empty-diff.ts", reason: "diff-empty" },
       ],
       stats: {
-        filesConsidered: 4,
+        filesConsidered: 5,
         filesIncluded: 0,
-        filesSkipped: 4,
+        filesSkipped: 5,
         chars: 0,
       },
     };
@@ -729,6 +729,7 @@ describe("renderJson - schema validation", () => {
     expect(reasons).toContain("excluded-by-glob");
     expect(reasons).toContain("binary");
     expect(reasons).toContain("not-included");
+    expect(reasons).toContain("diff-empty");
   });
 });
 
