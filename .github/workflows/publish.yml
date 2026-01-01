@@ -9,12 +9,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -30,6 +32,47 @@ jobs:
       - name: Build package
         run: bun run build
 
+      - name: Check for changesets
+        id: changesets
+        run: |
+          # Check if there are any changeset files (excluding README.md)
+          CHANGESET_COUNT=$(find .changeset -name "*.md" ! -name "README.md" 2>/dev/null | wc -l | tr -d ' ')
+          echo "count=$CHANGESET_COUNT" >> $GITHUB_OUTPUT
+          if [ "$CHANGESET_COUNT" -gt "0" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+            echo "Found $CHANGESET_COUNT changeset(s) to process"
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+            echo "No changesets found, skipping version bump"
+          fi
+
+      - name: Configure Git
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Version packages
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          bun run changeset version
+          # Get the new version from package.json
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Commit version bump
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          git add .
+          git commit -m "chore: release v${{ env.NEW_VERSION }}" || echo "No changes to commit"
+          git push
+
+      - name: Create and push git tag
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          git tag "v${{ env.NEW_VERSION }}"
+          git push origin "v${{ env.NEW_VERSION }}"
+
       - name: Setup Node.js for npm publish
         uses: actions/setup-node@v4
         with:
@@ -42,3 +85,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Create GitHub Release
+        if: steps.changesets.outputs.has_changesets == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.NEW_VERSION }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

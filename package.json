@@ -21,6 +21,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build",
+    "changeset:add": "changeset add --open",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "bun run build && changeset publish"
