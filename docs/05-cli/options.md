@@ -125,6 +125,49 @@ This PR implements user authentication using Supabase Auth.
 
 The following options are specific to the `dump-diff` command.
 
+### --mode
+
+Select the diff mode to use.
+
+```bash
+branch-narrator dump-diff --mode <type>
+```
+
+| Mode | Description | Git Equivalent |
+|------|-------------|----------------|
+| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
+| `unstaged` | Working tree vs index | `git diff` |
+| `staged` | Index vs HEAD | `git diff --staged` |
+| `all` | Working tree vs HEAD | `git diff HEAD` |
+
+**Default:** `branch`
+
+**Note:** When using `unstaged`, `staged`, or `all` modes, the `--base` and `--head` options are ignored (a warning is printed to stderr).
+
+---
+
+### --no-untracked
+
+Exclude untracked files from the diff output.
+
+```bash
+branch-narrator dump-diff --mode all --no-untracked
+```
+
+By default (without this flag), non-branch modes include untracked files:
+- Enumerates untracked files via `git status --porcelain`
+- Applies include/exclude filters to untracked files
+- Generates diffs for each untracked file
+- In JSON output, untracked files have `"untracked": true`
+
+When `--no-untracked` is specified, untracked files are skipped.
+
+**Default:** Untracked files are included (flag is off)
+
+**Note:** Only applies to non-branch modes (`unstaged`, `staged`, `all`).
+
+---
+
 ### --out
 
 Write output to a file instead of stdout.

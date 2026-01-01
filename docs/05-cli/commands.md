@@ -131,8 +131,10 @@ branch-narrator dump-diff [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
+| `--mode <type>` | `branch` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
+| `--no-untracked` | (off) | Exclude untracked files (non-branch modes) |
 | `--out <path>` | stdout | Write output to file |
 | `--format <type>` | `text` | Output format: `text`, `md`, or `json` |
 | `--unified <n>` | `0` | Lines of unified context |
@@ -142,6 +144,15 @@ branch-narrator dump-diff [options]
 | `--chunk-dir <path>` | `.ai/diff-chunks` | Directory for chunk files |
 | `--name <prefix>` | `diff` | Chunk file name prefix |
 | `--dry-run` | `false` | Preview what would be included/excluded |
+
+### Diff Modes
+
+| Mode | Description | Git Command |
+|------|-------------|-------------|
+| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
+| `unstaged` | Working tree vs index (uncommitted) | `git diff` |
+| `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
+| `all` | Working tree vs HEAD (all uncommitted) | `git diff HEAD` |
 
 ### Default Exclusions
 
@@ -158,11 +169,24 @@ The following patterns are excluded by default (unless `--include` overrides):
 ### Examples
 
 ```bash
-# Basic usage - output diff to stdout
+# Basic usage - output diff to stdout (branch mode)
 branch-narrator dump-diff
 
 # Write to file
 branch-narrator dump-diff --out .ai/diff.txt
+
+# Unstaged changes (working tree vs index)
+branch-narrator dump-diff --mode unstaged --out .ai/diff.txt
+
+# Staged changes only
+branch-narrator dump-diff --mode staged --format md --out .ai/staged.md
+
+# Everything since HEAD (untracked included by default)
+branch-narrator dump-diff --mode all \
+  --max-chars 25000 --chunk-dir .ai/diff-chunks
+
+# Exclude untracked files
+branch-narrator dump-diff --mode all --no-untracked
 
 # Markdown format with header
 branch-narrator dump-diff --format md --out .ai/diff.md
@@ -188,11 +212,12 @@ branch-narrator dump-diff --unified 3
 
 ### JSON Output Schema
 
-When using `--format json`, the output follows this schema:
+When using `--format json`, the output follows this schema (v1.1):
 
 ```json
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
+  "mode": "branch",
   "base": "main",
   "head": "HEAD",
   "unified": 0,
@@ -201,6 +226,12 @@ When using `--format json`, the output follows this schema:
       "path": "src/routes/foo/+page.svelte",
       "status": "M",
       "diff": "--- a/src/routes/foo/+page.svelte\n+++ b/src/routes/foo/+page.svelte\n..."
+    },
+    {
+      "path": "src/new-file.ts",
+      "status": "A",
+      "untracked": true,
+      "diff": "..."
     }
   ],
   "skipped": [
@@ -216,7 +247,11 @@ When using `--format json`, the output follows this schema:
 }
 ```
 
-**Note:** JSON format does not support chunking. If output exceeds `--max-chars`, an error is returned.
+**Notes:**
+- `mode` field indicates which diff mode was used
+- For non-branch modes, `base` and `head` are `null`
+- `untracked: true` is set for untracked files (included by default in non-branch modes)
+- JSON format does not support chunking. If output exceeds `--max-chars`, an error is returned.
 
 ---
 
