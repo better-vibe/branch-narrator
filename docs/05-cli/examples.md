@@ -23,6 +23,19 @@ branch-narrator facts | jq -r '.riskScore.level'
 # Output: low, medium, or high
 ```
 
+### Preview Analysis (Dry Run)
+
+```bash
+# See what would be analyzed without generating full output
+branch-narrator facts --dry-run
+
+# Shows: mode, profile, findings count, risk score, and breakdown by type
+branch-narrator facts --mode all --dry-run
+
+# Preview before writing to file
+branch-narrator facts --out report.json --dry-run
+```
+
 ---
 
 ## Git Workflow
@@ -58,6 +71,22 @@ branch-narrator pr-body --base v1.0.0 --head v1.1.0
 
 ## JSON Processing
 
+### Using Enhanced Output Format
+
+```bash
+# Get metadata and stats
+branch-narrator facts --mode all | jq '.stats'
+
+# Get total findings count
+branch-narrator facts | jq '.stats.totalFindings'
+
+# Get findings breakdown by type
+branch-narrator facts | jq '.stats.findingsByType'
+
+# Check which mode was used
+branch-narrator facts --mode unstaged | jq -r '.mode'
+```
+
 ### Filter by Type
 
 ```bash
@@ -66,6 +95,9 @@ branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
 
 # Get dependency changes
 branch-narrator facts | jq '.findings[] | select(.type == "dependency-change")'
+
+# Count specific finding type
+branch-narrator facts | jq '.stats.findingsByType["route-change"]'
 ```
 
 ### Extract Specific Data
@@ -83,6 +115,19 @@ branch-narrator facts | jq -r '.findings[] | select(.type == "env-var" and .chan
 ```bash
 # Get score and evidence
 branch-narrator facts | jq '{score: .riskScore.score, level: .riskScore.level, evidence: .riskScore.evidenceBullets}'
+```
+
+### Write to File for CI/CD
+
+```bash
+# Save analysis for later processing
+branch-narrator facts --out analysis.json
+
+# Compact format for storage efficiency
+branch-narrator facts --format compact --out analysis.min.json
+
+# Preview before writing
+branch-narrator facts --dry-run
 ```
 
 ---
