@@ -11,7 +11,7 @@ import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet } from "./git/collector.js";
 import { getProfile, resolveProfileName } from "./profiles/index.js";
-import { renderJson, renderMarkdown, renderTerminal } from "./render/index.js";
+import { aggregateFindingsByType, renderJson, renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
 
 const program = new Command();
@@ -340,11 +340,8 @@ program
         console.log(`\nFindings: ${findings.length}`);
         console.log(`Risk Score: ${riskScore.score}/100 (${riskScore.level})`);
         
-        // Group findings by type
-        const findingsByType = findings.reduce((acc, finding) => {
-          acc[finding.type] = (acc[finding.type] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
+        // Group findings by type using shared utility
+        const findingsByType = aggregateFindingsByType(findings);
         
         console.log("\nFindings by type:");
         for (const [type, count] of Object.entries(findingsByType)) {
@@ -379,7 +376,8 @@ program
         const dir = dirname(options.out);
         await mkdir(dir, { recursive: true });
         await writeFile(options.out, output, "utf-8");
-        console.log(`Wrote ${format} output to ${options.out}`);
+        const formatDesc = format === "compact" ? "compact JSON" : "JSON";
+        console.log(`Wrote ${formatDesc} output to ${options.out}`);
       } else {
         console.log(output);
       }

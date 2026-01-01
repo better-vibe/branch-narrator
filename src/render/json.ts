@@ -32,6 +32,16 @@ export interface RenderJsonOptions {
 }
 
 /**
+ * Aggregate findings by type.
+ */
+export function aggregateFindingsByType(findings: Finding[]): Record<string, number> {
+  return findings.reduce((acc, finding) => {
+    acc[finding.type] = (acc[finding.type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+}
+
+/**
  * Render findings as JSON output.
  */
 export function renderJson(
@@ -49,10 +59,7 @@ export function renderJson(
   }
 
   // Enhanced output with metadata
-  const findingsByType = context.findings.reduce((acc, finding) => {
-    acc[finding.type] = (acc[finding.type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const findingsByType = aggregateFindingsByType(context.findings);
 
   const output: EnhancedFactsOutput = {
     schemaVersion: "1.0",
