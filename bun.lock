@@ -11,11 +11,13 @@
         "execa": "^9.5.2",
         "ora": "^9.0.0",
         "parse-diff": "^0.11.1",
+        "picomatch": "^4.0.3",
         "semver": "^7.6.3",
       },
       "devDependencies": {
         "@changesets/cli": "^2.29.8",
         "@types/node": "^20.17.10",
+        "@types/picomatch": "^4.0.2",
         "@types/semver": "^7.5.8",
         "tsup": "^8.3.5",
         "typescript": "^5.7.2",
@@ -185,6 +187,8 @@
     "@types/estree": ["@types/estree@1.0.8", "", {}, "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="],
 
     "@types/node": ["@types/node@20.19.27", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-N2clP5pJhB2YnZJ3PIHFk5RkygRX5WO/5f0WC08tp0wd+sv0rsJk3MqWn3CbNmT2J505a5336jaQj4ph1AdMug=="],
+
+    "@types/picomatch": ["@types/picomatch@4.0.2", "", {}, "sha512-qHHxQ+P9PysNEGbALT8f8YOSHW0KJu6l2xU8DYY0fu/EmGxXdVnuTLvFUvBgPJMSqXq29SYHveejeAha+4AYgA=="],
 
     "@types/semver": ["@types/semver@7.7.1", "", {}, "sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA=="],
 

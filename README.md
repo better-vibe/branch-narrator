@@ -61,6 +61,25 @@ branch-narrator facts
 branch-narrator facts | jq '.riskScore.level'
 ```
 
+### Dump Diff for AI Agents
+
+```bash
+# Output prompt-ready diff to stdout
+branch-narrator dump-diff
+
+# Write to file
+branch-narrator dump-diff --out .ai/diff.txt
+
+# Chunk large diffs for context windows
+branch-narrator dump-diff --max-chars 25000 --chunk-dir .ai/diff-chunks
+
+# JSON format with metadata
+branch-narrator dump-diff --format json --out .ai/diff.json
+
+# Include only specific files
+branch-narrator dump-diff --include "src/**" --include "tests/**"
+```
+
 ## CLI Commands
 
 ### `pretty` Command
@@ -96,6 +115,26 @@ Output JSON findings for programmatic use.
 | `--head <ref>` | `HEAD` | Head git reference |
 | `-u, --uncommitted` | `false` | Include uncommitted changes |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+
+### `dump-diff` Command
+
+Output prompt-ready git diff with smart exclusions. Designed for AI agents.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--base <ref>` | `main` | Base git reference |
+| `--head <ref>` | `HEAD` | Head git reference |
+| `--out <path>` | stdout | Write output to file |
+| `--format <type>` | `text` | Format: `text`, `md`, or `json` |
+| `--unified <n>` | `0` | Lines of unified context |
+| `--include <glob>` | (none) | Include only matching files |
+| `--exclude <glob>` | (none) | Additional exclusion globs |
+| `--max-chars <n>` | (none) | Chunk if output exceeds size |
+| `--chunk-dir <path>` | `.ai/diff-chunks` | Directory for chunks |
+| `--name <prefix>` | `diff` | Chunk file prefix |
+| `--dry-run` | `false` | Preview without writing |
+
+**Default exclusions:** lockfiles, `.d.ts`, logs, `dist/`, `build/`, `.svelte-kit/`, `.next/`, minified files, sourcemaps, binaries.
 
 ## Sample Output
 

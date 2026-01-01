@@ -8,6 +8,7 @@ import ora from "ora";
 import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
 import type { Finding, ProfileName, RenderContext } from "./core/types.js";
+import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet } from "./git/collector.js";
 import { getProfile, resolveProfileName } from "./profiles/index.js";
 import { renderJson, renderMarkdown, renderTerminal } from "./render/index.js";
@@ -218,6 +219,86 @@ program
       };
 
       console.log(renderJson(renderContext));
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+// Helper to collect repeatable options into an array
+function collect(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
+// dump-diff command - prompt-ready git diff for AI agents
+program
+  .command("dump-diff")
+  .description("Output prompt-ready git diff with smart exclusions (for AI agents)")
+  .option("--base <ref>", "Base git reference", "main")
+  .option("--head <ref>", "Head git reference", "HEAD")
+  .option("--out <path>", "Write output to file (creates directories as needed)")
+  .option(
+    "--format <type>",
+    "Output format: text|md|json",
+    "text"
+  )
+  .option("--unified <n>", "Lines of unified context (git diff -U)", "0")
+  .option(
+    "--include <glob>",
+    "Include only files matching glob (repeatable)",
+    collect,
+    []
+  )
+  .option(
+    "--exclude <glob>",
+    "Additional exclusion glob (repeatable)",
+    collect,
+    []
+  )
+  .option("--max-chars <n>", "Chunk output if it exceeds this size")
+  .option(
+    "--chunk-dir <path>",
+    "Directory for chunk files",
+    ".ai/diff-chunks"
+  )
+  .option("--name <prefix>", "Chunk file name prefix", "diff")
+  .option("--dry-run", "Preview what would be included/excluded", false)
+  .action(async (options) => {
+    try {
+      const format = options.format as "text" | "md" | "json";
+      if (!["text", "md", "json"].includes(format)) {
+        console.error(`Invalid format: ${options.format}. Use text, md, or json.`);
+        process.exit(1);
+      }
+
+      const unified = parseInt(options.unified, 10);
+      if (isNaN(unified) || unified < 0) {
+        console.error(`Invalid unified context: ${options.unified}. Must be a non-negative integer.`);
+        process.exit(1);
+      }
+
+      const maxChars = options.maxChars
+        ? parseInt(options.maxChars, 10)
+        : undefined;
+      if (maxChars !== undefined && (isNaN(maxChars) || maxChars <= 0)) {
+        console.error(`Invalid max-chars: ${options.maxChars}. Must be a positive integer.`);
+        process.exit(1);
+      }
+
+      await executeDumpDiff({
+        base: options.base,
+        head: options.head,
+        out: options.out,
+        format,
+        unified,
+        include: options.include,
+        exclude: options.exclude,
+        maxChars,
+        chunkDir: options.chunkDir,
+        name: options.name,
+        dryRun: options.dryRun,
+      });
+
       process.exit(0);
     } catch (error) {
       handleError(error);

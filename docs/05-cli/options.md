@@ -10,6 +10,7 @@ Base git reference to compare against.
 branch-narrator pretty --base <ref>
 branch-narrator pr-body --base <ref>
 branch-narrator facts --base <ref>
+branch-narrator dump-diff --base <ref>
 ```
 
 ### Values
@@ -117,6 +118,126 @@ Responses appear in `## Context` section:
 
 This PR implements user authentication using Supabase Auth.
 ```
+
+---
+
+## dump-diff Options
+
+The following options are specific to the `dump-diff` command.
+
+### --out
+
+Write output to a file instead of stdout.
+
+```bash
+branch-narrator dump-diff --out .ai/diff.txt
+```
+
+Creates parent directories as needed.
+
+---
+
+### --format
+
+Output format for the diff.
+
+```bash
+branch-narrator dump-diff --format <type>
+```
+
+| Format | Description |
+|--------|-------------|
+| `text` | Raw unified diff (default) |
+| `md` | Markdown with fenced code block and header |
+| `json` | Machine-readable JSON with metadata |
+
+---
+
+### --unified
+
+Number of context lines around changes.
+
+```bash
+branch-narrator dump-diff --unified 3
+```
+
+**Default:** `0` (minimal output for AI consumption)
+
+---
+
+### --include
+
+Include only files matching glob pattern. Can be repeated.
+
+```bash
+branch-narrator dump-diff --include "src/**" --include "tests/**"
+```
+
+When specified, default exclusions don't apply to matching files.
+
+---
+
+### --exclude
+
+Additional exclusion globs. Can be repeated.
+
+```bash
+branch-narrator dump-diff --exclude "**/generated/**" --exclude "**/vendor/**"
+```
+
+Excludes always take priority over includes.
+
+---
+
+### --max-chars
+
+Maximum output size before chunking.
+
+```bash
+branch-narrator dump-diff --max-chars 25000
+```
+
+When exceeded, output is split into multiple files at file boundaries.
+
+**Note:** Not supported with `--format json` (will error).
+
+---
+
+### --chunk-dir
+
+Directory for chunk files when chunking is needed.
+
+```bash
+branch-narrator dump-diff --max-chars 25000 --chunk-dir .ai/chunks
+```
+
+**Default:** `.ai/diff-chunks`
+
+---
+
+### --name
+
+Prefix for chunk file names.
+
+```bash
+branch-narrator dump-diff --max-chars 25000 --name pr-diff
+```
+
+Produces: `pr-diff-001.txt`, `pr-diff-002.txt`, etc.
+
+**Default:** `diff`
+
+---
+
+### --dry-run
+
+Preview what would be included/excluded without writing.
+
+```bash
+branch-narrator dump-diff --dry-run
+```
+
+Shows file lists, estimated sizes, and chunk counts.
 
 ---
 
