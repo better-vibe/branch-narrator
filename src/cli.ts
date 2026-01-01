@@ -627,6 +627,34 @@ program
     }
   });
 
+// integrate command - generate AI assistant integration files
+program
+  .command("integrate <provider>")
+  .description("Generate integration files for AI coding assistants")
+  .option("--dry-run", "Preview what would be created without writing files", false)
+  .option("--force", "Overwrite existing files", false)
+  .action(async (provider: string, options) => {
+    try {
+      const { executeIntegrate } = await import("./commands/integrate.js");
+
+      // Validate provider
+      if (provider !== "cursor") {
+        console.error(`Unknown provider: ${provider}. Supported providers: cursor`);
+        process.exit(1);
+      }
+
+      await executeIntegrate({
+        provider: provider as "cursor",
+        dryRun: options.dryRun,
+        force: options.force,
+      });
+
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
 /**
  * Handle errors and exit with appropriate code.
  */

@@ -204,6 +204,49 @@ branch-narrator dump-diff --format json --out .ai/diff.json
 branch-narrator dump-diff --include "src/**" --include "tests/**"
 ```
 
+### AI Assistant Integration
+
+Generate integration files for AI coding assistants (Cursor, etc.) to help them use `branch-narrator` effectively when writing PR descriptions.
+
+```bash
+# Generate Cursor rules (creates .cursor/rules/*.md)
+branch-narrator integrate cursor
+
+# Preview what would be created without writing files
+branch-narrator integrate cursor --dry-run
+
+# Overwrite existing files
+branch-narrator integrate cursor --force
+```
+
+**What it creates:**
+
+When you run `branch-narrator integrate cursor`, it creates two rule files in `.cursor/rules/`:
+
+1. **`.cursor/rules/branch-narrator.md`** - Tool usage guidance
+   - Explains when and how to use `branch-narrator`
+   - Documents the `facts` and `dump-diff` commands
+   - Provides default refs (`main..HEAD`)
+
+2. **`.cursor/rules/pr-description.md`** - PR description procedure
+   - Step-by-step workflow for writing PR descriptions
+   - Instructs Cursor to call `facts` and `dump-diff --unified 3` first
+   - Provides a comprehensive PR body template
+   - Ensures descriptions are grounded in actual diff data
+
+**Why use this:**
+
+- **Accuracy**: Cursor will call `facts` and `dump-diff` to get real diff data instead of guessing
+- **Consistency**: PR descriptions follow a standardized template
+- **Evidence-based**: Every claim in the PR is backed by actual file changes
+- **No hallucinations**: Cursor won't invent intent or outcomes
+
+**Behavior:**
+
+- Without flags: Creates files, fails if they already exist (exit code 1)
+- `--dry-run`: Prints what would be written without creating files
+- `--force`: Overwrites existing files
+
 ## CLI Commands
 
 ### `pretty` Command
@@ -267,6 +310,28 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 - `all`: Working tree vs HEAD (all uncommitted changes)
 
 **Default exclusions:** lockfiles, `.d.ts`, logs, `dist/`, `build/`, `.svelte-kit/`, `.next/`, minified files, sourcemaps, binaries.
+
+### `integrate` Command
+
+Generate integration files for AI coding assistants. Currently supports Cursor.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--dry-run` | `false` | Preview what would be created without writing files |
+| `--force` | `false` | Overwrite existing files |
+
+**Arguments:**
+- `<provider>`: Integration provider (currently only `cursor` is supported)
+
+**Files created (for Cursor):**
+- `.cursor/rules/branch-narrator.md` - Tool usage guidance (mentions `facts` and `dump-diff`)
+- `.cursor/rules/pr-description.md` - PR description procedure (uses `dump-diff --unified 3`)
+
+**Exit Codes:**
+| Code | Description |
+|------|-------------|
+| `0` | Success |
+| `1` | Expected errors (files exist without --force, unknown provider) |
 
 ### `risk-report` Command
 
