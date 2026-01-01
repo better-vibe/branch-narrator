@@ -115,6 +115,9 @@ branch-narrator facts [options]
 | `--base <ref>` | `main` | Base git reference (branch mode only) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--out <path>` | stdout | Write output to file (creates directories as needed) |
+| `--format <type>` | `json` | Output format: `json` (pretty) or `compact` (single-line) |
+| `--dry-run` | `false` | Preview analysis scope without running analyzers |
 
 ### Diff Modes
 
@@ -124,6 +127,21 @@ branch-narrator facts [options]
 | `unstaged` | Working tree vs index (uncommitted) | `git diff` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
 | `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+
+### Output Formats
+
+| Format | Description |
+|--------|-------------|
+| `json` | Pretty-printed JSON with 2-space indentation (default) |
+| `compact` | Single-line JSON (minified, no whitespace) |
+
+### Features
+
+- **JSON Schema**: Consistent structure with `profile`, `riskScore`, and `findings` fields
+- **File Output**: Write to file with automatic directory creation (`--out`)
+- **Compact Mode**: Single-line JSON for space-efficient storage (`--format compact`)
+- **Dry Run**: Preview what will be analyzed without running analyzers (`--dry-run`)
+- **Diff Modes**: Support for branch, unstaged, staged, and all changes
 
 ### Examples
 
@@ -140,11 +158,61 @@ branch-narrator facts --mode staged
 # Analyze all uncommitted changes
 branch-narrator facts --mode all
 
+# Write to file
+branch-narrator facts --out .ai/facts.json
+
+# Compact JSON (single line)
+branch-narrator facts --format compact
+
+# Preview analysis scope
+branch-narrator facts --dry-run
+
 # Parse with jq
 branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
 
 # Get risk level
 branch-narrator facts | jq -r '.riskScore.level'
+
+# Count findings by type
+branch-narrator facts | jq '.findings | group_by(.type) | map({type: .[0].type, count: length})'
+```
+
+### JSON Output Schema
+
+```json
+{
+  "profile": "auto",
+  "riskScore": {
+    "score": 45,
+    "level": "medium",
+    "evidenceBullets": [
+      "Database migration detected (supabase/migrations/...)",
+      "3 environment variables added or modified"
+    ]
+  },
+  "findings": [
+    {
+      "type": "file-summary",
+      "added": ["src/routes/new-page/+page.svelte"],
+      "modified": ["src/lib/db.ts"],
+      "deleted": [],
+      "renamed": []
+    },
+    {
+      "type": "route-change",
+      "routeId": "/new-page",
+      "file": "src/routes/new-page/+page.svelte",
+      "change": "added",
+      "routeType": "page"
+    },
+    {
+      "type": "env-var",
+      "name": "DATABASE_URL",
+      "change": "added",
+      "evidenceFiles": ["src/lib/db.ts"]
+    }
+  ]
+}
 ```
 
 ---

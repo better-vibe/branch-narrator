@@ -59,6 +59,20 @@ branch-narrator facts
 
 # Parse with jq
 branch-narrator facts | jq '.riskScore.level'
+
+# Write to file
+branch-narrator facts --out .ai/facts.json
+
+# Compact JSON (single line)
+branch-narrator facts --format compact
+
+# Different diff modes
+branch-narrator facts --mode unstaged  # working tree vs index
+branch-narrator facts --mode staged    # index vs HEAD
+branch-narrator facts --mode all       # all changes
+
+# Preview analysis scope
+branch-narrator facts --dry-run
 ```
 
 ### Dump Diff for AI Agents

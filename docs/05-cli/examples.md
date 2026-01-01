@@ -21,6 +21,15 @@ branch-narrator pr-body > pr.md
 branch-narrator facts | jq -r '.riskScore.level'
 
 # Output: low, medium, or high
+
+# Save facts to file for later analysis
+branch-narrator facts --out .ai/facts.json
+
+# Compact JSON for storage
+branch-narrator facts --format compact --out facts-compact.json
+
+# Preview what will be analyzed
+branch-narrator facts --dry-run
 ```
 
 ---
@@ -33,8 +42,11 @@ branch-narrator facts | jq -r '.riskScore.level'
 # Check uncommitted changes
 branch-narrator pr-body -u
 
-# See what will be flagged
-branch-narrator facts -u | jq '.riskScore.evidenceBullets'
+# See what will be flagged (unstaged changes)
+branch-narrator facts --mode unstaged | jq '.riskScore.evidenceBullets'
+
+# Check staged changes before commit
+branch-narrator facts --mode staged --out pre-commit-facts.json
 ```
 
 ### Feature Branch

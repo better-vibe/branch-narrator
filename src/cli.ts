@@ -4,6 +4,8 @@
 
 import { Command } from "commander";
 import { createInterface } from "readline";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import ora from "ora";
 import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
@@ -38,6 +40,68 @@ async function prompt(question: string): Promise<string> {
       resolve(answer.trim());
     });
   });
+}
+
+/**
+ * Write output to file, creating directories as needed.
+ */
+async function writeOutputToFile(filepath: string, content: string): Promise<void> {
+  const dir = dirname(filepath);
+  await mkdir(dir, { recursive: true });
+  await writeFile(filepath, content, "utf-8");
+}
+
+/**
+ * Handle dry-run for facts command.
+ */
+async function handleFactsDryRun(options: {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  profile: ProfileName;
+}): Promise<void> {
+  // Collect git data
+  const changeSet = await collectChangeSet({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    includeUntracked: options.mode === "all",
+  });
+
+  // Resolve profile
+  const resolvedProfile = resolveProfileName(
+    options.profile,
+    changeSet,
+    process.cwd()
+  );
+  const profile = getProfile(resolvedProfile);
+
+  console.log("=== Dry Run (Facts) ===\n");
+  console.log(`Mode: ${options.mode}`);
+  if (options.mode === "branch") {
+    console.log(`Base: ${options.base}`);
+    console.log(`Head: ${options.head}`);
+  }
+  console.log(`Profile: ${resolvedProfile}`);
+  console.log(`Analyzers: ${profile.analyzers.length}`);
+  console.log("");
+
+  console.log("Analyzers that would run:");
+  for (const analyzer of profile.analyzers) {
+    console.log(`  - ${analyzer.name || analyzer.analyze.name || "unnamed"}`);
+  }
+  console.log("");
+
+  const addedFiles = changeSet.files.filter(f => f.status === "added");
+  const modifiedFiles = changeSet.files.filter(f => f.status === "modified");
+  const deletedFiles = changeSet.files.filter(f => f.status === "deleted");
+  const renamedFiles = changeSet.files.filter(f => f.status === "renamed");
+
+  console.log(`Files changed: ${changeSet.files.length}`);
+  console.log(`Files added: ${addedFiles.length}`);
+  console.log(`Files modified: ${modifiedFiles.length}`);
+  console.log(`Files deleted: ${deletedFiles.length}`);
+  console.log(`Files renamed: ${renamedFiles.length}`);
 }
 
 /**
@@ -283,12 +347,26 @@ program
     "Profile to use (auto|sveltekit)",
     "auto"
   )
+  .option("--out <path>", "Write output to file (creates directories as needed)")
+  .option(
+    "--format <type>",
+    "Output format: json|compact",
+    "json"
+  )
+  .option("--dry-run", "Preview analysis scope without running analyzers", false)
   .action(async (options) => {
     try {
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
         console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      // Validate format
+      const format = options.format as "json" | "compact";
+      if (!["json", "compact"].includes(format)) {
+        console.error(`Invalid format: ${options.format}. Use json or compact.`);
         process.exit(1);
       }
 
@@ -301,6 +379,17 @@ program
             `Warning: --base and --head are ignored when --mode is "${mode}"`
           );
         }
+      }
+
+      // Handle dry-run
+      if (options.dryRun) {
+        await handleFactsDryRun({
+          mode,
+          base: mode === "branch" ? options.base : undefined,
+          head: mode === "branch" ? options.head : undefined,
+          profile: options.profile as ProfileName,
+        });
+        process.exit(0);
       }
 
       const { findings, resolvedProfile } = await runAnalysisWithMode({
@@ -319,7 +408,18 @@ program
         profile: resolvedProfile,
       };
 
-      console.log(renderJson(renderContext));
+      const jsonOutput = renderJson(renderContext);
+      const output = format === "compact" 
+        ? JSON.stringify(JSON.parse(jsonOutput))
+        : jsonOutput;
+
+      if (options.out) {
+        await writeOutputToFile(options.out, output);
+        console.error(`Wrote ${format} output to ${options.out}`);
+      } else {
+        console.log(output);
+      }
+
       process.exit(0);
     } catch (error) {
       handleError(error);
