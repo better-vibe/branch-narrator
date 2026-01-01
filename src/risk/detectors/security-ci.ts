@@ -24,7 +24,7 @@ function extractEvidenceLines(
  */
 function isCIFile(path: string): boolean {
   return (
-    path.includes(".github/workflows/") && (path.endsWith(".yml") || path.endsWith(".yaml")) ||
+    (path.includes(".github/workflows/") && (path.endsWith(".yml") || path.endsWith(".yaml"))) ||
     path === ".gitlab-ci.yml" ||
     path === "Jenkinsfile" ||
     path === "azure-pipelines.yml"

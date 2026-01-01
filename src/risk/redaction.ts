@@ -38,7 +38,8 @@ export function redactLine(line: string): string {
   // Redact values after = or : for secret keys
   for (const pattern of SECRET_KEY_PATTERNS) {
     // Match key=value or key: value patterns
-    const eqPattern = new RegExp(`(${pattern.source})\\s*=\\s*['"]?([^'"\\s<]+)['"]?`, "gi");
+    // Use consistent character exclusions for both patterns
+    const eqPattern = new RegExp(`(${pattern.source})\\s*=\\s*['"]?([^'"\\s}<]+)['"]?`, "gi");
     const colonPattern = new RegExp(`(${pattern.source})\\s*:\\s*['"]?([^'"\\s,}<]+)['"]?`, "gi");
 
     redacted = redacted.replace(eqPattern, (match, key) => `${key}=<redacted>`);

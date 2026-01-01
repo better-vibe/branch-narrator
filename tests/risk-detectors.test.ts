@@ -59,7 +59,7 @@ describe("Security/CI Detectors", () => {
     expect(flags[0].id).toBe("security.workflow_permissions_broadened");
     expect(flags[0].score).toBe(35);
     expect(flags[0].confidence).toBe(0.9);
-    expect(flags[0].effectiveScore).toBe(32); // round(35 * 0.9) = 32
+    expect(flags[0].effectiveScore).toBe(32); // round(35 * 0.9) = round(31.5) = 32
   });
 
   it("should detect pull_request_target", () => {

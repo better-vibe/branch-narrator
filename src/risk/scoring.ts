@@ -85,10 +85,10 @@ function buildScoreBreakdown(
   const entries = Object.entries(categoryScores) as Array<[RiskCategory, number]>;
   const sorted = entries.sort((a, b) => b[1] - a[1]);
 
-  const maxCategory = sorted[0] || { category: "security" as RiskCategory, score: 0 };
+  const maxCategory = sorted.length > 0 ? sorted[0] : (["security", 0] as [RiskCategory, number]);
   const topCategories = sorted.slice(0, 3).map(([category, score]) => ({ category, score }));
 
-  const maxCat = maxCategory ? maxCategory[1] : 0;
+  const maxCat = maxCategory[1];
   const top3 = topCategories.map(t => t.score);
   while (top3.length < 3) top3.push(0);
   const top3Avg = top3.reduce((sum, s) => sum + s, 0) / 3;
@@ -96,7 +96,7 @@ function buildScoreBreakdown(
   const formula = `riskScore = round(0.6 * ${maxCat} + 0.4 * ${top3Avg.toFixed(2)})`;
 
   return {
-    maxCategory: { category: maxCategory[0] || "security", score: maxCat },
+    maxCategory: { category: maxCategory[0], score: maxCat },
     topCategories,
     formula,
   };

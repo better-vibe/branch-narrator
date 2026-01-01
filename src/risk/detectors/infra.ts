@@ -33,7 +33,7 @@ function isK8sFile(path: string): boolean {
   return (
     path.includes("k8s/") ||
     path.includes("helm/") ||
-    path.includes("deployment") && (path.endsWith(".yml") || path.endsWith(".yaml"))
+    (path.includes("deployment") && (path.endsWith(".yml") || path.endsWith(".yaml")))
   );
 }
 
