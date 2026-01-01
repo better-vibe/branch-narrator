@@ -78,6 +78,31 @@ bun run typecheck
 bun run dev
 ```
 
+## Development Workflow
+
+### CRITICAL: Changesets and Tests Required
+
+**ALWAYS** include both a changeset and tests when making code changes:
+
+1. **Changesets** - Required for ALL user-facing changes:
+   - New features, bug fixes, breaking changes
+   - Run `bun run changeset:add` (or `npm run changeset:add`)
+   - Select appropriate version: `patch` (bug fix), `minor` (feature), `major` (breaking)
+   - Write user-facing description (not implementation details)
+   - See [Changesets](#changesets) section below for full details
+
+2. **Tests** - Required for ALL code changes:
+   - Add tests in `tests/` directory with `.test.ts` suffix
+   - Follow existing test patterns using Vitest
+   - Test both success and error cases
+   - Run tests before committing: `bun test`
+   - See [Testing](#testing) section below for full details
+
+**Do NOT submit pull requests without both a changeset and tests** unless the changes are:
+- Documentation-only updates
+- Internal refactoring with no behavior changes
+- CI/CD configuration updates
+
 ## Coding Conventions
 
 ### TypeScript
