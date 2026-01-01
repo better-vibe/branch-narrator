@@ -204,6 +204,10 @@ export const fileCategoryAnalyzer: Analyzer = {
 
     const finding: FileCategoryFinding = {
       type: "file-category",
+      kind: "file-category",
+      category: "unknown",
+      confidence: "high",
+      evidence: [],
       categories,
       summary,
     };

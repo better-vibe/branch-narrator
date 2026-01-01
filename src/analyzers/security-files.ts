@@ -2,6 +2,7 @@
  * Security-sensitive file change detector.
  */
 
+import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -101,8 +102,17 @@ export const securityFilesAnalyzer: Analyzer = {
       return [];
     }
 
+    // Create evidence from file paths
+    const evidence = securityFiles
+      .slice(0, 3)
+      .map((file) => createEvidence(file, `Security file: ${file}`));
+
     const securityFinding: SecurityFileFinding = {
       type: "security-file",
+      kind: "security-file",
+      category: "infra",
+      confidence: "medium",
+      evidence,
       files: securityFiles,
       reasons: Array.from(reasons),
     };
@@ -114,8 +124,12 @@ export const securityFilesAnalyzer: Analyzer = {
       .join(", ");
     const riskFinding: RiskFlagFinding = {
       type: "risk-flag",
+      kind: "risk-flag",
+      category: "infra",
+      confidence: "medium",
+      evidence,
       risk: "medium",
-      evidence: `Security-sensitive files changed (${reasonLabels}): ${securityFiles.length} file(s)`,
+      evidenceText: `Security-sensitive files changed (${reasonLabels}): ${securityFiles.length} file(s)`,
     };
     findings.push(riskFinding);
 

@@ -155,13 +155,21 @@ describe("renderMarkdown", () => {
     const findings: Finding[] = [
       {
         type: "risk-flag",
+        kind: "risk-flag",
+        category: "infra",
+        confidence: "high",
+        evidence: [],
         risk: "high",
-        evidence: "Critical security change",
+        evidenceText: "Critical security change",
       },
       {
         type: "risk-flag",
+        kind: "risk-flag",
+        category: "database",
+        confidence: "high",
+        evidence: [],
         risk: "high",
-        evidence: "Database schema modification",
+        evidenceText: "Database schema modification",
       },
     ];
 
@@ -301,8 +309,24 @@ describe("computeRiskScore", () => {
 
   it("should compute high risk for risk flags", () => {
     const findings: Finding[] = [
-      { type: "risk-flag", risk: "high", evidence: "Critical issue" },
-      { type: "risk-flag", risk: "high", evidence: "Another issue" },
+      { 
+        type: "risk-flag", 
+        kind: "risk-flag",
+        category: "infra",
+        confidence: "high",
+        evidence: [],
+        risk: "high", 
+        evidenceText: "Critical issue" 
+      },
+      { 
+        type: "risk-flag", 
+        kind: "risk-flag",
+        category: "infra",
+        confidence: "high",
+        evidence: [],
+        risk: "high", 
+        evidenceText: "Another issue" 
+      },
     ];
 
     const score = computeRiskScore(findings);
@@ -312,11 +336,20 @@ describe("computeRiskScore", () => {
 
   it("should include evidence bullets", () => {
     const findings: Finding[] = [
-      { type: "risk-flag", risk: "high", evidence: "Security concern" },
+      { 
+        type: "risk-flag", 
+        kind: "risk-flag",
+        category: "infra",
+        confidence: "high",
+        evidence: [],
+        risk: "high", 
+        evidenceText: "Security concern" 
+      },
     ];
 
     const score = computeRiskScore(findings);
-    expect(score.evidenceBullets.some((b) => b.includes("Security concern"))).toBe(
+    const bullets = score.evidenceBullets ?? [];
+    expect(bullets.some((b) => b.includes("Security concern"))).toBe(
       true
     );
   });

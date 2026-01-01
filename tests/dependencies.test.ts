@@ -115,7 +115,7 @@ describe("dependencyAnalyzer", () => {
 
     expect(riskFindings.length).toBeGreaterThan(0);
     expect(
-      riskFindings.some((f) => f.evidence.includes("@sveltejs/kit"))
+      riskFindings.some((f) => f.evidenceText.includes("@sveltejs/kit"))
     ).toBe(true);
   });
 
@@ -216,7 +216,7 @@ describe("dependencyAnalyzer", () => {
     ) as RiskFlagFinding[];
 
     expect(
-      riskFindings.some((f) => f.evidence.includes("Payment Processing"))
+      riskFindings.some((f) => f.evidenceText.includes("Payment Processing"))
     ).toBe(true);
   });
 });

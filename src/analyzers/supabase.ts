@@ -3,6 +3,7 @@
  */
 
 import { getAdditions } from "../git/parser.js";
+import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -64,38 +65,64 @@ export function scanForDestructivePatterns(
 
 /**
  * Determine migration risk level based on content.
+ * Returns risk level, reasons, and evidence.
  */
 export function determineMigrationRisk(
   files: string[],
   changeSet: ChangeSet
-): { risk: MigrationRisk; reasons: string[] } {
+): {
+  risk: MigrationRisk;
+  reasons: string[];
+  evidence: Array<{ file: string; excerpt: string }>;
+} {
   const reasons: string[] = [];
+  const evidence: Array<{ file: string; excerpt: string }> = [];
   let hasDestructive = false;
 
   for (const file of files) {
     const diff = changeSet.diffs.find((d) => d.path === file);
     if (!diff) continue;
 
-    const additions = getAdditions(diff).join("\n");
-    const destructive = scanForDestructivePatterns(additions);
+    const additions = getAdditions(diff);
+    const additionsText = additions.join("\n");
+    const destructive = scanForDestructivePatterns(additionsText);
 
     for (const { description } of destructive) {
       hasDestructive = true;
       reasons.push(`${description} detected in ${file}`);
+      
+      // Find the line with the destructive pattern
+      const lineWithPattern = additions.find((line) =>
+        DESTRUCTIVE_PATTERNS.some((p) => p.pattern.test(line))
+      );
+      if (lineWithPattern) {
+        evidence.push({
+          file,
+          excerpt: lineWithPattern.trim(),
+        });
+      }
     }
   }
 
   if (hasDestructive) {
-    return { risk: "high", reasons };
+    return { risk: "high", reasons, evidence };
   }
 
   // Check if only seeds/config
   const onlySeedsOrConfig = files.every((f) => isSeedOrConfig(f));
   if (onlySeedsOrConfig) {
-    return { risk: "low", reasons: ["Only seed/config files changed"] };
+    return {
+      risk: "low",
+      reasons: ["Only seed/config files changed"],
+      evidence,
+    };
   }
 
-  return { risk: "medium", reasons: ["Migration files changed"] };
+  return {
+    risk: "medium",
+    reasons: ["Migration files changed"],
+    evidence,
+  };
 }
 
 export const supabaseAnalyzer: Analyzer = {
@@ -122,13 +149,22 @@ export const supabaseAnalyzer: Analyzer = {
     }
 
     // Determine risk
-    const { risk, reasons } = determineMigrationRisk(
+    const { risk, reasons, evidence: evidenceData } = determineMigrationRisk(
       migrationFiles.length > 0 ? migrationFiles : supabaseFiles,
       changeSet
     );
 
+    // Convert evidence data to Evidence type
+    const evidence = evidenceData.map((e) =>
+      createEvidence(e.file, e.excerpt)
+    );
+
     const migrationFinding: DbMigrationFinding = {
       type: "db-migration",
+      kind: "db-migration",
+      category: "database",
+      confidence: "high",
+      evidence,
       tool: "supabase",
       files: migrationFiles.length > 0 ? migrationFiles : supabaseFiles,
       risk,
@@ -141,8 +177,12 @@ export const supabaseAnalyzer: Analyzer = {
     if (risk === "high") {
       const riskFinding: RiskFlagFinding = {
         type: "risk-flag",
+        kind: "risk-flag",
+        category: "database",
+        confidence: "high",
+        evidence,
         risk: "high",
-        evidence: `Destructive SQL detected: ${reasons.join(", ")}`,
+        evidenceText: `Destructive SQL detected: ${reasons.join(", ")}`,
       };
       findings.push(riskFinding);
     }

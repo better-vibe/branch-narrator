@@ -3,6 +3,7 @@
  */
 
 import { getAdditions } from "../git/parser.js";
+import { createEvidence, extractRepresentativeExcerpt } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -46,35 +47,60 @@ export const cloudflareAnalyzer: Analyzer = {
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];
-    const areaFiles = new Map<CloudflareArea, string[]>();
+    const areaFilesAndEvidence = new Map<
+      CloudflareArea,
+      Array<{ file: string; excerpt: string }>
+    >();
 
     // Check for wrangler config changes
     for (const file of changeSet.files) {
       if (isWranglerConfig(file.path)) {
-        if (!areaFiles.has("wrangler")) {
-          areaFiles.set("wrangler", []);
+        if (!areaFilesAndEvidence.has("wrangler")) {
+          areaFilesAndEvidence.set("wrangler", []);
         }
-        areaFiles.get("wrangler")!.push(file.path);
+        // Try to get excerpt from diff
+        const diff = changeSet.diffs.find((d) => d.path === file.path);
+        const excerpt = diff
+          ? extractRepresentativeExcerpt(getAdditions(diff))
+          : file.path;
+        areaFilesAndEvidence.get("wrangler")!.push({
+          file: file.path,
+          excerpt,
+        });
       }
     }
 
     // Check for CI changes that mention Cloudflare
     for (const diff of changeSet.diffs) {
       if (isGitHubWorkflow(diff.path)) {
-        const additions = getAdditions(diff).join("\n");
-        if (workflowMentionsCloudflare(additions)) {
-          if (!areaFiles.has("ci")) {
-            areaFiles.set("ci", []);
+        const additions = getAdditions(diff);
+        const additionsText = additions.join("\n");
+        if (workflowMentionsCloudflare(additionsText)) {
+          if (!areaFilesAndEvidence.has("ci")) {
+            areaFilesAndEvidence.set("ci", []);
           }
-          areaFiles.get("ci")!.push(diff.path);
+          const excerpt = extractRepresentativeExcerpt(additions);
+          areaFilesAndEvidence.get("ci")!.push({
+            file: diff.path,
+            excerpt,
+          });
         }
       }
     }
 
     // Create findings
-    for (const [area, files] of areaFiles) {
+    for (const [area, fileExcerpts] of areaFilesAndEvidence) {
+      const files = fileExcerpts.map((fe) => fe.file);
+      const evidence = fileExcerpts
+        .slice(0, 3)
+        .map((fe) => createEvidence(fe.file, fe.excerpt));
+
       const finding: CloudflareChangeFinding = {
         type: "cloudflare-change",
+        kind: "cloudflare-change",
+        category: "cloudflare",
+        confidence: "high",
+        evidence,
         area,
         files,
       };

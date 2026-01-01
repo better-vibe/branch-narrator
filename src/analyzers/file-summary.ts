@@ -56,6 +56,10 @@ export const fileSummaryAnalyzer: Analyzer = {
 
     const finding: FileSummaryFinding = {
       type: "file-summary",
+      kind: "file-summary",
+      category: "unknown",
+      confidence: "high",
+      evidence: [],
       added,
       modified,
       deleted,

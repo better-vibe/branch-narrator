@@ -380,8 +380,9 @@ function renderRisks(context: RenderContext): string {
   let output = "## Risks / Notes\n\n";
   output += `**Overall Risk:** ${levelEmoji} ${riskScore.level.toUpperCase()} (score: ${riskScore.score}/100)\n\n`;
 
-  if (riskScore.evidenceBullets.length > 0) {
-    for (const bullet of riskScore.evidenceBullets) {
+  const bullets = riskScore.evidenceBullets ?? [];
+  if (bullets.length > 0) {
+    for (const bullet of bullets) {
       output += `- ${bullet}\n`;
     }
     output += "\n";
