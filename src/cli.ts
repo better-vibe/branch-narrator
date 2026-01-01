@@ -627,6 +627,28 @@ program
     }
   });
 
+// integrate command - generate provider rules (Cursor, etc.)
+program
+  .command("integrate <target>")
+  .description("Generate provider-specific rules (e.g., cursor)")
+  .option("--dry-run", "Preview what would be written without creating files", false)
+  .option("--force", "Overwrite existing files", false)
+  .action(async (target, options) => {
+    try {
+      const { executeIntegrate } = await import("./commands/integrate.js");
+
+      await executeIntegrate({
+        target: target as "cursor",
+        dryRun: options.dryRun,
+        force: options.force,
+      });
+
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
 /**
  * Handle errors and exit with appropriate code.
  */
