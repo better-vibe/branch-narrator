@@ -353,6 +353,7 @@ program
     "Output format: json|compact",
     "json"
   )
+  .option("--aggregate", "Include findings aggregated by type", false)
   .option("--dry-run", "Preview analysis scope without running analyzers", false)
   .action(async (options) => {
     try {
@@ -408,7 +409,9 @@ program
         profile: resolvedProfile,
       };
 
-      const jsonOutput = renderJson(renderContext);
+      const jsonOutput = renderJson(renderContext, {
+        includeFindingsByType: options.aggregate,
+      });
       const output = format === "compact" 
         ? JSON.stringify(JSON.parse(jsonOutput))
         : jsonOutput;

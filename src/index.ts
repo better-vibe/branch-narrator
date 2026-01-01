@@ -28,6 +28,12 @@ export {
 
 // Renderers
 export { renderMarkdown } from "./render/markdown.js";
-export { renderJson } from "./render/json.js";
+export {
+  aggregateFindingsByType,
+  renderJson,
+  validateFactsOutput,
+  type FactsOutput,
+  type RenderJsonOptions,
+} from "./render/json.js";
 export { computeRiskScore } from "./render/risk-score.js";
 

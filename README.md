@@ -66,6 +66,9 @@ branch-narrator facts --out .ai/facts.json
 # Compact JSON (single line)
 branch-narrator facts --format compact
 
+# Include findings aggregated by type
+branch-narrator facts --aggregate
+
 # Different diff modes
 branch-narrator facts --mode unstaged  # working tree vs index
 branch-narrator facts --mode staged    # index vs HEAD

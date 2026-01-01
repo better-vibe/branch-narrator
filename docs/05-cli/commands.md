@@ -117,6 +117,7 @@ branch-narrator facts [options]
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
 | `--out <path>` | stdout | Write output to file (creates directories as needed) |
 | `--format <type>` | `json` | Output format: `json` (pretty) or `compact` (single-line) |
+| `--aggregate` | `false` | Include findings aggregated by type |
 | `--dry-run` | `false` | Preview analysis scope without running analyzers |
 
 ### Diff Modes
@@ -138,6 +139,8 @@ branch-narrator facts [options]
 ### Features
 
 - **JSON Schema**: Consistent structure with `profile`, `riskScore`, and `findings` fields
+- **Schema Validation**: Built-in validation function for programmatic use
+- **Findings Aggregation**: Optional count of findings by type (`--aggregate`)
 - **File Output**: Write to file with automatic directory creation (`--out`)
 - **Compact Mode**: Single-line JSON for space-efficient storage (`--format compact`)
 - **Dry Run**: Preview what will be analyzed without running analyzers (`--dry-run`)
@@ -167,13 +170,19 @@ branch-narrator facts --format compact
 # Preview analysis scope
 branch-narrator facts --dry-run
 
+# Include findings aggregated by type
+branch-narrator facts --aggregate
+
 # Parse with jq
 branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
 
 # Get risk level
 branch-narrator facts | jq -r '.riskScore.level'
 
-# Count findings by type
+# Count findings by type (using built-in aggregation)
+branch-narrator facts --aggregate | jq '.findingsByType'
+
+# Or count manually with jq
 branch-narrator facts | jq '.findings | group_by(.type) | map({type: .[0].type, count: length})'
 ```
 
@@ -211,8 +220,33 @@ branch-narrator facts | jq '.findings | group_by(.type) | map({type: .[0].type, 
       "change": "added",
       "evidenceFiles": ["src/lib/db.ts"]
     }
-  ]
+  ],
+  "findingsByType": {
+    "file-summary": 1,
+    "route-change": 1,
+    "env-var": 1
+  }
 }
+```
+
+**Note**: The `findingsByType` field is only included when using the `--aggregate` option.
+
+### Programmatic Usage
+
+```typescript
+import { validateFactsOutput, aggregateFindingsByType } from 'branch-narrator';
+
+// Validate JSON output
+const output = JSON.parse(jsonString);
+if (validateFactsOutput(output)) {
+  console.log('Valid facts output');
+} else {
+  console.error('Invalid facts output');
+}
+
+// Aggregate findings manually
+const counts = aggregateFindingsByType(output.findings);
+console.log(counts); // { "file-summary": 1, "env-var": 2, ... }
 ```
 
 ---
