@@ -3,6 +3,7 @@
  */
 
 import { getAdditions } from "../git/parser.js";
+import { createEvidence, extractRepresentativeExcerpt } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -147,8 +148,24 @@ export const routeDetectorAnalyzer: Analyzer = {
       const routeId = pathToRouteId(path);
       const routeType = getRouteType(path);
 
+      // Extract evidence
+      const evidence = [];
+      if (diff && diff.hunks.length > 0) {
+        const additions = getAdditions(diff);
+        if (additions.length > 0) {
+          const excerpt = extractRepresentativeExcerpt(additions);
+          if (excerpt) {
+            evidence.push(createEvidence(path, excerpt));
+          }
+        }
+      }
+
       const finding: RouteChangeFinding = {
         type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence,
         routeId,
         file: path,
         change: status,
@@ -160,6 +177,11 @@ export const routeDetectorAnalyzer: Analyzer = {
         const methods = detectMethods(diff);
         if (methods.length > 0) {
           finding.methods = methods;
+          // Add method export as evidence if available
+          const methodsExcerpt = methods.map(m => `export const ${m}`).join(", ");
+          if (!evidence.length) {
+            evidence.push(createEvidence(path, methodsExcerpt));
+          }
         }
       }
 

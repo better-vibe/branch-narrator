@@ -8,6 +8,7 @@ import type {
   Finding,
   RiskLevel,
   RiskScore,
+  RiskFactor,
 } from "../core/types.js";
 
 /**
@@ -72,6 +73,7 @@ function checkLowRiskOnlyChanges(
 export function computeRiskScore(findings: Finding[]): RiskScore {
   let score = 0;
   const evidenceBullets: string[] = [];
+  const factors: RiskFactor[] = [];
 
   // Check for low-risk only changes first
   const { isLowRisk, category } = checkLowRiskOnlyChanges(findings);
@@ -82,59 +84,111 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
       config: -5,
       "docs/tests/config": -10,
     };
-    score += reductions[category] ?? 0;
+    const weight = reductions[category] ?? 0;
+    score += weight;
     evidenceBullets.push(
       `✅ Changes are only in ${category} (lower risk)`
     );
+    factors.push({
+      kind: "low-risk-category",
+      weight,
+      explanation: `Changes are only in ${category} (lower risk)`,
+      evidence: [],
+    });
   }
 
   for (const finding of findings) {
     switch (finding.type) {
       case "risk-flag":
-        if (finding.risk === "high") {
-          score += 40;
-          evidenceBullets.push(`⚠️ ${finding.evidence}`);
-        } else if (finding.risk === "medium") {
-          score += 20;
-          evidenceBullets.push(`⚡ ${finding.evidence}`);
-        } else {
-          score += 5;
-          evidenceBullets.push(`ℹ️ ${finding.evidence}`);
+        {
+          const weight = finding.risk === "high" 
+            ? 40 
+            : finding.risk === "medium" 
+            ? 20 
+            : 5;
+          score += weight;
+          const emoji = finding.risk === "high" 
+            ? "⚠️" 
+            : finding.risk === "medium" 
+            ? "⚡" 
+            : "ℹ️";
+          evidenceBullets.push(`${emoji} ${finding.evidenceText}`);
+          factors.push({
+            kind: `risk-${finding.risk}`,
+            weight,
+            explanation: finding.evidenceText,
+            evidence: finding.evidence,
+          });
         }
         break;
 
       case "db-migration":
-        if (finding.risk === "high") {
-          score += 30;
-          evidenceBullets.push(
-            `⚠️ High-risk database migration: ${finding.reasons.join(", ")}`
-          );
-        } else if (finding.risk === "medium") {
-          score += 15;
-          evidenceBullets.push(
-            `⚡ Database migration detected: ${finding.files.join(", ")}`
-          );
+        {
+          const weight = finding.risk === "high" 
+            ? 30 
+            : finding.risk === "medium" 
+            ? 15 
+            : 0;
+          if (weight > 0) {
+            score += weight;
+            const explanation = finding.risk === "high"
+              ? `High-risk database migration: ${finding.reasons.join(", ")}`
+              : `Database migration detected: ${finding.files.join(", ")}`;
+            evidenceBullets.push(
+              finding.risk === "high" ? `⚠️ ${explanation}` : `⚡ ${explanation}`
+            );
+            factors.push({
+              kind: "db-migration",
+              weight,
+              explanation,
+              evidence: finding.evidence,
+            });
+          }
         }
         break;
 
       case "route-change":
         if (finding.change === "added") {
           score += 5;
+          factors.push({
+            kind: "route-added",
+            weight: 5,
+            explanation: `Route added: ${finding.routeId}`,
+            evidence: finding.evidence,
+          });
         } else if (finding.change === "deleted") {
           score += 10;
           evidenceBullets.push(`ℹ️ Route deleted: ${finding.routeId}`);
+          factors.push({
+            kind: "route-deleted",
+            weight: 10,
+            explanation: `Route deleted: ${finding.routeId}`,
+            evidence: finding.evidence,
+          });
         }
         break;
 
       case "dependency-change":
-        if (finding.impact === "major") {
-          score += 15;
-        } else if (finding.impact === "minor") {
-          score += 5;
-        }
-        // Risky packages get additional points (already flagged via risk-flag)
-        if (finding.riskCategory && finding.impact === "new") {
-          score += 10;
+        {
+          let weight = 0;
+          if (finding.impact === "major") {
+            weight = 15;
+          } else if (finding.impact === "minor") {
+            weight = 5;
+          }
+          // Risky packages get additional points (already flagged via risk-flag)
+          if (finding.riskCategory && finding.impact === "new") {
+            weight += 10;
+          }
+          if (weight > 0) {
+            score += weight;
+            factors.push({
+              kind: `dependency-${finding.impact}`,
+              weight,
+              explanation: `${finding.name}: ${finding.from ?? "new"} → ${finding.to ?? "removed"}`,
+              evidence: finding.evidence,
+            });
+          }
         }
         break;
 
@@ -142,12 +196,24 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
         if (finding.change === "added") {
           score += 5;
           evidenceBullets.push(`ℹ️ New env var: ${finding.name}`);
+          factors.push({
+            kind: "env-var-added",
+            weight: 5,
+            explanation: `New env var: ${finding.name}`,
+            evidence: finding.evidence,
+          });
         }
         break;
 
       case "security-file":
         // Additional points for security files (already adds risk-flag)
         score += 15;
+        factors.push({
+          kind: "security-file",
+          weight: 15,
+          explanation: `Security-sensitive files changed: ${finding.files.length} file(s)`,
+          evidence: finding.evidence,
+        });
         break;
     }
   }
@@ -165,5 +231,5 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
     level = "low";
   }
 
-  return { score, level, evidenceBullets };
+  return { score, level, factors, evidenceBullets };
 }

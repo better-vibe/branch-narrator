@@ -2,6 +2,7 @@
  * Vitest test change detector.
  */
 
+import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -56,8 +57,17 @@ export const vitestAnalyzer: Analyzer = {
       return [];
     }
 
+    // Create evidence from file list
+    const evidence = testFiles
+      .slice(0, 3)
+      .map((file) => createEvidence(file, `Test file ${file}`));
+
     const finding: TestChangeFinding = {
       type: "test-change",
+      kind: "test-change",
+      category: "tests",
+      confidence: "high",
+      evidence,
       framework: "vitest",
       files: testFiles,
     };

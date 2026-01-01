@@ -184,7 +184,7 @@ describe("supabaseAnalyzer", () => {
 
     expect(riskFinding).toBeDefined();
     expect(riskFinding.risk).toBe("high");
-    expect(riskFinding.evidence).toContain("Destructive SQL");
+    expect(riskFinding.evidenceText).toContain("Destructive SQL");
   });
 
   it("should return empty for no supabase files", () => {

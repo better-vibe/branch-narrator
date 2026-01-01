@@ -2,6 +2,29 @@
  * File filtering utilities to exclude build artifacts and generated files.
  */
 
+// Default exclusion patterns
+export const DEFAULT_EXCLUDES = [
+  "**/*.d.ts",
+  "**/*.map",
+  "**/*.min.js",
+  "**/*.min.css",
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/.next/**",
+  "**/.svelte-kit/**",
+  "**/.nuxt/**",
+  "**/out/**",
+  "**/.cache/**",
+  "**/.parcel-cache/**",
+  "**/vendor/**",
+  "**/*.log",
+  "**/package-lock.json",
+  "**/yarn.lock",
+  "**/pnpm-lock.yaml",
+  "**/bun.lock",
+];
+
 // Patterns for files that should be excluded from analysis
 const EXCLUDED_PATTERNS: RegExp[] = [
   // Build output

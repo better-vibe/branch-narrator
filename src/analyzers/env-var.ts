@@ -3,6 +3,7 @@
  */
 
 import { shouldExcludeFile } from "../core/filters.js";
+import { createEvidence, extractRepresentativeExcerpt } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -157,7 +158,10 @@ export const envVarAnalyzer: Analyzer = {
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];
-    const varToFiles = new Map<string, Set<string>>();
+    const varToFilesAndExcerpts = new Map<
+      string,
+      Array<{ file: string; excerpt: string }>
+    >();
 
     // Scan code files for env vars in additions
     for (const diff of changeSet.diffs) {
@@ -171,24 +175,50 @@ export const envVarAnalyzer: Analyzer = {
         continue;
       }
 
-      const additions = getAdditions(diff).join("\n");
-      const vars = extractEnvVars(additions);
+      const additions = getAdditions(diff);
+      const additionsText = additions.join("\n");
+      const vars = extractEnvVars(additionsText);
 
       for (const varName of vars) {
-        if (!varToFiles.has(varName)) {
-          varToFiles.set(varName, new Set());
+        if (!varToFilesAndExcerpts.has(varName)) {
+          varToFilesAndExcerpts.set(varName, []);
         }
-        varToFiles.get(varName)!.add(diff.path);
+        
+        // Find line with this var
+        const lineWithVar = additions.find(line => 
+          line.includes(varName)
+        );
+        const excerpt = lineWithVar 
+          ? lineWithVar.trim()
+          : extractRepresentativeExcerpt(additions);
+        
+        varToFilesAndExcerpts.get(varName)!.push({
+          file: diff.path,
+          excerpt,
+        });
       }
     }
 
     // Create findings
-    for (const [name, files] of varToFiles) {
+    for (const [name, fileExcerpts] of varToFilesAndExcerpts) {
+      const files = Array.from(
+        new Set(fileExcerpts.map((fe) => fe.file))
+      );
+      
+      // Create evidence (up to 3 excerpts)
+      const evidence = fileExcerpts
+        .slice(0, 3)
+        .map((fe) => createEvidence(fe.file, fe.excerpt));
+
       const finding: EnvVarFinding = {
         type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence,
         name,
         change: "added", // MVP heuristic: if in additions, treat as added
-        evidenceFiles: Array.from(files),
+        evidenceFiles: files,
       };
       findings.push(finding);
     }

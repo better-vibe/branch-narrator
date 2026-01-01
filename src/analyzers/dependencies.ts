@@ -3,6 +3,7 @@
  */
 
 import * as semver from "semver";
+import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -195,8 +196,13 @@ export function compareDependencies(
 
       if (!from && to) {
         // Added
+        const excerpt = `"${name}": "${to}"`;
         findings.push({
           type: "dependency-change",
+          kind: "dependency-change",
+          category: "dependencies",
+          confidence: "high",
+          evidence: [createEvidence("package.json", excerpt)],
           name,
           section,
           to,
@@ -205,8 +211,13 @@ export function compareDependencies(
         });
       } else if (from && !to) {
         // Removed
+        const excerpt = `"${name}": "${from}" (removed)`;
         findings.push({
           type: "dependency-change",
+          kind: "dependency-change",
+          category: "dependencies",
+          confidence: "high",
+          evidence: [createEvidence("package.json", excerpt)],
           name,
           section,
           from,
@@ -216,8 +227,13 @@ export function compareDependencies(
       } else {
         // Changed
         const impact = determineImpact(from, to);
+        const excerpt = `"${name}": "${from}" → "${to}"`;
         findings.push({
           type: "dependency-change",
+          kind: "dependency-change",
+          category: "dependencies",
+          confidence: "high",
+          evidence: [createEvidence("package.json", excerpt)],
           name,
           section,
           from,
@@ -253,10 +269,15 @@ export const dependencyAnalyzer: Analyzer = {
         depFinding.from &&
         depFinding.to
       ) {
+        const excerpt = `${depFinding.name}: ${depFinding.from} → ${depFinding.to}`;
         const riskFinding: RiskFlagFinding = {
           type: "risk-flag",
+          kind: "risk-flag",
+          category: "dependencies",
+          confidence: "high",
+          evidence: [createEvidence("package.json", excerpt)],
           risk: "high",
-          evidence: `Major version bump: ${depFinding.name} ${depFinding.from} → ${depFinding.to}`,
+          evidenceText: `Major version bump: ${depFinding.name} ${depFinding.from} → ${depFinding.to}`,
         };
         findings.push(riskFinding);
       }
@@ -269,10 +290,15 @@ export const dependencyAnalyzer: Analyzer = {
           native: "Native Module",
           payment: "Payment Processing",
         };
+        const excerpt = `${depFinding.name}: ${depFinding.to}`;
         const riskFinding: RiskFlagFinding = {
           type: "risk-flag",
+          kind: "risk-flag",
+          category: "dependencies",
+          confidence: "medium",
+          evidence: [createEvidence("package.json", excerpt)],
           risk: "medium",
-          evidence: `New ${categoryLabels[depFinding.riskCategory]} package: ${depFinding.name}`,
+          evidenceText: `New ${categoryLabels[depFinding.riskCategory]} package: ${depFinding.name}`,
         };
         findings.push(riskFinding);
       }

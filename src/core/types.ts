@@ -32,77 +32,147 @@ export interface FileDiff {
 }
 
 // ============================================================================
+// Evidence and Category Types
+// ============================================================================
+
+export interface Evidence {
+  file: string;
+  excerpt: string;
+  line?: number;
+  hunk?: {
+    oldStart: number;
+    oldLines: number;
+    newStart: number;
+    newLines: number;
+  };
+}
+
+export type Category =
+  | "routes"
+  | "database"
+  | "config_env"
+  | "cloudflare"
+  | "dependencies"
+  | "tests"
+  | "ci"
+  | "docs"
+  | "infra"
+  | "unknown";
+
+export type Confidence = "high" | "medium" | "low";
+
+// ============================================================================
 // Finding Types (Discriminated Union)
 // ============================================================================
 
 export interface FileSummaryFinding {
   type: "file-summary";
+  kind: "file-summary";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   added: string[];
   modified: string[];
   deleted: string[];
   renamed: Array<{ from: string; to: string }>;
+  tags?: string[];
 }
 
 export interface DependencyChangeFinding {
   type: "dependency-change";
+  kind: "dependency-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   name: string;
   section: "dependencies" | "devDependencies";
   from?: string;
   to?: string;
   impact?: "major" | "minor" | "patch" | "new" | "removed" | "unknown";
   riskCategory?: "auth" | "database" | "native" | "payment";
+  tags?: string[];
 }
 
 export type RouteType = "page" | "layout" | "endpoint" | "error" | "unknown";
 
 export interface RouteChangeFinding {
   type: "route-change";
+  kind: "route-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   routeId: string;
   file: string;
   change: FileStatus;
   routeType: RouteType;
   methods?: string[]; // For endpoints: GET, POST, etc.
+  tags?: string[];
 }
 
 export type EnvVarChange = "added" | "touched";
 
 export interface EnvVarFinding {
   type: "env-var";
+  kind: "env-var";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   name: string;
   change: EnvVarChange;
   evidenceFiles: string[];
+  tags?: string[];
 }
 
 export type MigrationRisk = "high" | "medium" | "low";
 
 export interface DbMigrationFinding {
   type: "db-migration";
+  kind: "db-migration";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   tool: "supabase";
   files: string[];
   risk: MigrationRisk;
   reasons: string[];
+  tags?: string[];
 }
 
 export type CloudflareArea = "wrangler" | "pages" | "workers" | "ci";
 
 export interface CloudflareChangeFinding {
   type: "cloudflare-change";
+  kind: "cloudflare-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   area: CloudflareArea;
   files: string[];
+  tags?: string[];
 }
 
 export interface TestChangeFinding {
   type: "test-change";
+  kind: "test-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   framework: "vitest";
   files: string[];
+  tags?: string[];
 }
 
 export type RiskLevel = "high" | "medium" | "low";
 
 export interface RiskFlagFinding {
   type: "risk-flag";
+  kind: "risk-flag";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   risk: RiskLevel;
-  evidence: string;
+  evidenceText: string; // Legacy field for compatibility
+  tags?: string[];
 }
 
 export type FileCategory =
@@ -117,11 +187,16 @@ export type FileCategory =
 
 export interface FileCategoryFinding {
   type: "file-category";
+  kind: "file-category";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   categories: Record<FileCategory, string[]>;
   summary: Array<{
     category: FileCategory;
     count: number;
   }>;
+  tags?: string[];
 }
 
 export type SecurityFileReason =
@@ -134,8 +209,13 @@ export type SecurityFileReason =
 
 export interface SecurityFileFinding {
   type: "security-file";
+  kind: "security-file";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
   files: string[];
   reasons: SecurityFileReason[];
+  tags?: string[];
 }
 
 export type RiskyPackageCategory =
@@ -160,10 +240,19 @@ export type Finding =
 // Risk Score
 // ============================================================================
 
+export interface RiskFactor {
+  kind: string;
+  weight: number;
+  explanation: string;
+  evidence: Evidence[];
+}
+
 export interface RiskScore {
   score: number; // 0-100
   level: RiskLevel;
-  evidenceBullets: string[];
+  factors: RiskFactor[];
+  // Legacy field for compatibility
+  evidenceBullets?: string[];
 }
 
 // ============================================================================
@@ -217,5 +306,85 @@ export interface RenderContext {
     context?: string;
     testNotes?: string;
   };
+}
+
+// ============================================================================
+// Facts Output Schema (Agent-Grade)
+// ============================================================================
+
+export interface CategoryAggregate {
+  id: Category;
+  count: number;
+  riskWeight: number;
+  topEvidence: Evidence[];
+}
+
+export interface GitInfo {
+  base: string;
+  head: string;
+  range: string;
+  repoRoot: string;
+  isDirty: boolean;
+}
+
+export interface ProfileInfo {
+  requested: ProfileName;
+  detected: ProfileName;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+}
+
+export interface Stats {
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
+  skippedFilesCount: number;
+}
+
+export interface Filters {
+  defaultExcludes: string[];
+  excludes: string[];
+  includes: string[];
+  redact: boolean;
+  maxFileBytes: number;
+  maxDiffBytes: number;
+  maxFindings?: number;
+}
+
+export interface Summary {
+  byArea: Record<string, number>;
+  highlights: string[];
+}
+
+export interface Action {
+  id: string;
+  blocking: boolean;
+  reason: string;
+  commands: Array<{
+    cmd: string;
+    when: "local" | "ci" | "local-or-ci";
+  }>;
+}
+
+export interface SkippedFile {
+  file: string;
+  reason: string;
+  detail?: string;
+}
+
+export interface FactsOutput {
+  schemaVersion: string;
+  generatedAt: string;
+  git: GitInfo;
+  profile: ProfileInfo;
+  stats: Stats;
+  filters: Filters;
+  summary: Summary;
+  categories: CategoryAggregate[];
+  risk: RiskScore;
+  findings: Finding[];
+  actions: Action[];
+  skippedFiles: SkippedFile[];
+  warnings: string[];
 }
 

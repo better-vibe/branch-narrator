@@ -105,7 +105,7 @@ describe("securityFilesAnalyzer", () => {
     ) as RiskFlagFinding;
     expect(riskFinding).toBeDefined();
     expect(riskFinding.risk).toBe("medium");
-    expect(riskFinding.evidence).toContain("Security-sensitive");
+    expect(riskFinding.evidenceText).toContain("Security-sensitive");
   });
 
   it("should return empty for no security files", () => {

@@ -11,7 +11,7 @@ import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet } from "./git/collector.js";
 import { getProfile, resolveProfileName } from "./profiles/index.js";
-import { renderJson, renderMarkdown, renderTerminal } from "./render/index.js";
+import { renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
 
 const program = new Command();
@@ -270,56 +270,112 @@ program
 // facts command - JSON output for machine consumption
 program
   .command("facts")
-  .description("Output JSON findings (for piping to other tools)")
-  .option(
-    "--mode <type>",
-    "Diff mode: branch|unstaged|staged|all",
-    "branch"
-  )
-  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
-  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
+  .description("Output structured JSON facts (agent-grade output)")
+  .option("--base <ref>", "Base git reference", "main")
+  .option("--head <ref>", "Head git reference", "HEAD")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit)",
     "auto"
   )
+  .option("--format <type>", "Output format: json", "json")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .option("--redact", "Redact obvious secret values in evidence excerpts", false)
+  .option(
+    "--exclude <glob>",
+    "Additional exclusion glob (repeatable)",
+    collect,
+    []
+  )
+  .option(
+    "--include <glob>",
+    "Include only files matching glob (repeatable)",
+    collect,
+    []
+  )
+  .option(
+    "--max-file-bytes <n>",
+    "Maximum file size in bytes to analyze",
+    "1048576"
+  )
+  .option(
+    "--max-diff-bytes <n>",
+    "Maximum diff size in bytes to analyze",
+    "5242880"
+  )
+  .option(
+    "--max-findings <n>",
+    "Maximum number of findings to include"
+  )
   .action(async (options) => {
     try {
-      // Validate mode
-      const mode = options.mode as DiffMode;
-      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
-        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+      // Import buildFacts dynamically to avoid circular dependencies
+      const { buildFacts } = await import("./facts/index.js");
+
+      // Validate format
+      if (options.format !== "json") {
+        console.error(`Invalid format: ${options.format}. Only json is supported.`);
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
-        if (baseProvided || headProvided) {
-          console.error(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      // Parse numeric options
+      const maxFileBytes = parseInt(options.maxFileBytes, 10);
+      const maxDiffBytes = parseInt(options.maxDiffBytes, 10);
+      const maxFindings = options.maxFindings
+        ? parseInt(options.maxFindings, 10)
+        : undefined;
 
-      const { findings, resolvedProfile } = await runAnalysisWithMode({
-        mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
-        profile: options.profile as ProfileName,
-        showSpinner: false,
+      // Collect git data
+      const changeSet = await collectChangeSet({
+        base: options.base,
+        head: options.head,
       });
 
+      // Resolve profile
+      const resolvedProfile = resolveProfileName(
+        options.profile as ProfileName,
+        changeSet,
+        process.cwd()
+      );
+      const profile = getProfile(resolvedProfile);
+
+      // Run analyzers
+      const findings: Finding[] = [];
+      for (const analyzer of profile.analyzers) {
+        const analyzerFindings = analyzer.analyze(changeSet);
+        findings.push(...analyzerFindings);
+      }
+
+      // Compute risk
       const riskScore = computeRiskScore(findings);
 
-      const renderContext: RenderContext = {
+      // Build facts output
+      const facts = await buildFacts({
+        changeSet,
         findings,
         riskScore,
-        profile: resolvedProfile,
-      };
+        requestedProfile: options.profile as ProfileName,
+        detectedProfile: resolvedProfile,
+        profileConfidence: "high",
+        profileReasons: [`Detected ${resolvedProfile} project`],
+        filters: {
+          excludes: options.exclude,
+          includes: options.include,
+          redact: options.redact,
+          maxFileBytes,
+          maxDiffBytes,
+          maxFindings,
+        },
+        skippedFiles: [],
+        warnings: [],
+      });
 
-      console.log(renderJson(renderContext));
+      // Output JSON
+      const json = options.pretty
+        ? JSON.stringify(facts, null, 2)
+        : JSON.stringify(facts);
+      
+      console.log(json);
       process.exit(0);
     } catch (error) {
       handleError(error);

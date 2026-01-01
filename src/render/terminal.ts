@@ -591,8 +591,9 @@ function renderRisks(context: RenderContext): string {
 
   output += `${colors.label("Overall Risk:")} ${getRiskBadge(riskScore.level)} ${colors.muted(`(score: ${riskScore.score}/100)`)}\n\n`;
 
-  if (riskScore.evidenceBullets.length > 0) {
-    for (const bullet of riskScore.evidenceBullets) {
+  const bullets = riskScore.evidenceBullets ?? [];
+  if (bullets.length > 0) {
+    for (const bullet of bullets) {
       output += `  ${icons.bullet} ${bullet}\n`;
     }
   }

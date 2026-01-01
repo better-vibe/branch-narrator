@@ -51,14 +51,65 @@ branch-narrator pr-body --interactive
 branch-narrator pr-body | pbcopy
 ```
 
-### Generate JSON Facts
+### Generate JSON Facts (Agent-Grade)
 
 ```bash
-# Machine-readable output
+# Machine-readable structured output
 branch-narrator facts
 
+# Pretty-printed JSON
+branch-narrator facts --pretty
+
+# Redact secrets in evidence excerpts
+branch-narrator facts --redact
+
+# Custom git refs
+branch-narrator facts --base develop --head feature/auth
+
+# Limit output
+branch-narrator facts --max-findings 50
+
+# Filter files
+branch-narrator facts --exclude "**/test/**" --include "src/**"
+
 # Parse with jq
-branch-narrator facts | jq '.riskScore.level'
+branch-narrator facts | jq '.risk.level'
+branch-narrator facts | jq '.categories[] | select(.id == "database")'
+branch-narrator facts | jq '.actions[] | select(.blocking == true)'
+```
+
+**Output Schema (v1.0):**
+- `schemaVersion`: Schema version identifier
+- `generatedAt`: ISO timestamp
+- `git`: Git metadata (base, head, range, isDirty)
+- `profile`: Detected project profile with confidence
+- `stats`: File change statistics
+- `filters`: Applied filtering configuration
+- `summary`: High-level summary with highlights
+- `categories`: Findings aggregated by category with risk weights
+- `risk`: Structured risk score with factors and evidence
+- `findings`: Detailed findings array (typed discriminated union)
+- `actions`: Actionable recommendations (blocking/non-blocking)
+- `skippedFiles`: Files excluded from analysis with reasons
+- `warnings`: Any warnings encountered during analysis
+
+**Example categories output:**
+```json
+{
+  "categories": [
+    {
+      "id": "database",
+      "count": 2,
+      "riskWeight": 45,
+      "topEvidence": [
+        {
+          "file": "supabase/migrations/002_users.sql",
+          "excerpt": "DROP TABLE IF EXISTS old_users;"
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ### Dump Diff for AI Agents
