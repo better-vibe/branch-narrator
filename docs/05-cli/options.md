@@ -2,9 +2,32 @@
 
 Detailed documentation for each CLI option.
 
+## --mode
+
+Select the diff mode to use. Available on `pretty`, `facts`, and `dump-diff` commands.
+
+```bash
+branch-narrator pretty --mode <type>
+branch-narrator facts --mode <type>
+branch-narrator dump-diff --mode <type>
+```
+
+| Mode | Description | Git Equivalent |
+|------|-------------|----------------|
+| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
+| `unstaged` | Working tree vs index | `git diff` |
+| `staged` | Index vs HEAD | `git diff --staged` |
+| `all` | Working tree vs HEAD (includes untracked) | `git diff HEAD` |
+
+**Default:** `branch`
+
+**Note:** When using `unstaged`, `staged`, or `all` modes, the `--base` and `--head` options are ignored (a warning is printed to stderr).
+
+---
+
 ## --base
 
-Base git reference to compare against.
+Base git reference to compare against. Only used in `branch` mode.
 
 ```bash
 branch-narrator pretty --base <ref>
@@ -30,7 +53,7 @@ branch-narrator dump-diff --base <ref>
 
 ## --head
 
-Head git reference (your changes).
+Head git reference (your changes). Only used in `branch` mode.
 
 ```bash
 branch-narrator pr-body --head <ref>
@@ -46,7 +69,7 @@ Same value types as `--base`.
 
 ## -u, --uncommitted
 
-Include uncommitted and untracked changes.
+Include uncommitted and untracked changes. Only available on `pr-body` command.
 
 ```bash
 branch-narrator pr-body -u
@@ -66,10 +89,9 @@ When enabled:
 ```bash
 # Review changes before committing
 branch-narrator pr-body -u
-
-# Check risk of current work
-branch-narrator facts -u | jq '.riskScore'
 ```
+
+**Note:** For `pretty` and `facts` commands, use `--mode all` instead.
 
 ---
 
@@ -78,7 +100,9 @@ branch-narrator facts -u | jq '.riskScore'
 Specify which analyzer profile to use.
 
 ```bash
+branch-narrator pretty --profile <name>
 branch-narrator pr-body --profile <name>
+branch-narrator facts --profile <name>
 ```
 
 ### Values
@@ -98,7 +122,7 @@ branch-narrator pr-body --profile <name>
 
 ## --interactive
 
-Enable interactive mode with prompts.
+Enable interactive mode with prompts. Only available on `pr-body` command.
 
 ```bash
 branch-narrator pr-body --interactive
@@ -121,30 +145,9 @@ This PR implements user authentication using Supabase Auth.
 
 ---
 
-## dump-diff Options
+## dump-diff Specific Options
 
-The following options are specific to the `dump-diff` command.
-
-### --mode
-
-Select the diff mode to use.
-
-```bash
-branch-narrator dump-diff --mode <type>
-```
-
-| Mode | Description | Git Equivalent |
-|------|-------------|----------------|
-| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
-| `unstaged` | Working tree vs index | `git diff` |
-| `staged` | Index vs HEAD | `git diff --staged` |
-| `all` | Working tree vs HEAD | `git diff HEAD` |
-
-**Default:** `branch`
-
-**Note:** When using `unstaged`, `staged`, or `all` modes, the `--base` and `--head` options are ignored (a warning is printed to stderr).
-
----
+The following options are only available on the `dump-diff` command.
 
 ### --no-untracked
 
@@ -155,7 +158,7 @@ branch-narrator dump-diff --mode all --no-untracked
 ```
 
 By default (without this flag), non-branch modes include untracked files:
-- Enumerates untracked files via `git status --porcelain`
+- Enumerates untracked files via `git ls-files --others --exclude-standard`
 - Applies include/exclude filters to untracked files
 - Generates diffs for each untracked file
 - In JSON output, untracked files have `"untracked": true`
@@ -299,14 +302,24 @@ DEBUG=1 branch-narrator pr-body
 ## Combining Options
 
 ```bash
-# Full example
+# Full example with branch mode
 branch-narrator pr-body \
   --base main \
   --head feature/auth \
   --profile sveltekit \
   --interactive
 
-# Short form
-branch-narrator pr-body -u --interactive
-```
+# Using modes for uncommitted work
+branch-narrator pretty --mode all
+branch-narrator facts --mode staged
 
+# dump-diff with all options
+branch-narrator dump-diff \
+  --mode all \
+  --format md \
+  --unified 3 \
+  --include "src/**" \
+  --exclude "**/generated/**" \
+  --max-chars 25000 \
+  --out .ai/changes.md
+```

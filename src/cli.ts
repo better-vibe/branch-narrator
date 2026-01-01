@@ -7,7 +7,7 @@ import { createInterface } from "readline";
 import ora from "ora";
 import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
-import type { Finding, ProfileName, RenderContext } from "./core/types.js";
+import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet } from "./git/collector.js";
 import { getProfile, resolveProfileName } from "./profiles/index.js";
@@ -41,7 +41,64 @@ async function prompt(question: string): Promise<string> {
 }
 
 /**
- * Run analysis and return findings.
+ * Run analysis with mode-based options.
+ */
+async function runAnalysisWithMode(options: {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  profile: ProfileName;
+  showSpinner?: boolean;
+}): Promise<{ findings: Finding[]; resolvedProfile: ProfileName }> {
+  const spinner = options.showSpinner
+    ? ora({
+        text: "Collecting git changes...",
+        color: "cyan",
+      }).start()
+    : null;
+
+  // Collect git data using mode-based options
+  const changeSet = await collectChangeSet({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    includeUntracked: options.mode === "all",
+  });
+
+  if (spinner) {
+    spinner.text = "Resolving profile...";
+  }
+
+  // Resolve profile
+  const resolvedProfile = resolveProfileName(
+    options.profile,
+    changeSet,
+    process.cwd()
+  );
+  const profile = getProfile(resolvedProfile);
+
+  if (spinner) {
+    spinner.text = `Running analyzers (${profile.analyzers.length})...`;
+  }
+
+  // Run analyzers
+  const findings: Finding[] = [];
+  for (const analyzer of profile.analyzers) {
+    const analyzerFindings = analyzer.analyze(changeSet);
+    findings.push(...analyzerFindings);
+  }
+
+  if (spinner) {
+    spinner.succeed(
+      chalk.green(`Analysis complete (${findings.length} findings)`)
+    );
+  }
+
+  return { findings, resolvedProfile };
+}
+
+/**
+ * Run analysis with legacy options (for pr-body command).
  */
 async function runAnalysis(options: {
   base: string;
@@ -100,9 +157,13 @@ async function runAnalysis(options: {
 program
   .command("pretty")
   .description("Display a colorized summary of changes (for humans)")
-  .option("--base <ref>", "Base branch to compare against", "main")
-  .option("--head <ref>", "Head branch (current by default)", "HEAD")
-  .option("-u, --uncommitted", "Include uncommitted changes", false)
+  .option(
+    "--mode <type>",
+    "Diff mode: branch|unstaged|staged|all",
+    "branch"
+  )
+  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
+  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit)",
@@ -110,11 +171,29 @@ program
   )
   .action(async (options) => {
     try {
-      const { findings, resolvedProfile } = await runAnalysis({
-        base: options.base,
-        head: options.head,
+      // Validate mode
+      const mode = options.mode as DiffMode;
+      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
+        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      // Warn if base/head provided with non-branch mode
+      if (mode !== "branch") {
+        const baseProvided = options.base !== "main";
+        const headProvided = options.head !== "HEAD";
+        if (baseProvided || headProvided) {
+          console.error(
+            `Warning: --base and --head are ignored when --mode is "${mode}"`
+          );
+        }
+      }
+
+      const { findings, resolvedProfile } = await runAnalysisWithMode({
+        mode,
+        base: mode === "branch" ? options.base : undefined,
+        head: mode === "branch" ? options.head : undefined,
         profile: options.profile as ProfileName,
-        uncommitted: options.uncommitted,
         showSpinner: true,
       });
 
@@ -192,9 +271,13 @@ program
 program
   .command("facts")
   .description("Output JSON findings (for piping to other tools)")
-  .option("--base <ref>", "Base branch to compare against", "main")
-  .option("--head <ref>", "Head branch (current by default)", "HEAD")
-  .option("-u, --uncommitted", "Include uncommitted changes", false)
+  .option(
+    "--mode <type>",
+    "Diff mode: branch|unstaged|staged|all",
+    "branch"
+  )
+  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
+  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit)",
@@ -202,11 +285,29 @@ program
   )
   .action(async (options) => {
     try {
-      const { findings, resolvedProfile } = await runAnalysis({
-        base: options.base,
-        head: options.head,
+      // Validate mode
+      const mode = options.mode as DiffMode;
+      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
+        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      // Warn if base/head provided with non-branch mode
+      if (mode !== "branch") {
+        const baseProvided = options.base !== "main";
+        const headProvided = options.head !== "HEAD";
+        if (baseProvided || headProvided) {
+          console.error(
+            `Warning: --base and --head are ignored when --mode is "${mode}"`
+          );
+        }
+      }
+
+      const { findings, resolvedProfile } = await runAnalysisWithMode({
+        mode,
+        base: mode === "branch" ? options.base : undefined,
+        head: mode === "branch" ? options.head : undefined,
         profile: options.profile as ProfileName,
-        uncommitted: options.uncommitted,
         showSpinner: false,
       });
 

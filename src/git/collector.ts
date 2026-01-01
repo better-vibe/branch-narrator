@@ -13,7 +13,7 @@ import {
   InvalidRefError,
   NotAGitRepoError,
 } from "../core/errors.js";
-import type { ChangeSet } from "../core/types.js";
+import type { ChangeSet, DiffMode } from "../core/types.js";
 
 /**
  * Check if the current directory is inside a git repository.
@@ -49,8 +49,119 @@ export async function refExists(
 }
 
 /**
+ * Build git diff --name-status arguments based on mode.
+ */
+function buildNameStatusArgs(options: {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+}): string[] {
+  const args = ["diff", "--name-status", "--find-renames"];
+
+  switch (options.mode) {
+    case "branch":
+      args.push(`${options.base}..${options.head}`);
+      break;
+    case "unstaged":
+      // Working tree vs index (no additional args)
+      break;
+    case "staged":
+      args.push("--staged");
+      break;
+    case "all":
+      args.push("HEAD");
+      break;
+  }
+
+  return args;
+}
+
+/**
+ * Build git diff arguments based on mode.
+ */
+function buildUnifiedDiffArgs(options: {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+}): string[] {
+  const args = ["diff", "--unified=3"];
+
+  switch (options.mode) {
+    case "branch":
+      args.push(`${options.base}..${options.head}`);
+      break;
+    case "unstaged":
+      // Working tree vs index (no additional args)
+      break;
+    case "staged":
+      args.push("--staged");
+      break;
+    case "all":
+      args.push("HEAD");
+      break;
+  }
+
+  return args;
+}
+
+/**
+ * Get git diff --name-status output based on mode.
+ */
+export async function getNameStatusByMode(
+  options: {
+    mode: DiffMode;
+    base?: string;
+    head?: string;
+  },
+  cwd: string = process.cwd()
+): Promise<string> {
+  const args = buildNameStatusArgs(options);
+
+  try {
+    const result = await execa("git", args, { cwd });
+    return result.stdout;
+  } catch (error) {
+    if (error instanceof Error && "stderr" in error) {
+      throw new GitCommandError(
+        `git ${args.join(" ")}`,
+        String((error as { stderr: unknown }).stderr)
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get unified diff output based on mode.
+ */
+export async function getUnifiedDiffByMode(
+  options: {
+    mode: DiffMode;
+    base?: string;
+    head?: string;
+  },
+  cwd: string = process.cwd()
+): Promise<string> {
+  const args = buildUnifiedDiffArgs(options);
+
+  try {
+    const result = await execa("git", args, { cwd });
+    return result.stdout;
+  } catch (error) {
+    if (error instanceof Error && "stderr" in error) {
+      throw new GitCommandError(
+        `git ${args.join(" ")}`,
+        String((error as { stderr: unknown }).stderr)
+      );
+    }
+    throw error;
+  }
+}
+
+/**
  * Get git diff --name-status output.
  * If head is null, compares working directory against base.
+ * @deprecated Use getNameStatusByMode instead
  */
 export async function getNameStatus(
   base: string,
@@ -78,6 +189,7 @@ export async function getNameStatus(
 /**
  * Get unified diff output.
  * If head is null, compares working directory against base.
+ * @deprecated Use getUnifiedDiffByMode instead
  */
 export async function getUnifiedDiff(
   base: string,
@@ -256,6 +368,9 @@ async function getWorkingPackageJson(
   }
 }
 
+/**
+ * @deprecated Use CollectChangeSetOptionsV2 with mode instead
+ */
 export interface CollectChangeSetOptions {
   base: string;
   head: string;
@@ -263,16 +378,29 @@ export interface CollectChangeSetOptions {
   uncommitted?: boolean;
 }
 
+export interface CollectChangeSetOptionsV2 {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  cwd?: string;
+  includeUntracked?: boolean;
+}
+
 /**
  * Collect all git diff data and build a ChangeSet.
- * If uncommitted is true, compares working directory against base.
+ * Supports both legacy options (base/head/uncommitted) and new mode-based options.
  */
 export async function collectChangeSet(
-  baseOrOptions: string | CollectChangeSetOptions,
+  baseOrOptions: string | CollectChangeSetOptions | CollectChangeSetOptionsV2,
   head?: string,
   cwd: string = process.cwd()
 ): Promise<ChangeSet> {
-  // Handle both old signature and new options object
+  // Handle v2 options with mode
+  if (typeof baseOrOptions === "object" && "mode" in baseOrOptions) {
+    return collectChangeSetByMode(baseOrOptions);
+  }
+
+  // Handle both old signature and legacy options object
   let options: CollectChangeSetOptions;
   if (typeof baseOrOptions === "string") {
     options = { base: baseOrOptions, head: head!, cwd };
@@ -342,3 +470,113 @@ export async function collectChangeSet(
   });
 }
 
+/**
+ * Collect all git diff data and build a ChangeSet using mode-based options.
+ */
+async function collectChangeSetByMode(
+  options: CollectChangeSetOptionsV2
+): Promise<ChangeSet> {
+  const cwd = options.cwd ?? process.cwd();
+  const includeUntracked = options.includeUntracked ?? (options.mode === "all");
+
+  // Validate git repo
+  if (!(await isGitRepo(cwd))) {
+    throw new NotAGitRepoError(cwd);
+  }
+
+  // Validate refs only for branch mode
+  if (options.mode === "branch") {
+    if (!options.base) {
+      throw new InvalidRefError("base (required for branch mode)");
+    }
+    if (!options.head) {
+      throw new InvalidRefError("head (required for branch mode)");
+    }
+    if (!(await refExists(options.base, cwd))) {
+      throw new InvalidRefError(options.base);
+    }
+    if (!(await refExists(options.head, cwd))) {
+      throw new InvalidRefError(options.head);
+    }
+  }
+
+  // For non-branch modes that reference HEAD, validate HEAD exists
+  if (options.mode === "staged" || options.mode === "all") {
+    if (!(await refExists("HEAD", cwd))) {
+      throw new InvalidRefError("HEAD");
+    }
+  }
+
+  // Collect data based on mode
+  const [nameStatusOutput, unifiedDiff] = await Promise.all([
+    getNameStatusByMode(options, cwd),
+    getUnifiedDiffByMode(options, cwd),
+  ]);
+
+  // Parse unified diff for tracked files
+  let parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
+  let finalNameStatus = nameStatusOutput;
+
+  // Include untracked files if requested (default for "all" mode)
+  if (includeUntracked && options.mode !== "branch") {
+    const untrackedFiles = await getUntrackedFiles(cwd);
+    if (untrackedFiles.length > 0) {
+      const untrackedData = await createUntrackedDiffs(untrackedFiles, cwd);
+
+      // Merge untracked files into results
+      if (untrackedData.nameStatus) {
+        finalNameStatus = finalNameStatus
+          ? `${finalNameStatus}\n${untrackedData.nameStatus}`
+          : untrackedData.nameStatus;
+      }
+      parsedDiffs = [...parsedDiffs, ...untrackedData.diffs];
+    }
+  }
+
+  // Determine base/head for ChangeSet based on mode
+  let base: string;
+  let head: string;
+  let basePackageJson: Record<string, unknown> | undefined;
+  let headPackageJson: Record<string, unknown> | undefined;
+
+  switch (options.mode) {
+    case "branch":
+      base = options.base!;
+      head = options.head!;
+      basePackageJson = parsePackageJson(await getFileAtRef(base, "package.json", cwd));
+      headPackageJson = parsePackageJson(await getFileAtRef(head, "package.json", cwd));
+      break;
+
+    case "unstaged":
+      base = "INDEX";
+      head = "WORKING";
+      // For unstaged, the "base" is the index - get from HEAD since that's what's staged
+      basePackageJson = await getWorkingPackageJson(cwd); // Index is close to working for most cases
+      headPackageJson = await getWorkingPackageJson(cwd);
+      break;
+
+    case "staged":
+      base = "HEAD";
+      head = "INDEX";
+      basePackageJson = parsePackageJson(await getFileAtRef("HEAD", "package.json", cwd));
+      headPackageJson = await getWorkingPackageJson(cwd); // Staged content
+      break;
+
+    case "all":
+      base = "HEAD";
+      head = "WORKING";
+      basePackageJson = parsePackageJson(await getFileAtRef("HEAD", "package.json", cwd));
+      headPackageJson = await getWorkingPackageJson(cwd);
+      break;
+  }
+
+  // Build ChangeSet
+  return buildChangeSet({
+    base,
+    head,
+    nameStatusOutput: finalNameStatus,
+    parsedDiffs,
+    basePackageJson,
+    headPackageJson,
+  });
+}

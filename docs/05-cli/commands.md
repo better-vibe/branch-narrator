@@ -14,10 +14,19 @@ branch-narrator pretty [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
-| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--mode <type>` | `branch` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+
+### Diff Modes
+
+| Mode | Description | Git Command |
+|------|-------------|-------------|
+| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
+| `unstaged` | Working tree vs index (uncommitted) | `git diff` |
+| `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
+| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
 
 ### Features
 
@@ -30,11 +39,17 @@ branch-narrator pretty [options]
 ### Examples
 
 ```bash
-# Review current branch changes
+# Review current branch changes (default: main..HEAD)
 branch-narrator pretty
 
-# Include uncommitted work
-branch-narrator pretty -u
+# Review unstaged changes (working tree vs index)
+branch-narrator pretty --mode unstaged
+
+# Review staged changes only
+branch-narrator pretty --mode staged
+
+# Review all uncommitted changes (staged + unstaged + untracked)
+branch-narrator pretty --mode all
 
 # Compare specific branches
 branch-narrator pretty --base develop --head feature/auth
@@ -96,19 +111,34 @@ branch-narrator facts [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
-| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--mode <type>` | `branch` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+
+### Diff Modes
+
+| Mode | Description | Git Command |
+|------|-------------|-------------|
+| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
+| `unstaged` | Working tree vs index (uncommitted) | `git diff` |
+| `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
+| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
 
 ### Examples
 
 ```bash
-# Basic JSON output
+# Basic JSON output (branch mode)
 branch-narrator facts
 
-# Include uncommitted changes
-branch-narrator facts -u
+# Analyze unstaged changes
+branch-narrator facts --mode unstaged
+
+# Analyze staged changes
+branch-narrator facts --mode staged
+
+# Analyze all uncommitted changes
+branch-narrator facts --mode all
 
 # Parse with jq
 branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
