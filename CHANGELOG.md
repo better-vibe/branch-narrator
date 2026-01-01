@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.6.0
+
+### Minor Changes
+
+- 6c15af3: Add `integrate cursor` command to generate Cursor AI rules that instruct Cursor on how to use branch-narrator for PR descriptions
+
 ## 0.5.0
 
 ### Minor Changes
