@@ -311,7 +311,7 @@ program
         const baseProvided = options.base !== "main";
         const headProvided = options.head !== "HEAD";
         if (baseProvided || headProvided) {
-          console.error(
+          console.warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`
           );
         }
@@ -379,7 +379,7 @@ program
         const dir = dirname(options.out);
         await mkdir(dir, { recursive: true });
         await writeFile(options.out, output, "utf-8");
-        console.error(`Wrote ${format} output to ${options.out}`);
+        console.log(`Wrote ${format} output to ${options.out}`);
       } else {
         console.log(output);
       }

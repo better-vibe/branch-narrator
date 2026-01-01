@@ -65,9 +65,9 @@ describe("renderJson - legacy format (backward compatibility)", () => {
     expect(parsed.findings).toHaveLength(2);
     
     // Legacy format should NOT have enhanced fields
-    expect((parsed as any).schemaVersion).toBeUndefined();
-    expect((parsed as any).mode).toBeUndefined();
-    expect((parsed as any).stats).toBeUndefined();
+    expect("schemaVersion" in parsed).toBe(false);
+    expect("mode" in parsed).toBe(false);
+    expect("stats" in parsed).toBe(false);
   });
 
   it("should be valid JSON", () => {
