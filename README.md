@@ -5,12 +5,14 @@ A local-first CLI that reads `git diff` and generates structured **PR descriptio
 ## Features
 
 - **Heuristics-only**: No LLM calls, no network calls. Fully deterministic and grounded in git diff.
+- **Risk Analysis**: Framework-agnostic security and quality risk scoring (0-100) with evidence-backed flags.
 - **SvelteKit-aware**: Detects routes, layouts, endpoints, and HTTP methods.
 - **Supabase integration**: Scans migrations for destructive SQL patterns.
 - **Environment variable detection**: Finds `process.env`, SvelteKit `$env` imports.
 - **Cloudflare detection**: Detects wrangler config and CI changes.
 - **Dependency analysis**: Tracks package.json changes with semver impact.
-- **Risk scoring**: Computes aggregate risk with evidence-based explanations.
+- **CI/CD security**: Detects workflow permission changes, pull_request_target, remote script execution.
+- **Infrastructure changes**: Tracks Dockerfile, Terraform, and Kubernetes manifest changes.
 
 ## Installation
 
@@ -77,6 +79,65 @@ branch-narrator facts | jq '.risk.level'
 branch-narrator facts | jq '.categories[] | select(.id == "database")'
 branch-narrator facts | jq '.actions[] | select(.blocking == true)'
 ```
+
+### Risk Report (General-Purpose Security & Quality Analysis)
+
+```bash
+# Generate risk report with JSON output (default)
+branch-narrator risk-report
+
+# Markdown format for human review
+branch-narrator risk-report --format md
+
+# Text format for terminal
+branch-narrator risk-report --format text
+
+# Fail CI if risk score >= threshold
+branch-narrator risk-report --fail-on-score 50
+
+# Focus on specific categories
+branch-narrator risk-report --only security,deps,db
+
+# Exclude certain categories
+branch-narrator risk-report --exclude tests,churn
+
+# Show score breakdown
+branch-narrator risk-report --explain-score
+
+# Redact secrets in evidence
+branch-narrator risk-report --redact
+
+# Limit evidence lines per flag
+branch-narrator risk-report --max-evidence-lines 3
+
+# Write to file
+branch-narrator risk-report --format md --out .ai/risk-report.md
+
+# Custom git refs
+branch-narrator risk-report --base develop --head feature/auth
+
+# Parse with jq
+branch-narrator risk-report | jq '.riskScore'
+branch-narrator risk-report | jq '.flags[] | select(.category == "security")'
+branch-narrator risk-report | jq '.categoryScores.db'
+```
+
+**Risk Categories:**
+- `security`: Workflow permissions, pull_request_target, remote script execution
+- `ci`: CI/CD pipeline configuration changes
+- `deps`: New dependencies, major version bumps, lockfile inconsistencies
+- `db`: Database migrations, destructive SQL, schema changes
+- `infra`: Dockerfile, Terraform, Kubernetes manifests
+- `api`: OpenAPI, GraphQL, Protocol Buffer schema changes
+- `tests`: Test coverage gaps, test file changes
+- `churn`: Large changesets (>50 files or >1500 lines)
+
+**Risk Levels:** (based on 0-100 score)
+- `low` (0-20): Minimal risk, safe to merge
+- `moderate` (21-40): Some risk, review recommended
+- `elevated` (41-60): Moderate risk, careful review needed
+- `high` (61-80): High risk, thorough review required
+- `critical` (81-100): Critical risk, requires security review
 
 **Output Schema (v1.0):**
 - `schemaVersion`: Schema version identifier
@@ -206,6 +267,40 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 - `all`: Working tree vs HEAD (all uncommitted changes)
 
 **Default exclusions:** lockfiles, `.d.ts`, logs, `dist/`, `build/`, `.svelte-kit/`, `.next/`, minified files, sourcemaps, binaries.
+
+### `risk-report` Command
+
+Analyze git diff and emit a risk score (0-100) with evidence-backed flags. Framework-agnostic security and quality analysis.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--base <ref>` | `main` | Base git reference |
+| `--head <ref>` | `HEAD` | Head git reference |
+| `--format <type>` | `json` | Output format: `json`, `md`, or `text` |
+| `--out <path>` | stdout | Write output to file |
+| `--fail-on-score <n>` | (none) | Exit with code 2 if risk score >= threshold |
+| `--only <categories>` | (none) | Only include these categories (comma-separated) |
+| `--exclude <categories>` | (none) | Exclude these categories (comma-separated) |
+| `--max-evidence-lines <n>` | `5` | Max evidence lines per flag |
+| `--redact` | `false` | Redact secret values in evidence |
+| `--explain-score` | `false` | Include score breakdown in output |
+
+**Output Schema (v1.0):**
+- `schemaVersion`: "1.0"
+- `range`: { base, head }
+- `riskScore`: 0-100 computed score
+- `riskLevel`: "low" | "moderate" | "elevated" | "high" | "critical"
+- `categoryScores`: Scores per category (0-100)
+- `flags`: Array of risk flags with evidence
+- `skippedFiles`: Files excluded from analysis
+- `scoreBreakdown`: (optional) Score computation details
+
+**Exit Codes:**
+| Code | Description |
+|------|-------------|
+| `0` | Success |
+| `1` | Expected errors (not a git repo, bad ref) |
+| `2` | Risk score >= `--fail-on-score` threshold |
 
 ## Sample Output
 
@@ -372,6 +467,7 @@ Runs all analyzers optimized for SvelteKit projects.
 |------|-------------|
 | `0` | Success |
 | `1` | Expected failures (not a git repo, invalid refs, etc.) |
+| `2` | Risk score threshold exceeded (when using `risk-report --fail-on-score`) |
 
 ## Development
 
