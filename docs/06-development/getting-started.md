@@ -112,11 +112,79 @@ bun run build
 node dist/cli.js pr-body -u
 ```
 
-### 7. Commit
+### 7. Create a Changeset
+
+```bash
+bun run changeset:add
+# Follow prompts to describe your changes
+```
+
+### 8. Commit
 
 ```bash
 git add .
 git commit -m "feat: add my feature"
+```
+
+## Changesets
+
+This project uses [Changesets](https://github.com/changesets/changesets) for version management.
+
+### When to Add a Changeset
+
+Create a changeset for any PR that includes:
+- New features
+- Bug fixes  
+- Documentation updates
+- Dependency updates
+- Breaking changes
+
+Skip changesets for:
+- Internal refactoring (no user-facing changes)
+- Test-only changes
+- CI/CD configuration
+
+### Creating a Changeset
+
+```bash
+# After making your changes
+bun run changeset:add
+
+# Or use the shorthand
+bun run changeset
+```
+
+The CLI will prompt you to:
+1. Select change type: `patch`, `minor`, or `major`
+2. Write a user-facing summary
+
+### Version Guidelines
+
+- **patch** (0.0.x): Bug fixes, docs, small improvements
+- **minor** (0.x.0): New features, new CLI options
+- **major** (x.0.0): Breaking changes, removed features
+
+### Example
+
+```bash
+$ bun run changeset:add
+🦋  Which packages would you like to include?
+✔ @better-vibe/branch-narrator
+
+🦋  What kind of change is this for @better-vibe/branch-narrator?
+✔ minor
+
+🦋  Please enter a summary for this change:
+Add support for Tailwind CSS configuration detection
+
+✔ Changeset created: .changeset/funny-cats-dance.md
+```
+
+Then commit the changeset with your code:
+
+```bash
+git add .changeset/funny-cats-dance.md
+git commit -m "feat: add Tailwind CSS analyzer"
 ```
 
 ## Debugging

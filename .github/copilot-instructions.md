@@ -259,6 +259,79 @@ bun run dev
 - Don't expose sensitive data in error messages
 - Validate all user inputs (refs, file paths, options)
 
+## Changesets
+
+This project uses [Changesets](https://github.com/changesets/changesets) for version management and changelog generation.
+
+### When to Create a Changeset
+
+**ALWAYS** create a changeset when making changes that will be included in a release:
+
+- ✅ **Required**: Bug fixes, new features, documentation updates, dependency updates, breaking changes
+- ❌ **Not required**: Internal refactoring with no user-facing changes, test-only changes, CI/CD updates
+
+### How to Create a Changeset
+
+1. After making your code changes, run:
+   ```bash
+   bun run changeset:add
+   # or
+   bun run changeset
+   ```
+
+2. Follow the interactive prompts:
+   - **Change type**: Select `patch` (bug fix), `minor` (new feature), or `major` (breaking change)
+   - **Summary**: Write a clear description of the change from a user's perspective
+   
+3. This creates a new file in `.changeset/` with your change description
+
+4. Commit the changeset file with your code changes:
+   ```bash
+   git add .changeset/*.md
+   git commit -m "feat: add new analyzer for X"
+   ```
+
+### Changeset Guidelines
+
+- **Summary style**: Write user-facing descriptions, not implementation details
+  - ✅ Good: "Add support for detecting Tailwind CSS configuration changes"
+  - ❌ Bad: "Refactored analyzer.ts to use new helper function"
+  
+- **Version selection**:
+  - `patch` (0.0.x): Bug fixes, documentation updates, minor improvements
+  - `minor` (0.x.0): New features, new analyzers, new CLI options
+  - `major` (x.0.0): Breaking changes, removed features, changed APIs
+
+- **Multiple changes**: If your PR contains multiple distinct changes, create separate changesets for each
+
+### Example Changeset Workflow
+
+```bash
+# 1. Make your changes
+vim src/analyzers/new-analyzer.ts
+
+# 2. Test your changes
+bun test
+
+# 3. Create a changeset
+bun run changeset:add
+# Select: minor
+# Summary: Add analyzer for detecting Docker configuration changes
+
+# 4. Commit everything together
+git add .
+git commit -m "feat: add Docker analyzer"
+```
+
+### Changeset Configuration
+
+The project is configured with:
+- **Base branch**: `develop` (PRs should target this branch)
+- **Changelog format**: `@changesets/cli/changelog` (standard format)
+- **Access**: `public` (package is publicly published)
+
+See `.changeset/config.json` for the full configuration.
+
 ## Documentation
 
 The `docs/` directory contains comprehensive documentation organized by topic. When making changes to the codebase, update the corresponding documentation:
