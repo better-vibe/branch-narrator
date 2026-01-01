@@ -23,7 +23,7 @@ function isTestFile(path: string): boolean {
  */
 function isProductionCode(path: string): boolean {
   // Common production code directories
-  const prodPatterns = ["/src/", "/lib/", "/app/", "/components/", "/routes/"];
+  const prodPatterns = ["src/", "lib/", "app/", "components/", "routes/"];
   const hasPattern = prodPatterns.some(pattern => path.includes(pattern));
   
   // Exclude config, docs, etc.
@@ -32,8 +32,8 @@ function isProductionCode(path: string): boolean {
     "LICENSE",
     ".md",
     ".txt",
-    "/docs/",
-    "/config/",
+    "docs/",
+    "config/",
     "package.json",
     "tsconfig.json",
     ".gitignore",
