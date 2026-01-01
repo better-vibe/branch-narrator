@@ -204,6 +204,34 @@ branch-narrator dump-diff --format json --out .ai/diff.json
 branch-narrator dump-diff --include "src/**" --include "tests/**"
 ```
 
+### AI Agent Integration
+
+Generate provider-specific rules for AI coding assistants (Cursor, Claude Code, etc.).
+
+```bash
+# Generate Cursor rules
+branch-narrator integrate cursor
+
+# Preview what would be created without writing files
+branch-narrator integrate cursor --dry-run
+
+# Overwrite existing rule files
+branch-narrator integrate cursor --force
+```
+
+**What it does:**
+- Creates `.cursor/rules/branch-narrator.md` - Instructs Cursor on when and how to use `branch-narrator facts` and `dump-diff` commands
+- Creates `.cursor/rules/pr-description.md` - Provides a complete workflow for writing PR descriptions using branch-narrator
+
+**Why use this:**
+- Cursor (and other AI assistants) will automatically read these rules when working in your repository
+- Ensures the AI uses branch-narrator to ground PR descriptions in actual git diffs instead of guessing
+- Provides consistent PR description templates across your team
+
+**Exit codes:**
+- `0`: Success
+- `1`: Expected failure (unknown target, files exist without --force, etc.)
+
 ## CLI Commands
 
 ### `pretty` Command
@@ -267,6 +295,24 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 - `all`: Working tree vs HEAD (all uncommitted changes)
 
 **Default exclusions:** lockfiles, `.d.ts`, logs, `dist/`, `build/`, `.svelte-kit/`, `.next/`, minified files, sourcemaps, binaries.
+
+### `integrate` Command
+
+Generate provider-specific rules for AI coding assistants.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `<target>` | (required) | Integration target: `cursor` |
+| `--dry-run` | `false` | Preview what would be written without creating files |
+| `--force` | `false` | Overwrite existing files |
+
+**Supported targets:**
+- `cursor`: Generates `.cursor/rules/branch-narrator.md` and `.cursor/rules/pr-description.md`
+
+**Behavior:**
+- Creates `.cursor/rules/` directory if it doesn't exist
+- Fails with exit code 1 if files already exist (use `--force` to overwrite)
+- Outputs exact file paths and contents in `--dry-run` mode
 
 ### `risk-report` Command
 
