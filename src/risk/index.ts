@@ -1,0 +1,88 @@
+/**
+ * Main risk report engine.
+ */
+
+import type { ChangeSet, RiskFlag, RiskReport } from "../core/types.js";
+import { ALL_DETECTORS } from "./detectors/index.js";
+import { shouldSkipFile } from "./exclusions.js";
+import { redactLines } from "./redaction.js";
+import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
+
+/**
+ * Options for generating risk report.
+ */
+export interface RiskReportOptions {
+  only?: string[];
+  exclude?: string[];
+  maxEvidenceLines?: number;
+  redact?: boolean;
+  explainScore?: boolean;
+}
+
+/**
+ * Generate risk report from change set.
+ */
+export function generateRiskReport(
+  changeSet: ChangeSet,
+  options: RiskReportOptions = {}
+): RiskReport {
+  const {
+    only,
+    exclude,
+    maxEvidenceLines = 5,
+    redact = false,
+    explainScore = false,
+  } = options;
+
+  // Track skipped files
+  const skippedFiles: Array<{ file: string; reason: string }> = [];
+
+  // Check for skipped files in changeset
+  for (const file of changeSet.files) {
+    const skipCheck = shouldSkipFile(file.path);
+    if (skipCheck.skip) {
+      skippedFiles.push({
+        file: file.path,
+        reason: skipCheck.reason || "excluded",
+      });
+    }
+  }
+
+  // Run all detectors
+  let allFlags: RiskFlag[] = [];
+  for (const detector of ALL_DETECTORS) {
+    const flags = detector(changeSet);
+    allFlags.push(...flags);
+  }
+
+  // Filter by category if requested
+  allFlags = filterFlagsByCategory(allFlags, only, exclude);
+
+  // Apply redaction and evidence line limits
+  if (redact || maxEvidenceLines !== 5) {
+    allFlags = allFlags.map(flag => ({
+      ...flag,
+      evidence: flag.evidence.map(ev => ({
+        ...ev,
+        lines: redact 
+          ? redactLines(ev.lines.slice(0, maxEvidenceLines))
+          : ev.lines.slice(0, maxEvidenceLines),
+      })),
+    }));
+  }
+
+  // Compute report
+  return computeRiskReport(
+    changeSet.base,
+    changeSet.head,
+    allFlags,
+    skippedFiles,
+    { explainScore }
+  );
+}
+
+export * from "./detectors/index.js";
+export * from "./exclusions.js";
+export * from "./redaction.js";
+export * from "./scoring.js";
+export * from "./renderers.js";

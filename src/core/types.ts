@@ -388,3 +388,55 @@ export interface FactsOutput {
   warnings: string[];
 }
 
+// ============================================================================
+// Risk Report Schema (for risk-report command)
+// ============================================================================
+
+export type RiskReportLevel = "low" | "moderate" | "elevated" | "high" | "critical";
+
+export type RiskCategory =
+  | "security"
+  | "ci"
+  | "deps"
+  | "db"
+  | "infra"
+  | "api"
+  | "tests"
+  | "churn";
+
+export interface RiskFlagEvidence {
+  file: string;
+  hunk?: string;
+  lines: string[];
+}
+
+export interface RiskFlag {
+  id: string; // stable identifier, e.g. "db.destructive_sql"
+  category: RiskCategory;
+  score: number; // 0..100 (base score for this flag)
+  confidence: number; // 0..1
+  title: string;
+  summary: string;
+  evidence: RiskFlagEvidence[];
+  suggestedChecks: string[];
+  tags?: string[];
+  effectiveScore: number; // round(score * confidence)
+}
+
+export interface ScoreBreakdown {
+  maxCategory: { category: RiskCategory; score: number };
+  topCategories: Array<{ category: RiskCategory; score: number }>;
+  formula: string;
+}
+
+export interface RiskReport {
+  schemaVersion: "1.0";
+  range: { base: string; head: string };
+  riskScore: number; // 0..100
+  riskLevel: RiskReportLevel;
+  categoryScores: Record<RiskCategory, number>; // 0..100 per category
+  flags: RiskFlag[];
+  skippedFiles: Array<{ file: string; reason: string }>;
+  scoreBreakdown?: ScoreBreakdown;
+}
+

@@ -477,6 +477,106 @@ program
     }
   });
 
+// risk-report command - general-purpose risk analysis
+program
+  .command("risk-report")
+  .description("Analyze git diff and emit risk score (0-100) with evidence-backed flags")
+  .option("--base <ref>", "Base git reference", "main")
+  .option("--head <ref>", "Head git reference", "HEAD")
+  .option("--format <type>", "Output format: json|md|text", "json")
+  .option("--out <path>", "Write output to file instead of stdout")
+  .option("--fail-on-score <n>", "Exit with code 2 if risk score >= threshold")
+  .option("--only <categories>", "Only include these categories (comma-separated)")
+  .option("--exclude <categories>", "Exclude these categories (comma-separated)")
+  .option("--max-evidence-lines <n>", "Max evidence lines per flag", "5")
+  .option("--redact", "Redact secret values in evidence", false)
+  .option("--explain-score", "Include score breakdown in output", false)
+  .action(async (options) => {
+    try {
+      // Import risk report dynamically
+      const { generateRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./risk/index.js");
+
+      // Validate format
+      const format = options.format as "json" | "md" | "text";
+      if (!["json", "md", "text"].includes(format)) {
+        console.error(`Invalid format: ${options.format}. Use json, md, or text.`);
+        process.exit(1);
+      }
+
+      // Parse options
+      const maxEvidenceLines = parseInt(options.maxEvidenceLines, 10);
+      if (isNaN(maxEvidenceLines) || maxEvidenceLines < 1) {
+        console.error(`Invalid max-evidence-lines: ${options.maxEvidenceLines}. Must be a positive integer.`);
+        process.exit(1);
+      }
+
+      const failOnScore = options.failOnScore
+        ? parseInt(options.failOnScore, 10)
+        : undefined;
+      if (failOnScore !== undefined && (isNaN(failOnScore) || failOnScore < 0 || failOnScore > 100)) {
+        console.error(`Invalid fail-on-score: ${options.failOnScore}. Must be 0-100.`);
+        process.exit(1);
+      }
+
+      const only = options.only
+        ? options.only.split(",").map((s: string) => s.trim())
+        : undefined;
+      const exclude = options.exclude
+        ? options.exclude.split(",").map((s: string) => s.trim())
+        : undefined;
+
+      // Collect git data
+      const changeSet = await collectChangeSet({
+        base: options.base,
+        head: options.head,
+      });
+
+      // Generate risk report
+      const report = generateRiskReport(changeSet, {
+        only,
+        exclude,
+        maxEvidenceLines,
+        redact: options.redact,
+        explainScore: options.explainScore,
+      });
+
+      // Render output
+      let output: string;
+      switch (format) {
+        case "json":
+          output = renderRiskReportJSON(report, true);
+          break;
+        case "md":
+          output = renderRiskReportMarkdown(report);
+          break;
+        case "text":
+          output = renderRiskReportText(report);
+          break;
+      }
+
+      // Write to file or stdout
+      if (options.out) {
+        const { writeFile, mkdir } = await import("node:fs/promises");
+        const { dirname } = await import("node:path");
+        await mkdir(dirname(options.out), { recursive: true });
+        await writeFile(options.out, output, "utf-8");
+        console.error(`Risk report written to ${options.out}`);
+      } else {
+        console.log(output);
+      }
+
+      // Check fail-on-score threshold
+      if (failOnScore !== undefined && report.riskScore >= failOnScore) {
+        console.error(`Risk score ${report.riskScore} >= threshold ${failOnScore}`);
+        process.exit(2);
+      }
+
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
 /**
  * Handle errors and exit with appropriate code.
  */
