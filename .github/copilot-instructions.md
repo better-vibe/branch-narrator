@@ -8,7 +8,7 @@ branch-narrator is a local-first CLI tool that reads `git diff` and generates st
 
 - **Language**: TypeScript (ES2022)
 - **Runtime**: Node.js >= 18
-- **Package Manager**: npm (also supports bun)
+- **Package Manager**: bun (also supports npm)
 - **Test Framework**: Vitest
 - **Build Tool**: tsup
 - **CLI Framework**: commander
@@ -44,28 +44,38 @@ src/
     ├── json.ts               # JSON facts
     ├── terminal.ts           # Colorized terminal
     └── risk-score.ts         # Risk computation
+
+docs/                         # Documentation
+├── 01-product/               # Overview and roadmap
+├── 02-architecture/          # System design and structure
+├── 03-analyzers/             # Analyzer-specific docs
+├── 04-types/                 # TypeScript types reference
+├── 05-cli/                   # CLI commands and options
+├── 06-development/           # Coding standards and testing
+├── 07-profiles/              # Profile documentation
+└── 08-rendering/             # Output formats and risk scoring
 ```
 
 ## Development Commands
 
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Run tests
-npm test
+bun test
 
 # Run tests in watch mode
-npm run test:watch
+bun run test:watch
 
 # Build the project
-npm run build
+bun run build
 
 # Type check
-npm run typecheck
+bun run typecheck
 
 # Development mode (watch and rebuild)
-npm run dev
+bun run dev
 ```
 
 ## Coding Conventions
@@ -251,7 +261,33 @@ npm run dev
 
 ## Documentation
 
-- Keep README.md up to date with new features
-- Document analyzers in `docs/03-analyzers/`
-- Add examples to `docs/05-cli/examples.md`
-- Update architecture docs when structure changes
+The `docs/` directory contains comprehensive documentation organized by topic. When making changes to the codebase, update the corresponding documentation:
+
+### Documentation Structure
+
+- `docs/01-product/` - Project overview, vision, and roadmap
+- `docs/02-architecture/` - System design, data flow, project structure
+- `docs/03-analyzers/` - Individual analyzer documentation
+- `docs/04-types/` - TypeScript types and schemas
+- `docs/05-cli/` - Command-line interface reference
+- `docs/06-development/` - Contributing, testing, coding standards
+- `docs/07-profiles/` - Framework profiles and detection
+- `docs/08-rendering/` - Output generation and risk scoring
+
+### Documentation Guidelines
+
+- **New analyzers**: Create a corresponding doc in `docs/03-analyzers/` explaining what it detects and why
+- **New CLI commands**: Update `docs/05-cli/commands.md` with syntax and examples
+- **New Finding types**: Document in `docs/04-types/findings.md` with interface and examples
+- **New profiles**: Add profile documentation in `docs/07-profiles/`
+- **Architecture changes**: Update `docs/02-architecture/` when modifying core structure
+- **Breaking changes**: Update README.md and relevant docs immediately
+- **Code examples**: Add to `docs/05-cli/examples.md` for common use cases
+
+### When to Update Documentation
+
+- Adding a new analyzer → Update `docs/03-analyzers/`
+- Adding a new CLI option → Update `docs/05-cli/options.md`
+- Modifying risk scoring → Update `docs/08-rendering/risk-scoring.md`
+- Changing file structure → Update `docs/02-architecture/project-structure.md`
+- Adding a new Finding type → Update `docs/04-types/findings.md`
