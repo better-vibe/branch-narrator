@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.7.1
+
+### Patch Changes
+
+- 527e35f: Performance: Optimized `findAdditionMatches` by hoisting RegExp creation out of loops, improving performance for large diffs.
+
 ## 0.7.0
 
 ### Minor Changes
