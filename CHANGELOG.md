@@ -1,5 +1,12 @@
 # @better-vibe/branch-narrator
 
+## 0.8.0
+
+### Minor Changes
+
+- f8d3d97: Added `branch-narrator integrate` command with support for `cursor` and `jules` providers.
+  Refactored integration logic to use a provider registry and support appending to existing files by default.
+
 ## 0.7.1
 
 ### Patch Changes
