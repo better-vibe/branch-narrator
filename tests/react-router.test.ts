@@ -3,7 +3,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parse } from "@babel/parser";
+import {
+  extractJsxRoutes,
+  extractDataRoutes,
+  extractRoutesFromContent,
+  normalizePath,
+  joinPaths,
+} from "../src/analyzers/reactRouterRoutes.js";
 import type { RouteChangeFinding } from "../src/core/types.js";
 import { reactRouterRoutesAnalyzer } from "../src/analyzers/reactRouterRoutes.js";
 import { createChangeSet, createFileDiff } from "./fixtures/index.js";
@@ -137,61 +143,88 @@ function App() {
 describe("React Router route extraction", () => {
   describe("JSX routes", () => {
     it("should extract flat routes", () => {
-      const ast = parse(jsxRoutesFixture, {
-        sourceType: "module",
-        plugins: ["typescript", "jsx"],
-      });
-
-      // We can't directly test the extraction functions since they're not exported
-      // But we can test via the analyzer with a mock ChangeSet
-      // For now, we'll test the analyzer behavior
+      const routes = extractRoutesFromContent(jsxRoutesFixture, "App.tsx");
+      const paths = routes.map((r) => r.path).sort();
+      
+      expect(paths).toContain("/");
+      expect(paths).toContain("/users/:id");
+      expect(paths).toContain("/settings");
     });
 
     it("should extract nested routes with parent/child path joining", () => {
-      // Test case: /settings + billing = /settings/billing
-      // This will be tested via the analyzer
+      const routes = extractRoutesFromContent(jsxRoutesFixture, "App.tsx");
+      const paths = routes.map((r) => r.path).sort();
+      
+      // /settings + billing = /settings/billing
+      expect(paths).toContain("/settings/billing");
+      expect(paths).toContain("/settings/profile");
     });
 
     it("should handle index routes", () => {
+      const routes = extractRoutesFromContent(jsxRoutesFixture, "App.tsx");
+      const paths = routes.map((r) => r.path);
+      
       // Index route under /settings should map to /settings
-      // This will be tested via the analyzer
+      expect(paths).toContain("/settings");
     });
 
     it("should handle absolute child paths", () => {
+      const routes = extractRoutesFromContent(absoluteChildPathFixture, "App.tsx");
+      const paths = routes.map((r) => r.path);
+      
       // Child starting with / should be treated as absolute
-      // This will be tested via the analyzer
+      expect(paths).toContain("/absolute");
+      expect(paths).toContain("/parent");
     });
   });
 
   describe("Data router routes", () => {
     it("should extract routes from array literal", () => {
-      // createBrowserRouter([{ path: "/users/:id" }])
-      // This will be tested via the analyzer
+      const routes = extractRoutesFromContent(dataRouterLiteralFixture, "router.tsx");
+      const paths = routes.map((r) => r.path).sort();
+      
+      expect(paths).toContain("/");
+      expect(paths).toContain("/users/:id");
+      expect(paths).toContain("/account");
     });
 
     it("should extract routes from identifier reference", () => {
-      // const routes = [{ path: "/a" }] ; createBrowserRouter(routes)
-      // This will be tested via the analyzer
+      const routes = extractRoutesFromContent(dataRouterIdentifierFixture, "router.tsx");
+      const paths = routes.map((r) => r.path).sort();
+      
+      expect(paths).toContain("/");
+      expect(paths).toContain("/about");
     });
 
     it("should handle nested children", () => {
+      const routes = extractRoutesFromContent(dataRouterLiteralFixture, "router.tsx");
+      const paths = routes.map((r) => r.path).sort();
+      
       // Parent /account with child settings = /account/settings
-      // This will be tested via the analyzer
+      expect(paths).toContain("/account/settings");
     });
 
     it("should handle index routes in data router", () => {
+      const routes = extractRoutesFromContent(dataRouterLiteralFixture, "router.tsx");
+      const paths = routes.map((r) => r.path);
+      
       // index: true under /account should map to /account
-      // This will be tested via the analyzer
+      expect(paths).toContain("/account");
     });
 
     it("should support createHashRouter", () => {
-      // Should work with createHashRouter
-      // This will be tested via the analyzer
+      const routes = extractRoutesFromContent(hashRouterFixture, "router.tsx");
+      const paths = routes.map((r) => r.path);
+      
+      expect(paths).toContain("/");
+      expect(paths).toContain("/dashboard");
     });
 
     it("should support createMemoryRouter", () => {
-      // Should work with createMemoryRouter
-      // This will be tested via the analyzer
+      const routes = extractRoutesFromContent(memoryRouterFixture, "router.tsx");
+      const paths = routes.map((r) => r.path);
+      
+      expect(paths).toContain("/");
     });
   });
 });
@@ -201,25 +234,49 @@ describe("React Router route extraction", () => {
 // ============================================================================
 
 describe("reactRouterRoutesAnalyzer", () => {
-  it("should detect added routes from JSX", () => {
-    // Note: This test requires actual git operations
-    // For unit testing without git, we would need to refactor the analyzer
-    // to accept file contents directly instead of fetching from git
-    
-    // For now, we'll skip this test as it requires a git repository
-    // The analyzer is tested manually in the development workflow
-  });
+  it("should return empty array for non-candidate files", () => {
+    const changeSet = createChangeSet({
+      files: [
+        { path: "config.json", status: "modified" },
+        { path: "README.md", status: "modified" },
+      ],
+      diffs: [
+        createFileDiff("config.json", ["{}"]),
+        createFileDiff("README.md", ["# Docs"]),
+      ],
+    });
 
-  it("should detect deleted routes", () => {
-    // Similar to above - requires git operations
+    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    expect(findings).toEqual([]);
   });
 
   it("should deduplicate routes", () => {
-    // Test that the same route path doesn't appear multiple times
+    // This is tested by the implementation - routes are deduplicated by routeId+change+file
+    // We can verify by checking that the same route doesn't appear twice
+    const changeSet = createChangeSet({
+      files: [{ path: "App.tsx", status: "modified" }],
+      diffs: [createFileDiff("App.tsx", ["<Route path='/test' />"])],
+    });
+
+    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    const routeIds = findings.map((f) => (f as RouteChangeFinding).routeId);
+    const uniqueRouteIds = new Set(routeIds);
+    
+    expect(routeIds.length).toBe(uniqueRouteIds.size);
   });
 
   it("should sort routes deterministically", () => {
-    // Test that routes are always returned in the same order
+    // Routes are sorted alphabetically by routeId
+    const changeSet = createChangeSet({
+      files: [{ path: "App.tsx", status: "modified" }],
+      diffs: [createFileDiff("App.tsx", ["<Route path='/test' />"])],
+    });
+
+    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    const routeIds = findings.map((f) => (f as RouteChangeFinding).routeId);
+    const sortedRouteIds = [...routeIds].sort();
+    
+    expect(routeIds).toEqual(sortedRouteIds);
   });
 });
 
@@ -229,16 +286,36 @@ describe("reactRouterRoutesAnalyzer", () => {
 
 describe("Path normalization", () => {
   it("should collapse multiple slashes", () => {
-    // //path///to////resource -> /path/to/resource
+    expect(normalizePath("//path///to////resource")).toBe("/path/to/resource");
   });
 
   it("should remove trailing slash except for root", () => {
-    // /path/to/resource/ -> /path/to/resource
-    // / -> /
+    expect(normalizePath("/path/to/resource/")).toBe("/path/to/resource");
+    expect(normalizePath("/")).toBe("/");
   });
 
   it("should preserve route params", () => {
-    // :id, *, etc should be preserved
+    expect(normalizePath("/users/:id")).toBe("/users/:id");
+    expect(normalizePath("/docs/*")).toBe("/docs/*");
+  });
+});
+
+// ============================================================================
+// Path Joining Tests
+// ============================================================================
+
+describe("Path joining", () => {
+  it("should join parent and child paths", () => {
+    expect(joinPaths("/parent", "child")).toBe("/parent/child");
+    expect(joinPaths("/", "child")).toBe("/child");
+  });
+
+  it("should treat child starting with / as absolute", () => {
+    expect(joinPaths("/parent", "/absolute")).toBe("/absolute");
+  });
+
+  it("should normalize joined paths", () => {
+    expect(joinPaths("/parent/", "child")).toBe("/parent/child");
   });
 });
 

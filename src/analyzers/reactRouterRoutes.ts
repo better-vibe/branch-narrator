@@ -79,7 +79,7 @@ function isCandidateFile(path: string, diffContent?: string): boolean {
  * - Collapse multiple slashes
  * - Remove trailing slash unless path is exactly "/"
  */
-function normalizePath(path: string): string {
+export function normalizePath(path: string): string {
   // Collapse multiple slashes
   let normalized = path.replace(/\/+/g, "/");
 
@@ -94,7 +94,7 @@ function normalizePath(path: string): string {
 /**
  * Join parent and child paths.
  */
-function joinPaths(parent: string, child: string): string {
+export function joinPaths(parent: string, child: string): string {
   // If child starts with "/", treat as absolute
   if (child.startsWith("/")) {
     return normalizePath(child);
@@ -108,7 +108,7 @@ function joinPaths(parent: string, child: string): string {
 /**
  * Extract routes from JSX <Route> elements.
  */
-function extractJsxRoutes(
+export function extractJsxRoutes(
   ast: t.File,
   filePath: string,
   parentPath = "/"
@@ -171,6 +171,9 @@ function extractJsxRoutes(
             routes.push(...childRoutes);
           }
         }
+
+        // We've manually processed this Route's children; avoid traversing them again
+        path.skip();
       }
     },
   });
@@ -181,7 +184,7 @@ function extractJsxRoutes(
 /**
  * Extract routes from data router configuration.
  */
-function extractDataRoutes(
+export function extractDataRoutes(
   ast: t.File,
   filePath: string,
   parentPath = "/"
@@ -318,7 +321,7 @@ function extractRouteConfig(obj: t.ObjectExpression): {
 /**
  * Extract all routes from file content.
  */
-function extractRoutesFromContent(
+export function extractRoutesFromContent(
   content: string,
   filePath: string
 ): ExtractedRoute[] {
