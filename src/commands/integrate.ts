@@ -4,7 +4,7 @@
  */
 
 import { mkdir, writeFile, access } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { BranchNarratorError } from "../core/errors.js";
 
 // ============================================================================
@@ -212,7 +212,7 @@ async function fileExists(path: string): Promise<boolean> {
 export async function executeIntegrate(
   options: IntegrateOptions
 ): Promise<void> {
-  const cwd = options.cwd || process.cwd();
+  const cwd = options.cwd ?? process.cwd();
   const ruleFiles = getRuleFiles(options.provider);
 
   // Dry-run: print what would be written
@@ -242,13 +242,11 @@ export async function executeIntegrate(
     }
   }
 
-  // Create directory and write files
-  const firstFile = ruleFiles[0];
-  const rulesDir = join(cwd, firstFile.path.split("/").slice(0, -1).join("/"));
-  await mkdir(rulesDir, { recursive: true });
-
+  // Create directories and write files
   for (const file of ruleFiles) {
     const fullPath = join(cwd, file.path);
+    const dir = dirname(fullPath);
+    await mkdir(dir, { recursive: true });
     await writeFile(fullPath, file.content, "utf-8");
     console.log(`Created: ${file.path}`);
   }

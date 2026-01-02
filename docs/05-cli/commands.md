@@ -368,6 +368,71 @@ branch-narrator risk-report --explain-score
 
 ---
 
+## integrate
+
+Generate integration files for AI coding assistants (Cursor, etc.).
+
+```bash
+branch-narrator integrate <provider> [options]
+```
+
+### Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<provider>` | Yes | Integration provider. Currently supports: `cursor` |
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--dry-run` | `false` | Preview what would be created without writing files |
+| `--force` | `false` | Overwrite existing files |
+
+### Behavior
+
+- **Without flags**: Creates files, fails with exit code 1 if any file already exists
+- **With `--dry-run`**: Prints file paths and contents to stdout without writing
+- **With `--force`**: Overwrites existing files
+
+### Files Created (Cursor Provider)
+
+When you run `branch-narrator integrate cursor`, it creates:
+
+1. **`.cursor/rules/branch-narrator.md`**
+   - Tool usage guidance for Cursor
+   - Explains when and how to use `branch-narrator`
+   - Documents `facts` and `dump-diff` commands
+   - Provides default refs (`main..HEAD`)
+
+2. **`.cursor/rules/pr-description.md`**
+   - Step-by-step PR description workflow
+   - Instructs to call `facts` and `dump-diff --unified 3` first
+   - Comprehensive PR body template
+   - Evidence-based approach (no hallucinations)
+
+### Examples
+
+```bash
+# Generate Cursor integration files
+branch-narrator integrate cursor
+
+# Preview what would be created (dry-run)
+branch-narrator integrate cursor --dry-run
+
+# Overwrite existing files
+branch-narrator integrate cursor --force
+```
+
+### Exit Codes
+
+| Code | Description |
+|------|-------------|
+| `0` | Success |
+| `1` | Files already exist (without --force), or unknown provider |
+
+---
+
 ## Exit Codes
 
 | Code | Description |
@@ -387,6 +452,7 @@ branch-narrator pr-body --help
 branch-narrator facts --help
 branch-narrator dump-diff --help
 branch-narrator risk-report --help
+branch-narrator integrate --help
 
 # Show version
 branch-narrator --version
