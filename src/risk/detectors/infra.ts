@@ -2,7 +2,7 @@
  * Infrastructure detectors (Docker, Terraform, K8s).
  */
 
-import type { ChangeSet, RiskFlag, RiskFlagEvidence } from "../../core/types.js";
+import type { RiskFlag, RiskFlagEvidence } from "../../core/types.js";
 import type { Detector } from "./types.js";
 
 /**

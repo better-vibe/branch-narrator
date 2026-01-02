@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * branch-narrator CLI entry point.
  */

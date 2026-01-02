@@ -3,7 +3,7 @@
  */
 
 import * as semver from "semver";
-import type { ChangeSet, RiskFlag, RiskFlagEvidence } from "../../core/types.js";
+import type { RiskFlag, RiskFlagEvidence } from "../../core/types.js";
 import type { Detector } from "./types.js";
 
 /**

@@ -1,5 +1,5 @@
 
-import type { Provider, FileOperation } from "../types.js";
+import { Provider } from "../types.js";
 import { BRANCH_NARRATOR_USAGE, PR_DESCRIPTION_TEMPLATE } from "../shared.js";
 
 export const cursorProvider: Provider = {
