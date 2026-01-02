@@ -11,4 +11,5 @@ export * from "./cloudflare.js";
 export * from "./vitest.js";
 export * from "./dependencies.js";
 export * from "./security-files.js";
+export * from "./reactRouterRoutes.js";
 

@@ -287,7 +287,7 @@ export interface Analyzer {
 // Profile
 // ============================================================================
 
-export type ProfileName = "auto" | "sveltekit";
+export type ProfileName = "auto" | "sveltekit" | "react";
 
 export interface Profile {
   name: ProfileName;

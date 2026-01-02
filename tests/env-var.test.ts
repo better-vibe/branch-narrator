@@ -63,6 +63,24 @@ describe("extractEnvVars", () => {
     const vars = extractEnvVars(content);
     expect(vars.has("PUBLIC_MY_VAR")).toBe(true);
   });
+
+  it("should extract Vite import.meta.env variables", () => {
+    const vars = extractEnvVars(sampleEnvVarContent.viteEnv);
+    expect(vars.has("VITE_API_URL")).toBe(true);
+    expect(vars.has("VITE_API_KEY")).toBe(true);
+  });
+
+  it("should extract React App process.env variables", () => {
+    const vars = extractEnvVars(sampleEnvVarContent.reactAppEnv);
+    expect(vars.has("REACT_APP_API_URL")).toBe(true);
+    expect(vars.has("REACT_APP_API_KEY")).toBe(true);
+  });
+
+  it("should extract Next.js public env variables", () => {
+    const vars = extractEnvVars(sampleEnvVarContent.nextPublicEnv);
+    expect(vars.has("NEXT_PUBLIC_API_URL")).toBe(true);
+    expect(vars.has("SECRET_KEY")).toBe(true);
+  });
 });
 
 describe("envVarAnalyzer", () => {

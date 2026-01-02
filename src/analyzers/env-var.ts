@@ -75,8 +75,11 @@ function shouldScanForEnvVars(path: string): boolean {
 
 // Patterns for env var detection
 const ENV_PATTERNS = {
-  // process.env.VAR_NAME
+  // process.env.VAR_NAME (including REACT_APP_ and NEXT_PUBLIC_ prefixes)
   processEnv: /process\.env\.([A-Z_][A-Z0-9_]*)/g,
+
+  // import.meta.env.VITE_VAR_NAME (Vite)
+  viteEnv: /import\.meta\.env\.VITE_([A-Z0-9_]+)/g,
 
   // PUBLIC_VAR (SvelteKit public env vars)
   publicVar: /\bPUBLIC_([A-Z0-9_]+)/g,
@@ -124,6 +127,12 @@ export function extractEnvVars(content: string): Set<string> {
   const processEnvPattern = new RegExp(ENV_PATTERNS.processEnv.source, "g");
   while ((match = processEnvPattern.exec(content)) !== null) {
     vars.add(match[1]);
+  }
+
+  // import.meta.env.VITE_VAR (Vite)
+  const viteEnvPattern = new RegExp(ENV_PATTERNS.viteEnv.source, "g");
+  while ((match = viteEnvPattern.exec(content)) !== null) {
+    vars.add(`VITE_${match[1]}`);
   }
 
   // PUBLIC_VAR

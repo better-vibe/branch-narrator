@@ -165,6 +165,21 @@ export const sampleEnvVarContent = {
     import { SUPABASE_SERVICE_KEY as serviceKey } from '$env/static/private';
     const fallback = process.env.FALLBACK_URL;
   `,
+
+  viteEnv: `
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const apiKey = import.meta.env.VITE_API_KEY;
+  `,
+
+  reactAppEnv: `
+    const apiUrl = process.env.REACT_APP_API_URL;
+    const apiKey = process.env.REACT_APP_API_KEY;
+  `,
+
+  nextPublicEnv: `
+    const publicUrl = process.env.NEXT_PUBLIC_API_URL;
+    const secret = process.env.SECRET_KEY;
+  `,
 };
 
 // Sample package.json for dependency tests

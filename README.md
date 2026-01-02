@@ -7,8 +7,9 @@ A local-first CLI that reads `git diff` and generates structured **PR descriptio
 - **Heuristics-only**: No LLM calls, no network calls. Fully deterministic and grounded in git diff.
 - **Risk Analysis**: Framework-agnostic security and quality risk scoring (0-100) with evidence-backed flags.
 - **SvelteKit-aware**: Detects routes, layouts, endpoints, and HTTP methods.
+- **React Router support**: Detects route changes in React apps (JSX `<Route>` and data routers like `createBrowserRouter`).
 - **Supabase integration**: Scans migrations for destructive SQL patterns.
-- **Environment variable detection**: Finds `process.env`, SvelteKit `$env` imports.
+- **Environment variable detection**: Finds `process.env`, SvelteKit `$env` imports, Vite `import.meta.env`, React App `REACT_APP_*`, and Next.js `NEXT_PUBLIC_*`.
 - **Cloudflare detection**: Detects wrangler config and CI changes.
 - **Dependency analysis**: Tracks package.json changes with semver impact.
 - **CI/CD security**: Detects workflow permission changes, pull_request_target, remote script execution.
@@ -243,7 +244,7 @@ Display a colorized summary of changes in the terminal.
 | `--base <ref>` | `main` | Base git reference |
 | `--head <ref>` | `HEAD` | Head git reference |
 | `-u, --uncommitted` | `false` | Include uncommitted changes |
-| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 
 ### `pr-body` Command
 
@@ -254,7 +255,7 @@ Generate a raw Markdown PR description.
 | `--base <ref>` | `main` | Base git reference |
 | `--head <ref>` | `HEAD` | Head git reference |
 | `-u, --uncommitted` | `false` | Include uncommitted changes |
-| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 | `--interactive` | `false` | Prompt for additional context |
 
 ### `facts` Command
@@ -266,7 +267,7 @@ Output JSON findings for programmatic use.
 | `--base <ref>` | `main` | Base git reference |
 | `--head <ref>` | `HEAD` | Head git reference |
 | `-u, --uncommitted` | `false` | Include uncommitted changes |
-| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 
 ### `dump-diff` Command
 
@@ -500,12 +501,24 @@ Compares `package.json`:
 
 When `--profile auto` (default), the profile is detected by:
 
-1. Checking for `src/routes` directory
-2. Checking for `@sveltejs/kit` in package.json
+1. **SvelteKit**: Checking for `src/routes` directory or `@sveltejs/kit` in package.json
+2. **React**: Checking for `react`, `react-dom`, and `react-router-dom` in package.json (only when Next.js is not detected)
+3. **Default**: Generic profile for all other projects
 
 ### SvelteKit Profile
 
-Runs all analyzers optimized for SvelteKit projects.
+Runs all analyzers optimized for SvelteKit projects, including:
+- SvelteKit route detection (`src/routes/`)
+- SvelteKit env var patterns (`$env/static/public`, `$env/static/private`)
+
+### React Profile
+
+Runs all analyzers optimized for React projects, including:
+- React Router route detection (JSX `<Route>` components and data routers)
+- Vite env var patterns (`import.meta.env.VITE_*`)
+- React App env var patterns (`process.env.REACT_APP_*`)
+
+**Note**: React Router detection requires `react-router` or `react-router-dom` in package.json.
 
 ## Exit Codes
 
