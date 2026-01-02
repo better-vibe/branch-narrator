@@ -64,8 +64,13 @@ export function findAdditionMatches(
   pattern: RegExp
 ): RegExpMatchArray[] {
   const matches: RegExpMatchArray[] = [];
+  // Optimization: Hoist RegExp creation out of the loop
+  const globalPattern = new RegExp(pattern.source, "g" + pattern.flags.replace("g", ""));
+
   for (const line of getAdditions(diff)) {
-    const globalPattern = new RegExp(pattern.source, "g" + pattern.flags.replace("g", ""));
+    // Reset lastIndex for each line since we are reusing the same RegExp instance
+    globalPattern.lastIndex = 0;
+
     let match;
     while ((match = globalPattern.exec(line)) !== null) {
       matches.push(match);
@@ -73,4 +78,3 @@ export function findAdditionMatches(
   }
   return matches;
 }
-
