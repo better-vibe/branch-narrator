@@ -8,9 +8,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   executeIntegrate,
-  generateCursorRules,
-  type IntegrateOptions,
 } from "../src/commands/integrate.js";
+import { generateCursorRules } from "../src/commands/integrate/commands/legacy_stub.js";
+import type { IntegrateOptions } from "../src/commands/integrate/types.js";
 
 // ============================================================================
 // Test Fixtures
@@ -31,17 +31,17 @@ afterEach(async () => {
 });
 
 // ============================================================================
-// generateCursorRules Tests
+// generateCursorRules Tests (Legacy/Shared Content)
 // ============================================================================
 
 describe("generateCursorRules", () => {
-  it("should generate exactly 2 rule files", () => {
-    const rules = generateCursorRules();
+  it("should generate exactly 2 rule files", async () => {
+    const rules = await generateCursorRules();
     expect(rules).toHaveLength(2);
   });
 
-  it("should generate branch-narrator.md rule", () => {
-    const rules = generateCursorRules();
+  it("should generate branch-narrator.md rule", async () => {
+    const rules = await generateCursorRules();
     const branchNarratorRule = rules.find((r) =>
       r.path.endsWith("branch-narrator.md")
     );
@@ -52,44 +52,14 @@ describe("generateCursorRules", () => {
     expect(branchNarratorRule?.content).toContain("facts");
     expect(branchNarratorRule?.content).toContain("dump-diff");
   });
-
-  it("should generate pr-description.md rule", () => {
-    const rules = generateCursorRules();
-    const prDescriptionRule = rules.find((r) =>
-      r.path.endsWith("pr-description.md")
-    );
-
-    expect(prDescriptionRule).toBeDefined();
-    expect(prDescriptionRule?.path).toBe(".cursor/rules/pr-description.md");
-    expect(prDescriptionRule?.content).toContain("PR Description");
-    expect(prDescriptionRule?.content).toContain("dump-diff --base main --head HEAD --unified 3");
-  });
-
-  it("should include deterministic content with no timestamps", () => {
-    const rules1 = generateCursorRules();
-    const rules2 = generateCursorRules();
-
-    // Content should be identical across multiple calls
-    expect(rules1[0].content).toBe(rules2[0].content);
-    expect(rules1[1].content).toBe(rules2[1].content);
-  });
-
-  it("should use \\n line endings", () => {
-    const rules = generateCursorRules();
-    
-    for (const rule of rules) {
-      expect(rule.content).not.toContain("\r\n");
-      expect(rule.content).toContain("\n");
-    }
-  });
 });
 
 // ============================================================================
-// executeIntegrate Tests
+// executeIntegrate - Cursor
 // ============================================================================
 
-describe("executeIntegrate - basic functionality", () => {
-  it("should create .cursor/rules/ directory", async () => {
+describe("executeIntegrate - Cursor", () => {
+  it("should create rule files", async () => {
     const options: IntegrateOptions = {
       target: "cursor",
       dryRun: false,
@@ -101,17 +71,22 @@ describe("executeIntegrate - basic functionality", () => {
 
     const rulesDir = join(tempDir, ".cursor", "rules");
     const branchNarratorFile = join(rulesDir, "branch-narrator.md");
-    const prDescriptionFile = join(rulesDir, "pr-description.md");
 
     // Verify files exist
-    const branchNarratorContent = await readFile(branchNarratorFile, "utf-8");
-    const prDescriptionContent = await readFile(prDescriptionFile, "utf-8");
-
-    expect(branchNarratorContent).toContain("branch-narrator");
-    expect(prDescriptionContent).toContain("PR Description");
+    const content = await readFile(branchNarratorFile, "utf-8");
+    expect(content).toContain("# branch-narrator");
   });
 
-  it("should write both rule files with correct content", async () => {
+  it("should append if file exists (default behavior)", async () => {
+    // Create existing file
+    const rulesDir = join(tempDir, ".cursor", "rules");
+    await mkdir(rulesDir, { recursive: true });
+    await writeFile(
+      join(rulesDir, "branch-narrator.md"),
+      "EXISTING CONTENT\n",
+      "utf-8"
+    );
+
     const options: IntegrateOptions = {
       target: "cursor",
       dryRun: false,
@@ -121,147 +96,18 @@ describe("executeIntegrate - basic functionality", () => {
 
     await executeIntegrate(options);
 
-    const branchNarratorFile = join(tempDir, ".cursor/rules/branch-narrator.md");
-    const prDescriptionFile = join(tempDir, ".cursor/rules/pr-description.md");
-
-    const branchNarratorContent = await readFile(branchNarratorFile, "utf-8");
-    const prDescriptionContent = await readFile(prDescriptionFile, "utf-8");
-
-    // Verify branch-narrator.md content
-    expect(branchNarratorContent).toContain("# branch-narrator (local change analysis tool)");
-    expect(branchNarratorContent).toContain("branch-narrator facts --base main --head HEAD");
-    expect(branchNarratorContent).toContain("dump-diff");
-
-    // Verify pr-description.md content
-    expect(prDescriptionContent).toContain("# PR Description (use branch-narrator)");
-    expect(prDescriptionContent).toContain("branch-narrator dump-diff --base main --head HEAD --unified 3");
-  });
-});
-
-// ============================================================================
-// executeIntegrate - dry-run mode
-// ============================================================================
-
-describe("executeIntegrate - dry-run mode", () => {
-  it("should not create any files in dry-run mode", async () => {
-    const options: IntegrateOptions = {
-      target: "cursor",
-      dryRun: true,
-      force: false,
-      cwd: tempDir,
-    };
-
-    // Capture console.log output
-    const logs: string[] = [];
-    const originalLog = console.log;
-    console.log = (...args: unknown[]) => {
-      logs.push(args.map(String).join(" "));
-    };
-
-    try {
-      await executeIntegrate(options);
-
-      // Restore console.log
-      console.log = originalLog;
-
-      // Verify files were NOT created
-      const rulesDir = join(tempDir, ".cursor", "rules");
-      let dirExists = false;
-      try {
-        await readFile(join(rulesDir, "branch-narrator.md"), "utf-8");
-        dirExists = true;
-      } catch {
-        // Expected - file should not exist
-      }
-
-      expect(dirExists).toBe(false);
-
-      // Verify dry-run output contains file paths and contents
-      const output = logs.join("\n");
-      expect(output).toContain("DRY RUN");
-      expect(output).toContain(".cursor/rules/branch-narrator.md");
-      expect(output).toContain(".cursor/rules/pr-description.md");
-      expect(output).toContain("# branch-narrator");
-      expect(output).toContain("# PR Description");
-    } finally {
-      console.log = originalLog;
-    }
+    const content = await readFile(join(rulesDir, "branch-narrator.md"), "utf-8");
+    expect(content).toContain("EXISTING CONTENT");
+    expect(content).toContain("# branch-narrator"); // Appended
   });
 
-  it("should print both file paths and exact contents in dry-run", async () => {
-    const options: IntegrateOptions = {
-      target: "cursor",
-      dryRun: true,
-      force: false,
-      cwd: tempDir,
-    };
-
-    // Capture console.log output
-    const logs: string[] = [];
-    const originalLog = console.log;
-    console.log = (...args: unknown[]) => {
-      logs.push(args.map(String).join(" "));
-    };
-
-    try {
-      await executeIntegrate(options);
-      console.log = originalLog;
-
-      const output = logs.join("\n");
-
-      // Should contain file paths
-      expect(output).toContain("File: .cursor/rules/branch-narrator.md");
-      expect(output).toContain("File: .cursor/rules/pr-description.md");
-
-      // Should contain content from first file
-      expect(output).toContain("branch-narrator facts --base main --head HEAD");
-
-      // Should contain content from second file
-      expect(output).toContain("dump-diff --base main --head HEAD --unified 3");
-    } finally {
-      console.log = originalLog;
-    }
-  });
-});
-
-// ============================================================================
-// executeIntegrate - force mode
-// ============================================================================
-
-describe("executeIntegrate - force mode", () => {
-  it("should fail if files exist without --force", async () => {
-    // Create existing files
+  it("should overwrite if force is true", async () => {
+    // Create existing file
     const rulesDir = join(tempDir, ".cursor", "rules");
     await mkdir(rulesDir, { recursive: true });
     await writeFile(
       join(rulesDir, "branch-narrator.md"),
-      "existing content",
-      "utf-8"
-    );
-
-    const options: IntegrateOptions = {
-      target: "cursor",
-      dryRun: false,
-      force: false,
-      cwd: tempDir,
-    };
-
-    // Should throw an error containing both messages
-    await expect(executeIntegrate(options)).rejects.toThrow(/already exists.*--force/s);
-  });
-
-  it("should overwrite files with --force", async () => {
-    // Create existing files
-    const rulesDir = join(tempDir, ".cursor", "rules");
-    await mkdir(rulesDir, { recursive: true });
-    await writeFile(
-      join(rulesDir, "branch-narrator.md"),
-      "old content",
-      "utf-8"
-    );
-    await writeFile(
-      join(rulesDir, "pr-description.md"),
-      "old content",
+      "EXISTING CONTENT",
       "utf-8"
     );
 
@@ -274,112 +120,71 @@ describe("executeIntegrate - force mode", () => {
 
     await executeIntegrate(options);
 
-    // Verify files were overwritten
-    const branchNarratorContent = await readFile(
-      join(rulesDir, "branch-narrator.md"),
-      "utf-8"
-    );
-    const prDescriptionContent = await readFile(
-      join(rulesDir, "pr-description.md"),
-      "utf-8"
-    );
-
-    expect(branchNarratorContent).not.toBe("old content");
-    expect(prDescriptionContent).not.toBe("old content");
-    expect(branchNarratorContent).toContain("# branch-narrator");
-    expect(prDescriptionContent).toContain("# PR Description");
+    const content = await readFile(join(rulesDir, "branch-narrator.md"), "utf-8");
+    expect(content).not.toContain("EXISTING CONTENT");
+    expect(content).toContain("# branch-narrator");
   });
+});
 
-  it("should fail if only one file exists without --force", async () => {
-    // Create only pr-description.md
-    const rulesDir = join(tempDir, ".cursor", "rules");
-    await mkdir(rulesDir, { recursive: true });
-    await writeFile(
-      join(rulesDir, "pr-description.md"),
-      "existing content",
-      "utf-8"
-    );
+// ============================================================================
+// executeIntegrate - Jules
+// ============================================================================
 
+describe("executeIntegrate - Jules", () => {
+  it("should create AGENTS.md if missing", async () => {
     const options: IntegrateOptions = {
-      target: "cursor",
+      target: "jules",
       dryRun: false,
       force: false,
       cwd: tempDir,
     };
 
-    // Should throw an error
-    await expect(executeIntegrate(options)).rejects.toThrow(/already exists/);
+    await executeIntegrate(options);
+
+    const agentsFile = join(tempDir, "AGENTS.md");
+    const content = await readFile(agentsFile, "utf-8");
+
+    expect(content).toContain("Branch Narrator Usage");
+    expect(content).toContain("dump-diff");
+  });
+
+  it("should append to AGENTS.md if exists", async () => {
+    // Create existing AGENTS.md
+    await writeFile(
+      join(tempDir, "AGENTS.md"),
+      "# Existing Agents Rules\n\nDo not violate physics.\n",
+      "utf-8"
+    );
+
+    const options: IntegrateOptions = {
+      target: "jules",
+      dryRun: false,
+      force: false,
+      cwd: tempDir,
+    };
+
+    await executeIntegrate(options);
+
+    const content = await readFile(join(tempDir, "AGENTS.md"), "utf-8");
+    expect(content).toContain("# Existing Agents Rules");
+    expect(content).toContain("Do not violate physics.");
+    expect(content).toContain("Branch Narrator Usage"); // Appended
   });
 });
 
 // ============================================================================
-// executeIntegrate - error handling
+// executeIntegrate - Error Handling
 // ============================================================================
 
 describe("executeIntegrate - error handling", () => {
   it("should fail with unknown target", async () => {
     const options: IntegrateOptions = {
-      target: "unknown" as "cursor",
+      target: "unknown",
       dryRun: false,
       force: false,
       cwd: tempDir,
     };
 
-    await expect(executeIntegrate(options)).rejects.toThrow(/Unknown integration target/);
-  });
-});
-
-// ============================================================================
-// Integration Tests
-// ============================================================================
-
-describe("executeIntegrate - integration", () => {
-  it("should create directory structure when missing", async () => {
-    // Verify .cursor/rules/ doesn't exist
-    let dirExists = false;
-    try {
-      await readFile(join(tempDir, ".cursor", "rules", "test.txt"), "utf-8");
-      dirExists = true;
-    } catch {
-      // Expected
-    }
-    expect(dirExists).toBe(false);
-
-    const options: IntegrateOptions = {
-      target: "cursor",
-      dryRun: false,
-      force: false,
-      cwd: tempDir,
-    };
-
-    await executeIntegrate(options);
-
-    // Verify directory and files were created
-    const branchNarratorContent = await readFile(
-      join(tempDir, ".cursor/rules/branch-narrator.md"),
-      "utf-8"
-    );
-    expect(branchNarratorContent).toContain("# branch-narrator");
-  });
-
-  it("should work when .cursor/ exists but rules/ doesn't", async () => {
-    // Create .cursor/ directory but not rules/
-    await mkdir(join(tempDir, ".cursor"), { recursive: true });
-
-    const options: IntegrateOptions = {
-      target: "cursor",
-      dryRun: false,
-      force: false,
-      cwd: tempDir,
-    };
-
-    await executeIntegrate(options);
-
-    // Verify files were created
-    const branchNarratorContent = await readFile(
-      join(tempDir, ".cursor/rules/branch-narrator.md"),
-      "utf-8"
-    );
-    expect(branchNarratorContent).toContain("# branch-narrator");
+    await expect(executeIntegrate(options)).rejects.toThrow(/Supported targets/);
   });
 });

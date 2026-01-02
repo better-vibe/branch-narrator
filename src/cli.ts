@@ -627,10 +627,10 @@ program
     }
   });
 
-// integrate command - generate provider rules (Cursor, etc.)
+// integrate command - generate provider rules (Cursor, Jules, etc.)
 program
   .command("integrate <target>")
-  .description("Generate provider-specific rules (e.g., cursor)")
+  .description("Generate provider-specific rules")
   .option("--dry-run", "Preview what would be written without creating files", false)
   .option("--force", "Overwrite existing files", false)
   .action(async (target, options) => {
@@ -638,7 +638,7 @@ program
       const { executeIntegrate } = await import("./commands/integrate.js");
 
       await executeIntegrate({
-        target: target as "cursor",
+        target: target,
         dryRun: options.dryRun,
         force: options.force,
       });
