@@ -12,4 +12,6 @@ export * from "./vitest.js";
 export * from "./dependencies.js";
 export * from "./security-files.js";
 export * from "./reactRouterRoutes.js";
+export * from "./test-parity.js";
+export * from "./impact.js";
 

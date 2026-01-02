@@ -32,6 +32,8 @@ classDiagram
     Finding <|-- TestChangeFinding
     Finding <|-- RiskFlagFinding
     Finding <|-- SecurityFileFinding
+    Finding <|-- ConventionViolationFinding
+    Finding <|-- ImpactAnalysisFinding
 
     class Finding {
         <<discriminated union>>
@@ -199,6 +201,31 @@ interface SecurityFileFinding {
   type: "security-file";
   files: string[];
   reasons: SecurityFileReason[];
+}
+```
+
+---
+
+## ConventionViolationFinding
+
+```typescript
+interface ConventionViolationFinding {
+  type: "convention-violation";
+  message: string;
+  files: string[];
+}
+```
+
+---
+
+## ImpactAnalysisFinding
+
+```typescript
+interface ImpactAnalysisFinding {
+  type: "impact-analysis";
+  sourceFile: string;
+  affectedFiles: string[];
+  blastRadius: "low" | "medium" | "high";
 }
 ```
 

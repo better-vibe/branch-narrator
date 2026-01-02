@@ -4,12 +4,14 @@
 
 import type {
   CloudflareChangeFinding,
+  ConventionViolationFinding,
   DbMigrationFinding,
   DependencyChangeFinding,
   EnvVarFinding,
   FileCategoryFinding,
   FileSummaryFinding,
   Finding,
+  ImpactAnalysisFinding,
   RenderContext,
   RouteChangeFinding,
   SecurityFileFinding,
@@ -436,6 +438,43 @@ export function renderMarkdown(context: RenderContext): string {
   const deps =
     (groups.get("dependency-change") as DependencyChangeFinding[]) ?? [];
   output += renderDependencies(deps);
+
+  // Convention Violations
+  const violations =
+    (groups.get("convention-violation") as ConventionViolationFinding[]) ?? [];
+  if (violations.length > 0) {
+    output += "## ⚠️ Conventions\n\n";
+    for (const v of violations) {
+      output += `- **${v.message}**\n`;
+      for (const file of v.files.slice(0, 5)) {
+        output += `  - \`${file}\`\n`;
+      }
+      if (v.files.length > 5) {
+        output += `  - ...and ${v.files.length - 5} more\n`;
+      }
+    }
+    output += "\n";
+  }
+
+  // Impact Analysis
+  const impacts =
+    (groups.get("impact-analysis") as ImpactAnalysisFinding[]) ?? [];
+  if (impacts.length > 0) {
+    output += "## 🧨 Impact Analysis\n\n";
+    for (const impact of impacts) {
+      const radiusEmoji = impact.blastRadius === "high" ? "🔴" : impact.blastRadius === "medium" ? "🟡" : "🟢";
+      output += `### \`${impact.sourceFile}\` ${radiusEmoji}\n\n`;
+      output += `**Blast Radius:** ${impact.blastRadius.toUpperCase()} (${impact.affectedFiles.length} files)\n\n`;
+      output += "Affected files:\n";
+      for (const f of impact.affectedFiles.slice(0, 5)) {
+        output += `- \`${f}\`\n`;
+      }
+      if (impact.affectedFiles.length > 5) {
+        output += `- ...and ${impact.affectedFiles.length - 5} more\n`;
+      }
+      output += "\n";
+    }
+  }
 
   // Suggested test plan
   output += renderTestPlan(context, groups);

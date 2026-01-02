@@ -11,6 +11,8 @@ import {
   fileSummaryAnalyzer,
   securityFilesAnalyzer,
   vitestAnalyzer,
+  testParityAnalyzer,
+  impactAnalyzer,
 } from "../analyzers/index.js";
 
 /**
@@ -26,5 +28,7 @@ export const defaultProfile: Profile = {
     vitestAnalyzer,
     dependencyAnalyzer,
     securityFilesAnalyzer,
+    testParityAnalyzer,
+    impactAnalyzer,
   ],
 };

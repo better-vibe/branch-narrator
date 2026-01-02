@@ -218,6 +218,29 @@ export interface SecurityFileFinding {
   tags?: string[];
 }
 
+export interface ConventionViolationFinding {
+  type: "convention-violation";
+  kind: "convention-violation";
+  category: "tests";
+  confidence: Confidence;
+  evidence: Evidence[];
+  message: string;
+  files: string[];
+  tags?: string[];
+}
+
+export interface ImpactAnalysisFinding {
+  type: "impact-analysis";
+  kind: "impact-analysis";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  sourceFile: string;
+  affectedFiles: string[];
+  blastRadius: "low" | "medium" | "high";
+  tags?: string[];
+}
+
 export type RiskyPackageCategory =
   | "auth"
   | "database"
@@ -234,7 +257,9 @@ export type Finding =
   | TestChangeFinding
   | RiskFlagFinding
   | FileCategoryFinding
-  | SecurityFileFinding;
+  | SecurityFileFinding
+  | ConventionViolationFinding
+  | ImpactAnalysisFinding;
 
 // ============================================================================
 // Risk Score
