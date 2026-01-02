@@ -1,5 +1,4 @@
 
-import { BRANCH_NARRATOR_USAGE, PR_DESCRIPTION_TEMPLATE } from "../shared.js";
 import { cursorProvider } from "../providers/cursor.js";
 
 /**

@@ -42,8 +42,8 @@ export function redactLine(line: string): string {
     const eqPattern = new RegExp(`(${pattern.source})\\s*=\\s*['"]?([^'"\\s}<]+)['"]?`, "gi");
     const colonPattern = new RegExp(`(${pattern.source})\\s*:\\s*['"]?([^'"\\s,}<]+)['"]?`, "gi");
 
-    redacted = redacted.replace(eqPattern, (match, key) => `${key}=<redacted>`);
-    redacted = redacted.replace(colonPattern, (match, key) => `${key}: <redacted>`);
+    redacted = redacted.replace(eqPattern, (_match, key) => `${key}=<redacted>`);
+    redacted = redacted.replace(colonPattern, (_match, key) => `${key}: <redacted>`);
   }
 
   // Redact long base64/hex strings (but not if they look like hashes in code)
