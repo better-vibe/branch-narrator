@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.7.0
+
+### Minor Changes
+
+- fe8510e: Add React profile with React Router route detection and enhanced env var support for Vite and React App
+
 ## 0.6.0
 
 ### Minor Changes
