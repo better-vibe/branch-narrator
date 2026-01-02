@@ -36,6 +36,8 @@
     "pull-request",
     "cli",
     "sveltekit",
+    "react",
+    "react-router",
     "supabase",
     "cloudflare"
   ],
