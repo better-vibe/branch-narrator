@@ -4,7 +4,6 @@ import { impactAnalyzer } from "../src/analyzers/impact.js";
 import type { ChangeSet } from "../src/core/types.js";
 import { execa } from "execa";
 import fs from "node:fs/promises";
-import path from "node:path";
 
 // Mock execa and fs
 vi.mock("execa", () => {
