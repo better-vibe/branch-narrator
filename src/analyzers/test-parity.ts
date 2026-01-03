@@ -4,8 +4,7 @@
  */
 
 import path from "node:path";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
+import { execa } from "execa";
 import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
@@ -14,8 +13,6 @@ import type {
   Finding,
 } from "../core/types.js";
 import { isTestFile } from "./vitest.js";
-
-const execPromise = promisify(exec);
 
 // Files to exclude from parity check
 const EXCLUDED_PATTERNS = [
@@ -42,7 +39,7 @@ export function _resetCacheForTesting() {
 async function getAllFiles(): Promise<Set<string>> {
   if (cachedFileList) return cachedFileList;
   try {
-    const { stdout } = await execPromise("git ls-files --cached --others --exclude-standard");
+    const { stdout } = await execa("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { reject: false });
     cachedFileList = new Set(stdout.split("\n").filter(Boolean));
     return cachedFileList;
   } catch (error) {

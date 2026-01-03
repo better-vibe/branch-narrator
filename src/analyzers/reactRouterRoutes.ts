@@ -14,32 +14,7 @@ import type {
   RouteChangeFinding,
 } from "../core/types.js";
 import { createEvidence } from "../core/evidence.js";
-
-// ============================================================================
-// Git Operations
-// ============================================================================
-
-/**
- * Get file content from git at a specific ref.
- */
-function getFileContent(
-  ref: string,
-  path: string,
-  cwd: string = process.cwd()
-): string | null {
-  try {
-    const result = execaSync("git", ["show", `${ref}:${path}`], {
-      cwd,
-      reject: false,
-    });
-    if (result.exitCode !== 0) {
-      return null;
-    }
-    return result.stdout;
-  } catch {
-    return null;
-  }
-}
+import { batchGetFileContent } from "../git/batch.js";
 
 // ============================================================================
 // Route Extraction
@@ -50,9 +25,6 @@ interface ExtractedRoute {
   file: string;
 }
 
-/**
- * Check if file is a candidate for React Router route extraction.
- */
 function isCandidateFile(path: string, diffContent?: string): boolean {
   // Check extension
   const validExtensions = [".ts", ".tsx", ".js", ".jsx"];
@@ -60,17 +32,9 @@ function isCandidateFile(path: string, diffContent?: string): boolean {
     return false;
   }
 
-  // If we have diff content, check for React Router patterns
-  if (diffContent) {
-    return (
-      diffContent.includes("react-router") ||
-      diffContent.includes("<Route") ||
-      diffContent.includes("createBrowserRouter") ||
-      diffContent.includes("createHashRouter") ||
-      diffContent.includes("createMemoryRouter")
-    );
-  }
-
+  // We previously checked diffContent for react-router keywords,
+  // but that causes us to miss modifications where imports aren't touched.
+  // We accept the cost of checking all JS/TS files in exchange for correctness.
   return true;
 }
 
@@ -348,20 +312,51 @@ export function extractRoutesFromContent(
 export const reactRouterRoutesAnalyzer: Analyzer = {
   name: "react-router-routes",
 
-  analyze(changeSet: ChangeSet): Finding[] {
+  async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];
 
     // Select candidate files
     const candidateFiles = changeSet.files.filter((file) => {
       const diff = changeSet.diffs.find((d) => d.path === file.path);
-      const diffContent = diff?.hunks.map((h) => h.content).join("\n");
-      return isCandidateFile(file.path, diffContent);
+      // We assume isCandidateFile logic is correct
+      return isCandidateFile(file.path);
     });
+
+    if (candidateFiles.length === 0) return [];
+
+    // Prepare batch request
+    const batchRequest: Array<{ ref: string; path: string }> = [];
+    for (const file of candidateFiles) {
+       batchRequest.push({ ref: changeSet.base, path: file.path });
+       batchRequest.push({ ref: changeSet.head, path: file.path });
+    }
+
+    // Determine CWD (implicitly handled if batchGetFileContent uses process.cwd(),
+    // but ideally ChangeSet should provide it. Since we don't have it in ChangeSet,
+    // we assume process.cwd() is correct as per other analyzers).
+    // Note: In benchmarks we chdir to the repo.
+    const contentMap = await batchGetFileContent(batchRequest);
 
     // Extract routes from base and head for each file
     for (const file of candidateFiles) {
-      const baseContent = getFileContent(changeSet.base, file.path);
-      const headContent = getFileContent(changeSet.head, file.path);
+      const baseKey = `${changeSet.base}:${file.path}`;
+      const headKey = `${changeSet.head}:${file.path}`;
+
+      const baseContent = contentMap.get(baseKey);
+      const headContent = contentMap.get(headKey);
+
+      // Heuristic: If content doesn't contain "react-router", "Route", etc., skip AST parsing
+      // This saves time on files that are .tsx but not routes.
+      const hasRouterKeywords = (content: string) =>
+        content.includes("react-router") ||
+        content.includes("<Route") ||
+        content.includes("createBrowserRouter") ||
+        content.includes("createHashRouter") ||
+        content.includes("createMemoryRouter");
+
+      if (baseContent && !hasRouterKeywords(baseContent) && headContent && !hasRouterKeywords(headContent)) {
+        continue;
+      }
 
       const baseRoutes = baseContent
         ? extractRoutesFromContent(baseContent, file.path)
