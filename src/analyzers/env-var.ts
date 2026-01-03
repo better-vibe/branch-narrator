@@ -123,21 +123,22 @@ export function extractEnvVars(content: string): Set<string> {
   const vars = new Set<string>();
 
   // process.env.VAR
+  // Reset lastIndex to ensure consistent results since we're reusing global Regexps
+  ENV_PATTERNS.processEnv.lastIndex = 0;
   let match;
-  const processEnvPattern = new RegExp(ENV_PATTERNS.processEnv.source, "g");
-  while ((match = processEnvPattern.exec(content)) !== null) {
+  while ((match = ENV_PATTERNS.processEnv.exec(content)) !== null) {
     vars.add(match[1]);
   }
 
   // import.meta.env.VITE_VAR (Vite)
-  const viteEnvPattern = new RegExp(ENV_PATTERNS.viteEnv.source, "g");
-  while ((match = viteEnvPattern.exec(content)) !== null) {
+  ENV_PATTERNS.viteEnv.lastIndex = 0;
+  while ((match = ENV_PATTERNS.viteEnv.exec(content)) !== null) {
     vars.add(`VITE_${match[1]}`);
   }
 
   // PUBLIC_VAR
-  const publicPattern = new RegExp(ENV_PATTERNS.publicVar.source, "g");
-  while ((match = publicPattern.exec(content)) !== null) {
+  ENV_PATTERNS.publicVar.lastIndex = 0;
+  while ((match = ENV_PATTERNS.publicVar.exec(content)) !== null) {
     vars.add(`PUBLIC_${match[1]}`);
   }
 
@@ -150,8 +151,8 @@ export function extractEnvVars(content: string): Set<string> {
   ];
 
   for (const pattern of importPatterns) {
-    const importPattern = new RegExp(pattern.source, "g");
-    while ((match = importPattern.exec(content)) !== null) {
+    pattern.lastIndex = 0;
+    while ((match = pattern.exec(content)) !== null) {
       const importedVars = extractImportedVars(match[1]);
       for (const v of importedVars) {
         vars.add(v);
@@ -235,4 +236,3 @@ export const envVarAnalyzer: Analyzer = {
     return findings;
   },
 };
-
