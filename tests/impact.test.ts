@@ -156,6 +156,34 @@ describe("impactAnalyzer", () => {
     expect(finding.usageContext).toContain("import './init'");
   });
 
+  it("should handle multiple imports from same file", async () => {
+      mockChangeSet.files = [
+          { path: "src/types/user.ts", status: "modified" }
+      ];
+
+      mockGitGrep([
+          "src/api.ts:import { type User } from './types/user'"
+      ]);
+
+      // Mock content with two import lines
+      mockFileContent({
+          "src/api.ts": `
+import { type User } from './types/user';
+import { createUser } from './types/user';
+          `
+      });
+
+      const findings = await impactAnalyzer.analyze(mockChangeSet);
+
+      expect(findings).toHaveLength(1);
+      const finding = findings[0] as any;
+
+      expect(finding.importedSymbols).toContain("User");
+      expect(finding.importedSymbols).toContain("createUser");
+      expect(finding.usageContext).toContain("import { type User }");
+      expect(finding.usageContext).toContain("import { createUser }");
+  });
+
   it("should ignore excluded files", async () => {
     mockChangeSet.files = [
       { path: "src/types.d.ts", status: "modified" },

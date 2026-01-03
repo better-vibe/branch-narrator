@@ -139,13 +139,16 @@ async function analyzeDependency(
 
     for (const line of lines) {
       if (line.includes(sourceBaseName) && (line.trim().startsWith("import") || line.trim().startsWith("export"))) {
-        usageContext = line.trim();
+        usageContext = usageContext ? `${usageContext}\n${line.trim()}` : line.trim();
 
         // Try to extract symbols
         // Case 1: Named imports: import { A, B } ...
         const namedMatch = line.match(/\{([^}]+)\}/);
         if (namedMatch) {
-          const symbols = namedMatch[1].split(",").map(s => s.trim().split(" as ")[0].trim()); // Handle 'as' aliases
+          const symbols = namedMatch[1].split(",").map(s => {
+            const part = s.trim().split(" as ")[0].trim(); // Handle 'as' aliases
+            return part.replace(/^type\s+/, ""); // Handle 'type' keyword
+          });
           importedSymbols.push(...symbols);
         }
 
@@ -172,7 +175,7 @@ async function analyzeDependency(
            }
         }
 
-        break; // Found the import line, stop (assuming one import per file for simplicity)
+        // Removed break to capture multiple imports
       }
     }
 
@@ -237,10 +240,10 @@ export const impactAnalyzer: Analyzer = {
                  if (details) {
                      impactedFilesInfo.push({ file: dep, details });
                  } else {
-                     impactedFilesInfo.push({ file: dep, details: { isTestFile: false } });
+                     impactedFilesInfo.push({ file: dep, details: { importedSymbols: [], usageContext: "", isTestFile: false } });
                  }
             } else {
-                impactedFilesInfo.push({ file: dep, details: { isTestFile: false } });
+                impactedFilesInfo.push({ file: dep, details: { importedSymbols: [], usageContext: "", isTestFile: false } });
             }
         }
 
