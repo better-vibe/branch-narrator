@@ -4,6 +4,7 @@
  */
 
 import path from "node:path";
+import fs from "node:fs/promises";
 import { execa } from "execa";
 import { createEvidence } from "../core/evidence.js";
 import type {
@@ -17,11 +18,17 @@ import type {
 const EXCLUDE_PATTERNS = [
   /node_modules/,
   /\.d\.ts$/,
-  /\.test\.ts$/,
-  /\.spec\.ts$/,
   /^dist\//,
   /^build\//,
   /^\.git\//,
+];
+
+// Patterns for detecting test files
+const TEST_FILE_PATTERNS = [
+  /\.test\.ts$/,
+  /\.spec\.ts$/,
+  /^tests\//,
+  /^__tests__\//,
 ];
 
 /**
@@ -109,6 +116,76 @@ async function findDependentsBatch(
   return results;
 }
 
+/**
+ * Analyze a dependent file to extract detailed usage information.
+ */
+async function analyzeDependency(
+  dependentPath: string,
+  sourcePath: string,
+  cwd: string = process.cwd()
+): Promise<{ importedSymbols: string[]; usageContext: string; isTestFile: boolean } | null> {
+  try {
+    const content = await fs.readFile(path.join(cwd, dependentPath), "utf-8");
+    const sourceBaseName = path.basename(sourcePath, path.extname(sourcePath));
+    const lines = content.split("\n");
+
+    const importedSymbols: string[] = [];
+    let usageContext = "";
+
+    // Regex to find import statement
+    // Matches: import { A, B } from './source' or import X from './source'
+    // This is heuristic and won't cover 100% of cases (e.g. multiline imports might need smarter parsing)
+    // But we iterate lines to find the one containing the source name.
+
+    for (const line of lines) {
+      if (line.includes(sourceBaseName) && (line.trim().startsWith("import") || line.trim().startsWith("export"))) {
+        usageContext = line.trim();
+
+        // Try to extract symbols
+        // Case 1: Named imports: import { A, B } ...
+        const namedMatch = line.match(/\{([^}]+)\}/);
+        if (namedMatch) {
+          const symbols = namedMatch[1].split(",").map(s => s.trim().split(" as ")[0].trim()); // Handle 'as' aliases
+          importedSymbols.push(...symbols);
+        }
+
+        // Case 2: Default import: import X ...
+        // Simplistic check: if no curly braces and follows 'import'
+        if (!namedMatch && line.trim().startsWith("import")) {
+           const parts = line.split("from");
+           if (parts.length > 1) {
+             const preFrom = parts[0].replace("import", "").trim();
+             if (preFrom && !preFrom.includes("{") && !preFrom.includes("*")) {
+                importedSymbols.push(preFrom.split(" as ")[0].trim());
+             }
+           }
+        }
+
+        break; // Found the import line, stop (assuming one import per file for simplicity)
+      }
+    }
+
+    if (!usageContext) {
+      // Fallback if no clean import statement found (maybe dynamic import or require)
+      // Just take the first line with the reference
+      const match = lines.find(l => l.includes(sourceBaseName));
+      if (match) usageContext = match.trim();
+    }
+
+    const isTestFile = TEST_FILE_PATTERNS.some(p => p.test(dependentPath));
+
+    return {
+      importedSymbols,
+      usageContext,
+      isTestFile
+    };
+
+  } catch (error) {
+    // If file read fails (e.g. deleted), return null
+    return null;
+  }
+}
+
 export const impactAnalyzer: Analyzer = {
   name: "impact",
 
@@ -131,25 +208,60 @@ export const impactAnalyzer: Analyzer = {
     });
 
     // Run batch search
-    // Note: process.cwd() is used implicitely unless we are running in a specific context.
-    // The current architecture assumes the process runs in the repo root.
     const dependentsMap = await findDependentsBatch(targets);
 
     for (const source of sourceFiles) {
       const dependents = dependentsMap.get(source.path) || [];
 
       if (dependents.length > 0) {
+        // Detailed analysis for each dependent
+        const impactedFilesInfo: Array<{ file: string; details: any }> = [];
+
+        for (const dep of dependents) {
+            // We analyze only the first few dependents deeply to avoid perf hit on massive impact
+            // Or maybe we analyze all? Let's analyze all for now, assuming typical impact < 100 files.
+            // If massive, we might want to limit.
+            if (impactedFilesInfo.length < 20) {
+                 const details = await analyzeDependency(dep, source.path);
+                 if (details) {
+                     impactedFilesInfo.push({ file: dep, details });
+                 } else {
+                     impactedFilesInfo.push({ file: dep, details: { isTestFile: false } });
+                 }
+            } else {
+                impactedFilesInfo.push({ file: dep, details: { isTestFile: false } });
+            }
+        }
+
+        const evidence = [
+            createEvidence(source.path, `Modified file ${source.path} is imported by ${dependents.length} other file(s).`),
+            ...impactedFilesInfo.slice(0, 5).map(info => {
+                let text = `Depends on ${source.path}`;
+                if (info.details.importedSymbols?.length > 0) {
+                    text += ` (imports: ${info.details.importedSymbols.join(", ")})`;
+                }
+                if (info.details.isTestFile) {
+                    text += " [TEST]";
+                }
+                return createEvidence(info.file, text);
+            })
+        ];
+
+        // Collect all symbols for the finding summary
+        const allSymbols = new Set<string>();
+        impactedFilesInfo.forEach(i => i.details.importedSymbols?.forEach((s: string) => allSymbols.add(s)));
+
         findings.push({
           type: "impact-analysis",
           kind: "impact-analysis",
-          category: "tests",
+          category: "tests", // Keeping category as tests/quality related
           confidence: "medium",
-          evidence: [
-            createEvidence(source.path, `Modified file ${source.path} is imported by ${dependents.length} other file(s).`),
-            ...dependents.slice(0, 5).map(d => createEvidence(d, `Depends on ${source.path}`))
-          ],
+          evidence: evidence,
           sourceFile: source.path,
           affectedFiles: dependents,
+          importedSymbols: Array.from(allSymbols),
+          isTestFile: impactedFilesInfo.every(i => i.details.isTestFile), // True if ALL dependents are tests
+          usageContext: impactedFilesInfo[0]?.details.usageContext, // Example context from first file
           blastRadius: dependents.length > 10 ? "high" : dependents.length > 3 ? "medium" : "low",
           tags: ["impact", "dependency"]
         } as ImpactAnalysisFinding);

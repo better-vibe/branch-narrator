@@ -237,6 +237,9 @@ export interface ImpactAnalysisFinding {
   evidence: Evidence[];
   sourceFile: string;
   affectedFiles: string[];
+  importedSymbols?: string[];
+  usageContext?: string;
+  isTestFile?: boolean;
   blastRadius: "low" | "medium" | "high";
   tags?: string[];
 }
