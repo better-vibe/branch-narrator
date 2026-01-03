@@ -25,10 +25,12 @@ const EXCLUDE_PATTERNS = [
 
 // Patterns for detecting test files
 const TEST_FILE_PATTERNS = [
-  /\.test\.ts$/,
-  /\.spec\.ts$/,
-  /^tests\//,
-  /^__tests__\//,
+  // Match .test.{js,jsx,ts,tsx} (case-insensitive)
+  /\.test\.[jt]sx?$/i,
+  // Match .spec.{js,jsx,ts,tsx} (case-insensitive)
+  /\.spec\.[jt]sx?$/i,
+  /^tests\//i,
+  /^__tests__\//i,
 ];
 
 /**
