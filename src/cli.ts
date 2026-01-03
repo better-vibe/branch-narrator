@@ -85,7 +85,7 @@ async function runAnalysisWithMode(options: {
   // Run analyzers
   const findings: Finding[] = [];
   for (const analyzer of profile.analyzers) {
-    const analyzerFindings = analyzer.analyze(changeSet);
+    const analyzerFindings = await analyzer.analyze(changeSet);
     findings.push(...analyzerFindings);
   }
 
@@ -141,7 +141,7 @@ async function runAnalysis(options: {
   // Run analyzers
   const findings: Finding[] = [];
   for (const analyzer of profile.analyzers) {
-    const analyzerFindings = analyzer.analyze(changeSet);
+    const analyzerFindings = await analyzer.analyze(changeSet);
     findings.push(...analyzerFindings);
   }
 
@@ -368,7 +368,7 @@ program
       // Run analyzers
       const findings: Finding[] = [];
       for (const analyzer of profile.analyzers) {
-        const analyzerFindings = analyzer.analyze(changeSet);
+        const analyzerFindings = await analyzer.analyze(changeSet);
         findings.push(...analyzerFindings);
       }
 

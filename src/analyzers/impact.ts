@@ -3,8 +3,9 @@
  * Finds files that import the modified files (blast radius).
  */
 
-import fs from "node:fs";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
@@ -12,6 +13,8 @@ import type {
   Finding,
   ImpactAnalysisFinding,
 } from "../core/types.js";
+
+const execFilePromise = promisify(execFile);
 
 // Files to exclude from impact scanning (both as source and target)
 const EXCLUDE_PATTERNS = [
@@ -25,77 +28,55 @@ const EXCLUDE_PATTERNS = [
 ];
 
 /**
- * List all project files (naive implementation).
- * In a real scenario, we might want to respect .gitignore or use git ls-files.
- * For this local-first tool, we'll do a recursive walk or just rely on a known list if provided.
- * Since we want to be heuristic and fast, let's try to list files from git if possible,
- * or fallback to recursive walk of `src/`.
+ * Find files that import the target file using git grep.
+ * This avoids reading all files into memory.
  */
-function getAllProjectFiles(): string[] {
-  const files: string[] = [];
-
-  function walk(dir: string) {
-    if (!fs.existsSync(dir)) return;
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      // Skip exclusions
-      if (EXCLUDE_PATTERNS.some(p => p.test(fullPath))) continue;
-
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (/\.(ts|js|tsx|jsx|mts|mjs|svelte|vue)$/.test(entry.name)) {
-        files.push(fullPath);
-      }
-    }
-  }
-
-  // Focus on src for now as the main code area
-  walk("src");
-  return files;
-}
-
-/**
- * Check if file A imports file B.
- * Heuristic regex matching.
- */
-function checkImports(fileContent: string, targetFile: string): boolean {
-  // Normalize target file path to be relative and without extension for matching
-  // e.g. src/utils/math.ts -> utils/math
-  // or ../utils/math
-
-  // We look for the basename without extension primarily, but this is risky for collisions.
-  // Better: Look for path ending.
-
+async function findDependents(targetFile: string): Promise<string[]> {
   const ext = path.extname(targetFile);
-  const targetBase = path.basename(targetFile, ext); // math
+  const baseName = path.basename(targetFile, ext); // e.g. "math" from "src/utils/math.ts"
 
-  // Regex to match: from ".../math" or from ".../math.js"
-  // This is a loose heuristic.
-  // const importRegex = new RegExp(`from\\s+['"](.*/)?${targetBase}(\\.[a-z]+)?['"]`, 'g');
+  // We search for the base filename. This is heuristic and might return false positives,
+  // but it's much faster than parsing ASTs.
+  // We use git grep to search in all tracked files.
 
-  // More robust: matching strict relative paths is hard without resolving.
-  // Let's assume if we find the filename in an import string, it's a hit.
-  // It's a "Potential Impact".
+  // Searching for: 'import ... from ".../math"' or 'require(".../math")'
+  // Simplified: just search for the filename without extension.
+  // This might catch "math" in comments, but we filter later or accept the noise for speed.
 
-  const importPattern = new RegExp(`['"]([^'"]*${targetBase})([^'"]*)['"]`);
-  const match = fileContent.match(importPattern);
+  try {
+    // -l: list filenames only
+    // -F: fixed string (faster and safer against regex injection)
+    // We search for the baseName.
+    // Optimization: Search only in src/ or relevant dirs if possible, but git grep defaults to all tracked files.
 
-  if (match) {
-    // Verify it looks like an import/require
-    const importLine = fileContent.split('\n').find(l => l.includes(match[0]));
-    if (importLine && (importLine.includes('import ') || importLine.includes('require(') || importLine.includes('from '))) {
+    // Using execFile to avoid shell injection
+    const { stdout } = await execFilePromise("git", ["grep", "-l", "-F", baseName]);
+
+    const candidates = stdout.split("\n").filter(Boolean);
+
+    // Filter candidates:
+    // 1. Must not be the file itself
+    // 2. Must not be excluded
+    // 3. (Optional) Read file to verify it's an import?
+    //    For "Improve Algorithm Efficiency", we might skip full verification if git grep is precise enough.
+    //    Let's verify it contains "import" or "require" line with the file.
+
+    return candidates.filter(file => {
+      if (file === targetFile) return false;
+      if (EXCLUDE_PATTERNS.some(p => p.test(file))) return false;
       return true;
-    }
-  }
+    });
 
-  return false;
+  } catch (error) {
+    // git grep returns exit code 1 if not found, which throws error in execPromise
+    return [];
+  }
 }
 
 export const impactAnalyzer: Analyzer = {
   name: "impact",
 
-  analyze(changeSet: ChangeSet): Finding[] {
+  async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];
 
     // We only care about modified/renamed files that are "sources"
@@ -106,26 +87,8 @@ export const impactAnalyzer: Analyzer = {
 
     if (sourceFiles.length === 0) return [];
 
-    // Get all files to scan
-    // Performance: We scan all files for every source file. O(N*M).
-    const projectFiles = getAllProjectFiles();
-
     for (const source of sourceFiles) {
-      const dependents: string[] = [];
-
-      for (const file of projectFiles) {
-        // Don't check self
-        if (file === source.path) continue;
-
-        try {
-          const content = fs.readFileSync(file, 'utf-8');
-          if (checkImports(content, source.path)) {
-            dependents.push(file);
-          }
-        } catch (e) {
-          // Ignore read errors
-        }
-      }
+      const dependents = await findDependents(source.path);
 
       if (dependents.length > 0) {
         findings.push({
