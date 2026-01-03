@@ -6,7 +6,6 @@
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 import * as t from "@babel/types";
-import { execaSync } from "execa";
 import type {
   Analyzer,
   ChangeSet,
@@ -25,7 +24,7 @@ interface ExtractedRoute {
   file: string;
 }
 
-function isCandidateFile(path: string, diffContent?: string): boolean {
+function isCandidateFile(path: string): boolean {
   // Check extension
   const validExtensions = [".ts", ".tsx", ".js", ".jsx"];
   if (!validExtensions.some((ext) => path.endsWith(ext))) {
@@ -317,7 +316,6 @@ export const reactRouterRoutesAnalyzer: Analyzer = {
 
     // Select candidate files
     const candidateFiles = changeSet.files.filter((file) => {
-      const diff = changeSet.diffs.find((d) => d.path === file.path);
       // We assume isCandidateFile logic is correct
       return isCandidateFile(file.path);
     });

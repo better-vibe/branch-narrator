@@ -30,8 +30,9 @@ export async function batchGetFileContent(
       encoding: "buffer", // We need buffer to handle byte offsets correctly
     });
 
-    const { stdout } = await subprocess;
-    // stdout is a Buffer
+    const { stdout: stdoutRaw } = await subprocess;
+    // explicit cast to Buffer to avoid type errors with Uint8Array
+    const stdout = Buffer.from(stdoutRaw);
 
     let currentIndex = 0;
     for (const inputKey of inputs) {
