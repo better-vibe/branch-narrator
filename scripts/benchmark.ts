@@ -1,7 +1,6 @@
 
 import { execa } from 'execa';
 import { rm } from 'node:fs/promises';
-import path from 'node:path';
 
 const COMMANDS = [
   { name: 'pretty', args: ['./dist/cli.js', 'pretty', '--mode', 'branch', '--base', 'develop'] },
