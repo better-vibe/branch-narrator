@@ -1,5 +1,13 @@
 # @better-vibe/branch-narrator
 
+## 0.9.0
+
+### Minor Changes
+
+- 9ccbb1f: Added two new analyzers for enhanced verification:
+  - `TestParityAnalyzer`: Enforces that modified source files have corresponding test files.
+  - `ImpactAnalyzer`: Calculates the dependency "blast radius" of changes.
+
 ## 0.8.0
 
 ### Minor Changes
