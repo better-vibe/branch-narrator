@@ -1,3 +1,17 @@
+/**
+ * Benchmark script for branch-narrator CLI commands.
+ *
+ * Measures the performance of all major CLI commands (pretty, pr-body, facts,
+ * dump-diff, risk-report, integrate) by running them multiple times and
+ * reporting average, minimum, and maximum execution times.
+ *
+ * Usage:
+ *   bun run scripts/benchmark.ts
+ *   npm run scripts/benchmark.ts
+ *
+ * The script automatically builds the project before running benchmarks
+ * and runs each command 5 times to get reliable timing data.
+ */
 
 import { execa } from 'execa';
 import { rm } from 'node:fs/promises';
