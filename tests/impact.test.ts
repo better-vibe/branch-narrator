@@ -2,19 +2,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { impactAnalyzer } from "../src/analyzers/impact.js";
 import type { ChangeSet } from "../src/core/types.js";
-import fs from "node:fs";
+import { execFile } from "node:child_process";
 
-// Mock file system
-vi.mock("node:fs", () => {
+// Mock child_process
+vi.mock("node:child_process", () => {
   return {
-    default: {
-      existsSync: vi.fn(),
-      readdirSync: vi.fn(),
-      readFileSync: vi.fn(),
-    },
-    existsSync: vi.fn(),
-    readdirSync: vi.fn(),
-    readFileSync: vi.fn(),
+    execFile: vi.fn(),
   };
 });
 
@@ -28,52 +21,71 @@ describe("impactAnalyzer", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    // Default: src exists, empty dir
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readdirSync).mockReturnValue([]);
   });
 
-  it("should find files that import the modified file", () => {
+  const mockGitGrep = (results: string[]) => {
+      vi.mocked(execFile).mockImplementation(((cmd: string, args: string[], callback: any) => {
+        // Handle optional callback being the 2nd or 3rd argument
+        const cb = typeof args === 'function' ? args : callback;
+        const actualArgs = typeof args === 'function' ? [] : args;
+
+        if (cmd === "git" && actualArgs[0] === "grep") {
+             cb(null, { stdout: results.join("\n") });
+        } else {
+             cb(null, { stdout: "" });
+        }
+        return {} as any;
+    }) as any);
+  };
+
+  const mockGitGrepEmpty = () => {
+      vi.mocked(execFile).mockImplementation(((cmd: string, args: string[], callback: any) => {
+          const cb = typeof args === 'function' ? args : callback;
+          if (cmd === "git" && args[0] === "grep") {
+             // git grep returns exit code 1 if not found, simulate error
+             const error = new Error("Command failed");
+             (error as any).code = 1;
+             cb(error, { stdout: "" });
+          }
+          return {} as any;
+      }) as any);
+  };
+
+  it("should find files that import the modified file", async () => {
     mockChangeSet.files = [
       { path: "src/utils/math.ts", status: "modified" },
     ];
 
-    // Mock file system scan
-    vi.mocked(fs.readdirSync).mockImplementation((dir) => {
-      if (dir === "src") {
-        return [
-          { name: "main.ts", isDirectory: () => false },
-          { name: "utils", isDirectory: () => true },
-        ] as any;
-      }
-      return [];
-    });
+    // Mock git grep output
+    mockGitGrep(["src/main.ts", "src/utils/calc.ts"]);
 
-    // Mock file read
-    vi.mocked(fs.readFileSync).mockImplementation((path) => {
-      if (path === "src/main.ts") {
-        return "import { add } from './utils/math';";
-      }
-      return "";
-    });
-
-    const findings = impactAnalyzer.analyze(mockChangeSet);
+    const findings = await impactAnalyzer.analyze(mockChangeSet);
 
     expect(findings).toHaveLength(1);
     expect(findings[0].type).toBe("impact-analysis");
     expect((findings[0] as any).affectedFiles).toContain("src/main.ts");
+    expect((findings[0] as any).affectedFiles).toContain("src/utils/calc.ts");
     expect((findings[0] as any).blastRadius).toBe("low");
   });
 
-  it("should ignore excluded files", () => {
+  it("should ignore excluded files", async () => {
     mockChangeSet.files = [
       { path: "src/types.d.ts", status: "modified" },
     ];
+    // Should not even call git grep for d.ts
+    mockGitGrep(["src/main.ts"]);
 
-    // Even if something imports it, we skip d.ts modification analysis based on our rule
-    // Wait, the rule is to exclude d.ts from *sourceFiles* list.
-
-    const findings = impactAnalyzer.analyze(mockChangeSet);
+    const findings = await impactAnalyzer.analyze(mockChangeSet);
     expect(findings).toHaveLength(0);
+  });
+
+  it("should handle no dependents found", async () => {
+      mockChangeSet.files = [
+          { path: "src/utils/orphan.ts", status: "modified" },
+      ];
+      mockGitGrepEmpty();
+
+      const findings = await impactAnalyzer.analyze(mockChangeSet);
+      expect(findings).toHaveLength(0);
   });
 });

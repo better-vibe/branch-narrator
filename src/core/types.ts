@@ -305,7 +305,7 @@ export interface ChangeSet {
 
 export interface Analyzer {
   name: string;
-  analyze(changeSet: ChangeSet): Finding[];
+  analyze(changeSet: ChangeSet): Finding[] | Promise<Finding[]>;
 }
 
 // ============================================================================

@@ -3,8 +3,9 @@
  * Checks if modified source files have corresponding test files.
  */
 
-import fs from "node:fs";
 import path from "node:path";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
@@ -13,6 +14,8 @@ import type {
   Finding,
 } from "../core/types.js";
 import { isTestFile } from "./vitest.js";
+
+const execPromise = promisify(exec);
 
 // Files to exclude from parity check
 const EXCLUDED_PATTERNS = [
@@ -25,6 +28,29 @@ const EXCLUDED_PATTERNS = [
   /^dist\//, // Build artifacts
 ];
 
+// Cache for file list
+let cachedFileList: Set<string> | null = null;
+
+export function _resetCacheForTesting() {
+  cachedFileList = null;
+}
+
+/**
+ * Get all files in the project using git ls-files.
+ * Returns a Set for O(1) lookups.
+ */
+async function getAllFiles(): Promise<Set<string>> {
+  if (cachedFileList) return cachedFileList;
+  try {
+    const { stdout } = await execPromise("git ls-files --cached --others --exclude-standard");
+    cachedFileList = new Set(stdout.split("\n").filter(Boolean));
+    return cachedFileList;
+  } catch (error) {
+    console.warn("Failed to retrieve files via git, defaulting to empty set:", error);
+    return new Set();
+  }
+}
+
 /**
  * Check if a file should be checked for test parity.
  */
@@ -36,14 +62,11 @@ function shouldCheckParity(filePath: string): boolean {
 }
 
 /**
- * Find potential test files for a source file.
- * Strategy:
- * 1. src/foo.ts -> tests/foo.test.ts
- * 2. src/foo.ts -> tests/src/foo.test.ts (if tests mirrors src)
- * 3. src/foo.ts -> src/foo.test.ts (colocation)
- * 4. src/lib/foo.ts -> tests/lib/foo.test.ts
+ * Find potential test files for a source file using cached file list.
  */
-function findTestFile(sourcePath: string): string | null {
+async function findTestFile(sourcePath: string): Promise<string | null> {
+  const allFiles = await getAllFiles();
+
   const ext = path.extname(sourcePath);
   const baseName = path.basename(sourcePath, ext);
   const dirName = path.dirname(sourcePath);
@@ -54,35 +77,27 @@ function findTestFile(sourcePath: string): string | null {
   // 1. Colocation: src/foo.test.ts
   for (const testExt of testExts) {
     const colocated = path.join(dirName, `${baseName}${testExt}`);
-    if (fs.existsSync(colocated)) return colocated;
+    if (allFiles.has(colocated)) return colocated;
   }
 
   // 2. tests/ directory mapping
-  // If file is in src/, map to tests/
   let relativePath = sourcePath;
   if (sourcePath.startsWith("src/")) {
     relativePath = sourcePath.slice(4); // remove src/
-  } else {
-    // If not in src, treat the whole path as relative to root for tests/ mapping
-    // e.g. lib/foo.ts -> tests/lib/foo.test.ts
   }
-
-  // Try mapping to tests/ folder
-  // Option A: tests/{relativePath}.test.ts (flat or mirrored)
-  // Option B: tests/{filename}.test.ts (flat)
 
   for (const testExt of testExts) {
     // Mirror: src/utils/math.ts -> tests/utils/math.test.ts
     const mirrored = path.join("tests", path.dirname(relativePath), `${baseName}${testExt}`);
-    if (fs.existsSync(mirrored)) return mirrored;
+    if (allFiles.has(mirrored)) return mirrored;
 
-    // Flat: src/utils/math.ts -> tests/math.test.ts (less common but possible for small projects)
+    // Flat: src/utils/math.ts -> tests/math.test.ts
     const flat = path.join("tests", `${baseName}${testExt}`);
-    if (fs.existsSync(flat)) return flat;
+    if (allFiles.has(flat)) return flat;
 
     // Mirror with src: src/utils/math.ts -> tests/src/utils/math.test.ts
     const mirrorSrc = path.join("tests", dirName, `${baseName}${testExt}`);
-    if (fs.existsSync(mirrorSrc)) return mirrorSrc;
+    if (allFiles.has(mirrorSrc)) return mirrorSrc;
   }
 
   return null;
@@ -91,7 +106,7 @@ function findTestFile(sourcePath: string): string | null {
 export const testParityAnalyzer: Analyzer = {
   name: "test-parity",
 
-  analyze(changeSet: ChangeSet): Finding[] {
+  async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const violations: string[] = [];
     const evidenceList = [];
 
@@ -101,7 +116,7 @@ export const testParityAnalyzer: Analyzer = {
 
       if (!shouldCheckParity(file.path)) continue;
 
-      const testFile = findTestFile(file.path);
+      const testFile = await findTestFile(file.path);
 
       // If no existing test file found, check if a NEW test file is in the changeset
       // This handles the case where I add a new feature AND its test in the same PR

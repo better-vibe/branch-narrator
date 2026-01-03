@@ -1,16 +1,13 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { testParityAnalyzer } from "../src/analyzers/test-parity.js";
+import { testParityAnalyzer, _resetCacheForTesting } from "../src/analyzers/test-parity.js";
 import type { ChangeSet } from "../src/core/types.js";
-import fs from "node:fs";
+import { exec } from "node:child_process";
 
-// Mock file system
-vi.mock("node:fs", () => {
+// Mock child_process
+vi.mock("node:child_process", () => {
   return {
-    default: {
-      existsSync: vi.fn(),
-    },
-    existsSync: vi.fn(),
+    exec: vi.fn(),
   };
 });
 
@@ -24,82 +21,98 @@ describe("testParityAnalyzer", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    _resetCacheForTesting();
+    // Default mock implementation for git ls-files
+    vi.mocked(exec).mockImplementation(((cmd: string, callback: any) => {
+        if (cmd.includes("git ls-files")) {
+            callback(null, { stdout: "" });
+        } else {
+            callback(null, { stdout: "" });
+        }
+        return {} as any;
+    }) as any);
   });
 
-  it("should detect missing test for source file", () => {
+  const mockGitFiles = (files: string[]) => {
+      vi.mocked(exec).mockImplementation(((cmd: string, callback: any) => {
+        if (cmd.includes("git ls-files")) {
+            callback(null, { stdout: files.join("\n") });
+        } else {
+            callback(null, { stdout: "" });
+        }
+        return {} as any;
+    }) as any);
+  };
+
+  it("should detect missing test for source file", async () => {
     mockChangeSet.files = [
       { path: "src/utils/math.ts", status: "modified" },
     ];
+    mockGitFiles(["src/utils/math.ts"]);
 
-    const findings = testParityAnalyzer.analyze(mockChangeSet);
+    const findings = await testParityAnalyzer.analyze(mockChangeSet);
 
     expect(findings).toHaveLength(1);
     expect(findings[0].type).toBe("convention-violation");
     expect((findings[0] as any).files).toContain("src/utils/math.ts");
   });
 
-  it("should ignore excluded files", () => {
+  it("should ignore excluded files", async () => {
     mockChangeSet.files = [
       { path: "src/index.ts", status: "modified" },
       { path: "src/types.d.ts", status: "modified" },
       { path: "vitest.config.ts", status: "modified" },
     ];
+    mockGitFiles([]);
 
-    const findings = testParityAnalyzer.analyze(mockChangeSet);
+    const findings = await testParityAnalyzer.analyze(mockChangeSet);
 
     expect(findings).toHaveLength(0);
   });
 
-  it("should pass if test file exists (colocated)", () => {
+  it("should pass if test file exists (colocated)", async () => {
     mockChangeSet.files = [
       { path: "src/utils/math.ts", status: "modified" },
     ];
+    mockGitFiles(["src/utils/math.ts", "src/utils/math.test.ts"]);
 
-    // Mock existence of test file
-    vi.mocked(fs.existsSync).mockImplementation((path) => {
-      return path.toString().includes("src/utils/math.test.ts");
-    });
-
-    const findings = testParityAnalyzer.analyze(mockChangeSet);
+    const findings = await testParityAnalyzer.analyze(mockChangeSet);
 
     expect(findings).toHaveLength(0);
   });
 
-  it("should pass if test file exists (mirrored in tests/)", () => {
+  it("should pass if test file exists (mirrored in tests/)", async () => {
     mockChangeSet.files = [
       { path: "src/utils/math.ts", status: "modified" },
     ];
+    // src/utils/math.ts -> tests/utils/math.test.ts
+    mockGitFiles(["src/utils/math.ts", "tests/utils/math.test.ts"]);
 
-    // Mock existence of test file
-    vi.mocked(fs.existsSync).mockImplementation((path) => {
-      // should look for tests/utils/math.test.ts
-      return path.toString().includes("tests/utils/math.test.ts");
-    });
-
-    const findings = testParityAnalyzer.analyze(mockChangeSet);
+    const findings = await testParityAnalyzer.analyze(mockChangeSet);
 
     expect(findings).toHaveLength(0);
   });
 
-  it("should pass if new test file is in changeset", () => {
+  it("should pass if new test file is in changeset", async () => {
     mockChangeSet.files = [
       { path: "src/utils/math.ts", status: "added" },
       { path: "src/utils/math.test.ts", status: "added" },
     ];
+    mockGitFiles([]); // Files might not be in git yet if just added, but changeset has them
 
-    const findings = testParityAnalyzer.analyze(mockChangeSet);
+    const findings = await testParityAnalyzer.analyze(mockChangeSet);
 
     expect(findings).toHaveLength(0);
   });
 
-  it("should pass if new test file (different dir) is in changeset", () => {
+  it("should pass if new test file (different dir) is in changeset", async () => {
     mockChangeSet.files = [
       { path: "src/utils/math.ts", status: "added" },
       { path: "tests/math.test.ts", status: "added" },
     ];
+    mockGitFiles([]);
 
-    const findings = testParityAnalyzer.analyze(mockChangeSet);
+    const findings = await testParityAnalyzer.analyze(mockChangeSet);
 
     expect(findings).toHaveLength(0);
   });
