@@ -149,14 +149,21 @@ async function analyzeDependency(
           importedSymbols.push(...symbols);
         }
 
-        // Case 2: Default import: import X ...
+        // Case 2: Default or namespace import: import X ... / import * as X ...
         // Simplistic check: if no curly braces and follows 'import'
         if (!namedMatch && line.trim().startsWith("import")) {
            const parts = line.split("from");
            if (parts.length > 1) {
              const preFrom = parts[0].replace("import", "").trim();
-             if (preFrom && !preFrom.includes("{") && !preFrom.includes("*")) {
-                importedSymbols.push(preFrom.split(" as ")[0].trim());
+             if (preFrom) {
+               // Handle namespace imports: import * as Utils from "./utils"
+               const namespaceMatch = preFrom.match(/\*\s+as\s+([A-Za-z0-9_$]+)/);
+               if (namespaceMatch) {
+                 importedSymbols.push(namespaceMatch[1].trim());
+               } else if (!preFrom.includes("{") && !preFrom.includes("*")) {
+                 // Handle default imports: import X from "./x"
+                 importedSymbols.push(preFrom.split(" as ")[0].trim());
+               }
              }
            }
         }

@@ -46,10 +46,6 @@ describe("impactAnalyzer", () => {
       vi.mocked(execa).mockResolvedValue({ stdout } as any);
   };
 
-  const mockGitGrepEmpty = () => {
-      vi.mocked(execa).mockResolvedValue({ stdout: "", exitCode: 1 } as any);
-  };
-
   const mockFileContent = (pathMap: Record<string, string>) => {
     vi.mocked(fs.readFile).mockImplementation(async (filepath) => {
       // The analyzer calls path.join(cwd, filepath), so we just check if the filepath ends with our key
@@ -117,6 +113,26 @@ describe("impactAnalyzer", () => {
     expect(findings).toHaveLength(1);
     const finding = findings[0] as any;
     expect(finding.importedSymbols).toContain("Button");
+  });
+
+  it("should handle namespace imports", async () => {
+    mockChangeSet.files = [
+      { path: "src/utils/helpers.ts", status: "modified" },
+    ];
+
+    mockGitGrep([
+        "src/app.ts:import * as Helpers from './utils/helpers'"
+    ]);
+
+    mockFileContent({
+        "src/app.ts": "import * as Helpers from './utils/helpers';"
+    });
+
+    const findings = await impactAnalyzer.analyze(mockChangeSet);
+
+    expect(findings).toHaveLength(1);
+    const finding = findings[0] as any;
+    expect(finding.importedSymbols).toContain("Helpers");
   });
 
   it("should ignore excluded files", async () => {
