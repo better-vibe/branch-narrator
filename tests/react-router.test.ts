@@ -2,7 +2,7 @@
  * React Router analyzer tests.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   extractJsxRoutes,
   extractDataRoutes,
@@ -13,6 +13,14 @@ import {
 import type { RouteChangeFinding } from "../src/core/types.js";
 import { reactRouterRoutesAnalyzer } from "../src/analyzers/reactRouterRoutes.js";
 import { createChangeSet, createFileDiff } from "./fixtures/index.js";
+import { batchGetFileContent } from "../src/git/batch.js";
+
+// Mock the batch git operation
+vi.mock("../src/git/batch.js", () => {
+  return {
+    batchGetFileContent: vi.fn(),
+  };
+});
 
 // ============================================================================
 // Fixture Content
@@ -234,7 +242,12 @@ describe("React Router route extraction", () => {
 // ============================================================================
 
 describe("reactRouterRoutesAnalyzer", () => {
-  it("should return empty array for non-candidate files", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(batchGetFileContent).mockResolvedValue(new Map());
+  });
+
+  it("should return empty array for non-candidate files", async () => {
     const changeSet = createChangeSet({
       files: [
         { path: "config.json", status: "modified" },
@@ -246,37 +259,63 @@ describe("reactRouterRoutesAnalyzer", () => {
       ],
     });
 
-    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    const findings = await reactRouterRoutesAnalyzer.analyze(changeSet);
     expect(findings).toEqual([]);
+    // Should not call batchGetFileContent as no files match extension
+    expect(batchGetFileContent).not.toHaveBeenCalled();
   });
 
-  it("should deduplicate routes", () => {
-    // This is tested by the implementation - routes are deduplicated by routeId+change+file
-    // We can verify by checking that the same route doesn't appear twice
+  it("should deduplicate routes", async () => {
     const changeSet = createChangeSet({
       files: [{ path: "App.tsx", status: "modified" }],
       diffs: [createFileDiff("App.tsx", ["<Route path='/test' />"])],
     });
 
-    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    // Mock content for base (empty) and head (one route)
+    const contentMap = new Map<string, string>();
+    contentMap.set("main:App.tsx", "");
+    contentMap.set("HEAD:App.tsx", `
+      import { Routes, Route } from 'react-router-dom';
+      export const App = () => (
+        <Routes>
+          <Route path="/test" element={<Test />} />
+        </Routes>
+      );
+    `);
+
+    vi.mocked(batchGetFileContent).mockResolvedValue(contentMap);
+
+    const findings = await reactRouterRoutesAnalyzer.analyze(changeSet);
     const routeIds = findings.map((f) => (f as RouteChangeFinding).routeId);
-    const uniqueRouteIds = new Set(routeIds);
     
-    expect(routeIds.length).toBe(uniqueRouteIds.size);
+    // Should find /test exactly once
+    expect(routeIds).toEqual(["/test"]);
   });
 
-  it("should sort routes deterministically", () => {
-    // Routes are sorted alphabetically by routeId
+  it("should sort routes deterministically", async () => {
     const changeSet = createChangeSet({
       files: [{ path: "App.tsx", status: "modified" }],
-      diffs: [createFileDiff("App.tsx", ["<Route path='/test' />"])],
+      diffs: [createFileDiff("App.tsx", ["..."])],
     });
 
-    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    const contentMap = new Map<string, string>();
+    contentMap.set("main:App.tsx", "");
+    contentMap.set("HEAD:App.tsx", `
+      import { Routes, Route } from 'react-router-dom';
+      export const App = () => (
+        <Routes>
+          <Route path="/b" element={<B />} />
+          <Route path="/a" element={<A />} />
+        </Routes>
+      );
+    `);
+
+    vi.mocked(batchGetFileContent).mockResolvedValue(contentMap);
+
+    const findings = await reactRouterRoutesAnalyzer.analyze(changeSet);
     const routeIds = findings.map((f) => (f as RouteChangeFinding).routeId);
-    const sortedRouteIds = [...routeIds].sort();
     
-    expect(routeIds).toEqual(sortedRouteIds);
+    expect(routeIds).toEqual(["/a", "/b"]);
   });
 });
 
@@ -324,7 +363,12 @@ describe("Path joining", () => {
 // ============================================================================
 
 describe("File filtering", () => {
-  it("should only process .ts, .tsx, .js, .jsx files", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(batchGetFileContent).mockResolvedValue(new Map());
+  });
+
+  it("should only process .ts, .tsx, .js, .jsx files", async () => {
     const changeSet = createChangeSet({
       files: [
         { path: "App.tsx", status: "modified" },
@@ -340,28 +384,17 @@ describe("File filtering", () => {
       ],
     });
 
-    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    await reactRouterRoutesAnalyzer.analyze(changeSet);
     
-    // Should only process .tsx and .ts files with React Router patterns
-    // Note: This will be empty because we don't have real git content
-    expect(Array.isArray(findings)).toBe(true);
-  });
-
-  it("should filter files with React Router patterns in diff", () => {
-    const changeSet = createChangeSet({
-      files: [
-        { path: "App.tsx", status: "modified" },
-        { path: "utils.ts", status: "modified" },
-      ],
-      diffs: [
-        createFileDiff("App.tsx", ["<Route path='/test' />"]),
-        createFileDiff("utils.ts", ["export function add(a, b) { return a + b; }"]),
-      ],
-    });
-
-    const findings = reactRouterRoutesAnalyzer.analyze(changeSet);
+    // Should call batchGetFileContent for App.tsx and routes.ts
+    // config.json and README.md should be filtered out
+    expect(batchGetFileContent).toHaveBeenCalled();
+    const args = vi.mocked(batchGetFileContent).mock.calls[0][0];
+    const requestedPaths = new Set(args.map(a => a.path));
     
-    // Should only process App.tsx because it has <Route in diff
-    expect(Array.isArray(findings)).toBe(true);
+    expect(requestedPaths.has("App.tsx")).toBe(true);
+    expect(requestedPaths.has("routes.ts")).toBe(true);
+    expect(requestedPaths.has("config.json")).toBe(false);
+    expect(requestedPaths.has("README.md")).toBe(false);
   });
 });

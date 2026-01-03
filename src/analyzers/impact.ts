@@ -4,8 +4,7 @@
  */
 
 import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { execa } from "execa";
 import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
@@ -13,8 +12,6 @@ import type {
   Finding,
   ImpactAnalysisFinding,
 } from "../core/types.js";
-
-const execFilePromise = promisify(execFile);
 
 // Files to exclude from impact scanning (both as source and target)
 const EXCLUDE_PATTERNS = [
@@ -28,49 +25,88 @@ const EXCLUDE_PATTERNS = [
 ];
 
 /**
- * Find files that import the target file using git grep.
- * This avoids reading all files into memory.
+ * Batch search for dependents using git grep.
  */
-async function findDependents(targetFile: string): Promise<string[]> {
-  const ext = path.extname(targetFile);
-  const baseName = path.basename(targetFile, ext); // e.g. "math" from "src/utils/math.ts"
+async function findDependentsBatch(
+  targets: Array<{ path: string; baseName: string }>,
+  cwd: string = process.cwd()
+): Promise<Map<string, string[]>> {
+  const results = new Map<string, string[]>();
+  targets.forEach((t) => results.set(t.path, []));
 
-  // We search for the base filename. This is heuristic and might return false positives,
-  // but it's much faster than parsing ASTs.
-  // We use git grep to search in all tracked files.
+  if (targets.length === 0) return results;
 
-  // Searching for: 'import ... from ".../math"' or 'require(".../math")'
-  // Simplified: just search for the filename without extension.
-  // This might catch "math" in comments, but we filter later or accept the noise for speed.
-
-  try {
-    // -l: list filenames only
-    // -F: fixed string (faster and safer against regex injection)
-    // We search for the baseName.
-    // Optimization: Search only in src/ or relevant dirs if possible, but git grep defaults to all tracked files.
-
-    // Using execFile to avoid shell injection
-    const { stdout } = await execFilePromise("git", ["grep", "-l", "-F", baseName]);
-
-    const candidates = stdout.split("\n").filter(Boolean);
-
-    // Filter candidates:
-    // 1. Must not be the file itself
-    // 2. Must not be excluded
-    // 3. (Optional) Read file to verify it's an import?
-    //    For "Improve Algorithm Efficiency", we might skip full verification if git grep is precise enough.
-    //    Let's verify it contains "import" or "require" line with the file.
-
-    return candidates.filter(file => {
-      if (file === targetFile) return false;
-      if (EXCLUDE_PATTERNS.some(p => p.test(file))) return false;
-      return true;
-    });
-
-  } catch (error) {
-    // git grep returns exit code 1 if not found, which throws error in execPromise
-    return [];
+  // Group paths by basename to avoid duplicate searches
+  const baseNameToPaths = new Map<string, string[]>();
+  for (const t of targets) {
+    if (!baseNameToPaths.has(t.baseName)) {
+      baseNameToPaths.set(t.baseName, []);
+    }
+    baseNameToPaths.get(t.baseName)!.push(t.path);
   }
+
+  const uniqueBaseNames = Array.from(baseNameToPaths.keys());
+
+  // Chunking to avoid ARG_MAX issues
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < uniqueBaseNames.length; i += CHUNK_SIZE) {
+    const chunk = uniqueBaseNames.slice(i, i + CHUNK_SIZE);
+
+    // git grep -I -F --null -e name1 -e name2 ...
+    // -I: ignore binary files
+    // -F: fixed strings
+    // --null: output \0 after filename
+    const args = ["grep", "-I", "-F", "--null"];
+    for (const name of chunk) {
+      args.push("-e");
+      args.push(name);
+    }
+
+    try {
+      const { stdout } = await execa("git", args, {
+        cwd,
+        maxBuffer: 1024 * 1024 * 20, // Increase buffer for large outputs
+        reject: false // git grep returns 1 if no matches found
+      });
+
+      if (!stdout) continue;
+
+      const lines = stdout.split("\n");
+      for (const line of lines) {
+        if (!line) continue;
+
+        // Parse: filename\0content
+        const nullIndex = line.indexOf("\0");
+        if (nullIndex === -1) continue;
+
+        const file = line.slice(0, nullIndex);
+        const content = line.slice(nullIndex + 1);
+
+        // Skip excluded files
+        if (EXCLUDE_PATTERNS.some(p => p.test(file))) continue;
+
+        // Check which basename(s) matched in this line
+        for (const baseName of chunk) {
+          if (content.includes(baseName)) {
+            const sourcePaths = baseNameToPaths.get(baseName) || [];
+            for (const sourcePath of sourcePaths) {
+              // Avoid self-reference
+              if (sourcePath !== file) {
+                const deps = results.get(sourcePath)!;
+                if (!deps.includes(file)) {
+                  deps.push(file);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Should ignore errors
+    }
+  }
+
+  return results;
 }
 
 export const impactAnalyzer: Analyzer = {
@@ -79,7 +115,7 @@ export const impactAnalyzer: Analyzer = {
   async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];
 
-    // We only care about modified/renamed files that are "sources"
+    // Filter relevant source files
     const sourceFiles = changeSet.files.filter(f =>
       (f.status === "modified" || f.status === "renamed") &&
       !EXCLUDE_PATTERNS.some(p => p.test(f.path))
@@ -87,15 +123,27 @@ export const impactAnalyzer: Analyzer = {
 
     if (sourceFiles.length === 0) return [];
 
+    // Prepare targets for batch search
+    const targets = sourceFiles.map(source => {
+      const ext = path.extname(source.path);
+      const baseName = path.basename(source.path, ext);
+      return { path: source.path, baseName };
+    });
+
+    // Run batch search
+    // Note: process.cwd() is used implicitely unless we are running in a specific context.
+    // The current architecture assumes the process runs in the repo root.
+    const dependentsMap = await findDependentsBatch(targets);
+
     for (const source of sourceFiles) {
-      const dependents = await findDependents(source.path);
+      const dependents = dependentsMap.get(source.path) || [];
 
       if (dependents.length > 0) {
         findings.push({
           type: "impact-analysis",
           kind: "impact-analysis",
-          category: "tests", // broadly related to testing/qa
-          confidence: "medium", // heuristic
+          category: "tests",
+          confidence: "medium",
           evidence: [
             createEvidence(source.path, `Modified file ${source.path} is imported by ${dependents.length} other file(s).`),
             ...dependents.slice(0, 5).map(d => createEvidence(d, `Depends on ${source.path}`))
