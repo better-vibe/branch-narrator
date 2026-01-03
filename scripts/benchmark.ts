@@ -47,11 +47,11 @@ async function runBenchmark() {
 
     // Clean up temp_diff if it exists
     if (cmd.name === 'dump-diff') {
-        try {
-            await rm('temp_diff', { recursive: true, force: true });
-        } catch (e) {
-            // ignore
-        }
+      try {
+        await rm('temp_diff', { recursive: true, force: true });
+      } catch (e) {
+        // ignore
+      }
     }
   }
   console.log('------------------------------------------------------------');
