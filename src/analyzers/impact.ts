@@ -4,8 +4,7 @@
  */
 
 import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { execa } from "execa";
 import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
@@ -13,8 +12,6 @@ import type {
   Finding,
   ImpactAnalysisFinding,
 } from "../core/types.js";
-
-const execFilePromise = promisify(execFile);
 
 // Files to exclude from impact scanning (both as source and target)
 const EXCLUDE_PATTERNS = [
@@ -49,8 +46,8 @@ async function findDependents(targetFile: string): Promise<string[]> {
     // We search for the baseName.
     // Optimization: Search only in src/ or relevant dirs if possible, but git grep defaults to all tracked files.
 
-    // Using execFile to avoid shell injection
-    const { stdout } = await execFilePromise("git", ["grep", "-l", "-F", baseName]);
+    // Using execa to avoid shell injection
+    const { stdout } = await execa("git", ["grep", "-l", "-F", baseName]);
 
     const candidates = stdout.split("\n").filter(Boolean);
 

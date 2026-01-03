@@ -2,12 +2,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { impactAnalyzer } from "../src/analyzers/impact.js";
 import type { ChangeSet } from "../src/core/types.js";
-import { execFile } from "node:child_process";
+import { execa } from "execa";
 
-// Mock child_process
-vi.mock("node:child_process", () => {
+// Mock execa
+vi.mock("execa", () => {
   return {
-    execFile: vi.fn(),
+    execa: vi.fn(),
   };
 });
 
@@ -24,31 +24,19 @@ describe("impactAnalyzer", () => {
   });
 
   const mockGitGrep = (results: string[]) => {
-      vi.mocked(execFile).mockImplementation(((cmd: string, args: string[], callback: any) => {
-        // Handle optional callback being the 2nd or 3rd argument
-        const cb = typeof args === 'function' ? args : callback;
-        const actualArgs = typeof args === 'function' ? [] : args;
-
-        if (cmd === "git" && actualArgs[0] === "grep") {
-             cb(null, { stdout: results.join("\n") });
-        } else {
-             cb(null, { stdout: "" });
-        }
-        return {} as any;
-    }) as any);
+    vi.mocked(execa).mockResolvedValue({
+      stdout: results.join("\n"),
+      stderr: "",
+      exitCode: 0,
+    } as any);
   };
 
   const mockGitGrepEmpty = () => {
-      vi.mocked(execFile).mockImplementation(((cmd: string, args: string[], callback: any) => {
-          const cb = typeof args === 'function' ? args : callback;
-          if (cmd === "git" && args[0] === "grep") {
-             // git grep returns exit code 1 if not found, simulate error
-             const error = new Error("Command failed");
-             (error as any).code = 1;
-             cb(error, { stdout: "" });
-          }
-          return {} as any;
-      }) as any);
+    vi.mocked(execa).mockRejectedValue({
+      stdout: "",
+      stderr: "",
+      exitCode: 1,
+    } as any);
   };
 
   it("should find files that import the modified file", async () => {

@@ -2,12 +2,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { testParityAnalyzer, _resetCacheForTesting } from "../src/analyzers/test-parity.js";
 import type { ChangeSet } from "../src/core/types.js";
-import { exec } from "node:child_process";
+import { execa } from "execa";
 
-// Mock child_process
-vi.mock("node:child_process", () => {
+// Mock execa
+vi.mock("execa", () => {
   return {
-    exec: vi.fn(),
+    execa: vi.fn(),
   };
 });
 
@@ -23,25 +23,19 @@ describe("testParityAnalyzer", () => {
     vi.resetAllMocks();
     _resetCacheForTesting();
     // Default mock implementation for git ls-files
-    vi.mocked(exec).mockImplementation(((cmd: string, callback: any) => {
-        if (cmd.includes("git ls-files")) {
-            callback(null, { stdout: "" });
-        } else {
-            callback(null, { stdout: "" });
-        }
-        return {} as any;
-    }) as any);
+    vi.mocked(execa).mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+    } as any);
   });
 
   const mockGitFiles = (files: string[]) => {
-      vi.mocked(exec).mockImplementation(((cmd: string, callback: any) => {
-        if (cmd.includes("git ls-files")) {
-            callback(null, { stdout: files.join("\n") });
-        } else {
-            callback(null, { stdout: "" });
-        }
-        return {} as any;
-    }) as any);
+    vi.mocked(execa).mockResolvedValue({
+      stdout: files.join("\n"),
+      stderr: "",
+      exitCode: 0,
+    } as any);
   };
 
   it("should detect missing test for source file", async () => {

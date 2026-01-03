@@ -109,8 +109,8 @@ export function detectMethods(diff: FileDiff): string[] {
   const content = getAdditions(diff).join("\n");
 
   let match;
-  const pattern = new RegExp(METHOD_PATTERN.source, "g");
-  while ((match = pattern.exec(content)) !== null) {
+  METHOD_PATTERN.lastIndex = 0;
+  while ((match = METHOD_PATTERN.exec(content)) !== null) {
     methods.add(match[1]);
   }
 
