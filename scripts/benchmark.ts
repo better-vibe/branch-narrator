@@ -30,13 +30,19 @@ async function runBenchmark() {
       const start = performance.now();
       try {
         await execa('bun', cmd.args, { stdio: 'ignore' });
+        const end = performance.now();
+        times.push(end - start);
       } catch (error) {
         console.error(`Error running ${cmd.name}:`, error);
       }
-      const end = performance.now();
-      times.push(end - start);
     }
 
+    if (times.length === 0) {
+      console.log(
+        `| ${cmd.name.padEnd(12)} | ${'N/A'.padEnd(8)} | ${'N/A'.padEnd(8)} | ${'N/A'.padEnd(8)} |`
+      );
+      continue;
+    }
     const avg = times.reduce((a, b) => a + b, 0) / times.length;
     const min = Math.min(...times);
     const max = Math.max(...times);
