@@ -6,9 +6,9 @@ The Impact Radius Analyzer determines the "blast radius" of a change by identify
 
 1.  **Scope**: Scans all `modified` or `renamed` source files in the change set.
 2.  **Scanning**:
-    *   Iterates through all project source files (excluding `node_modules`, `dist`, etc.).
-    *   Heuristically checks for import statements referencing the modified file.
-    *   Uses regex matching to find imports like `import ... from './my-modified-file'`.
+    *   Uses **batched `git grep`** for high-performance searching across the codebase.
+    *   Searches for the modified file's name (basename) in other files.
+    *   Verifies matches to reduce false positives (checking if the line likely contains an import).
 3.  **Blast Radius Calculation**:
     *   **Low**: 1-3 dependent files.
     *   **Medium**: 4-10 dependent files.

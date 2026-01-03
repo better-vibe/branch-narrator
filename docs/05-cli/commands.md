@@ -115,6 +115,14 @@ branch-narrator facts [options]
 | `--base <ref>` | `main` | Base git reference (branch mode only) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--format <type>` | `json` | Output format: `json` |
+| `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
+| `--redact` | `false` | Redact obvious secret values in evidence excerpts |
+| `--exclude <glob>` | (none) | Additional exclusion glob (repeatable) |
+| `--include <glob>` | (none) | Include only files matching glob (repeatable) |
+| `--max-file-bytes <n>` | `1048576` | Maximum file size in bytes to analyze |
+| `--max-diff-bytes <n>` | `5242880` | Maximum diff size in bytes to analyze |
+| `--max-findings <n>` | (none) | Maximum number of findings to include |
 
 ### Diff Modes
 
@@ -364,6 +372,43 @@ branch-narrator risk-report --redact
 
 # Include score breakdown
 branch-narrator risk-report --explain-score
+```
+
+---
+
+## integrate
+
+Generate provider-specific rules for AI coding assistants (e.g., Cursor, Jules).
+
+```bash
+branch-narrator integrate <target> [options]
+```
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--dry-run` | `false` | Preview what would be written without creating files |
+| `--force` | `false` | Overwrite existing files |
+
+### Targets
+
+| Target | Description |
+|--------|-------------|
+| `cursor` | Generates `.cursor/rules/branch-narrator.md` and `.cursor/rules/pr-description.md` |
+| `jules` | Generates `.jules/rules/branch-narrator.md` |
+
+### Examples
+
+```bash
+# Generate Cursor rules
+branch-narrator integrate cursor
+
+# Preview without writing
+branch-narrator integrate cursor --dry-run
+
+# Overwrite existing rules
+branch-narrator integrate cursor --force
 ```
 
 ---
