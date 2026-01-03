@@ -44,7 +44,7 @@ jobs:
 
       - name: Run tests
         if: steps.changesets.outputs.has_changesets == 'true'
-        run: bun test
+        run: bun run test
 
       - name: Build package
         if: steps.changesets.outputs.has_changesets == 'true'
