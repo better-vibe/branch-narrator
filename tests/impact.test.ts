@@ -135,6 +135,27 @@ describe("impactAnalyzer", () => {
     expect(finding.importedSymbols).toContain("Helpers");
   });
 
+  it("should handle side-effect imports", async () => {
+    mockChangeSet.files = [
+        { path: "src/init.ts", status: "modified" }
+    ];
+
+    mockGitGrep([
+        "src/main.ts:import './init'"
+    ]);
+
+    mockFileContent({
+        "src/main.ts": "import './init';"
+    });
+
+    const findings = await impactAnalyzer.analyze(mockChangeSet);
+
+    expect(findings).toHaveLength(1);
+    const finding = findings[0] as any;
+    expect(finding.importedSymbols).toEqual([]);
+    expect(finding.usageContext).toContain("import './init'");
+  });
+
   it("should ignore excluded files", async () => {
     mockChangeSet.files = [
       { path: "src/types.d.ts", status: "modified" },

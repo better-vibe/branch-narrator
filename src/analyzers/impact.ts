@@ -165,6 +165,10 @@ async function analyzeDependency(
                  importedSymbols.push(preFrom.split(" as ")[0].trim());
                }
              }
+           } else {
+             // Note: lines like `import "./utils";` or `import "./styles.css";` are side-effect-only imports.
+             // In these cases (and if we otherwise fail to parse), we intentionally leave `importedSymbols` empty
+             // to distinguish "no named symbols, just side effects" from the presence of explicit imported identifiers.
            }
         }
 
