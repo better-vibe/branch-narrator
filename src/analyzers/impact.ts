@@ -24,6 +24,7 @@ const EXCLUDE_PATTERNS = [
 ];
 
 // Patterns for detecting test files (aligned with file-category.ts)
+// Note: We exclude .e2e files as they're typically integration tests handled differently
 const TEST_FILE_PATTERNS = [
   /\.test\.[jt]sx?$/i,
   /\.spec\.[jt]sx?$/i,
@@ -161,7 +162,7 @@ async function analyzeDependency(
             .split(",")
             .map(s => {
               // Handle 'as' aliases and TypeScript 'type' keyword
-              const trimmed = s.trim().replace(/^type\s+/, ""); // Remove 'type' prefix
+              const trimmed = s.trim().replace(/^type\s+/, ""); // Remove 'type ' prefix (with space)
               return trimmed.split(" as ")[0].trim();
             });
           importedSymbols.push(...symbols);
@@ -176,7 +177,7 @@ async function analyzeDependency(
              const preFrom = parts[0].replace("import", "").trim();
              if (preFrom) {
                // Handle namespace imports: import * as Utils from "./utils"
-               const namespaceMatch = preFrom.match(/\*\s+as\s+([A-Za-z0-9_$]+)/);
+               const namespaceMatch = preFrom.match(/\*\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)/);
                if (namespaceMatch) {
                  importedSymbols.push(namespaceMatch[1].trim());
                } else if (!preFrom.includes("{") && !preFrom.includes("*")) {
