@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.10.0
+
+### Minor Changes
+
+- 7839c77: Enhance impact analysis with symbol-level tracking and test detection.
+
 ## 0.9.0
 
 ### Minor Changes
