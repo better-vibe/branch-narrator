@@ -225,6 +225,9 @@ interface ImpactAnalysisFinding {
   type: "impact-analysis";
   sourceFile: string;
   affectedFiles: string[];
+  importedSymbols?: string[]; // e.g. ["User", "login"]
+  usageContext?: string; // e.g. "import { User } from './user'"
+  isTestFile?: boolean; // true if all affected files are tests
   blastRadius: "low" | "medium" | "high";
 }
 ```
