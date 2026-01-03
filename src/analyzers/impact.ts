@@ -23,12 +23,12 @@ const EXCLUDE_PATTERNS = [
   /^\.git\//,
 ];
 
-// Patterns for detecting test files
+// Patterns for detecting test files (aligned with file-category.ts)
 const TEST_FILE_PATTERNS = [
-  /\.test\.ts$/,
-  /\.spec\.ts$/,
-  /^tests\//,
-  /^__tests__\//,
+  /\.test\.[jt]sx?$/i,
+  /\.spec\.[jt]sx?$/i,
+  /^tests?\//i,
+  /^__tests__\//i,
 ];
 
 /**
@@ -117,13 +117,22 @@ async function findDependentsBatch(
 }
 
 /**
+ * Details about how a file depends on another file.
+ */
+interface DependencyDetails {
+  importedSymbols: string[];
+  usageContext: string;
+  isTestFile: boolean;
+}
+
+/**
  * Analyze a dependent file to extract detailed usage information.
  */
 async function analyzeDependency(
   dependentPath: string,
   sourcePath: string,
   cwd: string = process.cwd()
-): Promise<{ importedSymbols: string[]; usageContext: string; isTestFile: boolean } | null> {
+): Promise<DependencyDetails | null> {
   try {
     const content = await fs.readFile(path.join(cwd, dependentPath), "utf-8");
     const sourceBaseName = path.basename(sourcePath, path.extname(sourcePath));
@@ -135,33 +144,52 @@ async function analyzeDependency(
     // Regex to find import statement
     // Matches: import { A, B } from './source' or import X from './source'
     // This is heuristic and won't cover 100% of cases (e.g. multiline imports might need smarter parsing)
-    // But we iterate lines to find the one containing the source name.
+    // But we iterate lines to find all matching import/export statements.
 
     for (const line of lines) {
       if (line.includes(sourceBaseName) && (line.trim().startsWith("import") || line.trim().startsWith("export"))) {
-        usageContext = line.trim();
+        // Capture the first usage context if not already set
+        if (!usageContext) {
+          usageContext = line.trim();
+        }
 
         // Try to extract symbols
         // Case 1: Named imports: import { A, B } ...
         const namedMatch = line.match(/\{([^}]+)\}/);
         if (namedMatch) {
-          const symbols = namedMatch[1].split(",").map(s => s.trim().split(" as ")[0].trim()); // Handle 'as' aliases
+          const symbols = namedMatch[1]
+            .split(",")
+            .map(s => {
+              // Handle 'as' aliases and TypeScript 'type' keyword
+              const trimmed = s.trim().replace(/^type\s+/, ""); // Remove 'type' prefix
+              return trimmed.split(" as ")[0].trim();
+            });
           importedSymbols.push(...symbols);
+          continue; // Move to next line to find other imports
         }
 
-        // Case 2: Default import: import X ...
+        // Case 2: Default or namespace import: import X ... / import * as X ...
         // Simplistic check: if no curly braces and follows 'import'
         if (!namedMatch && line.trim().startsWith("import")) {
            const parts = line.split("from");
            if (parts.length > 1) {
              const preFrom = parts[0].replace("import", "").trim();
-             if (preFrom && !preFrom.includes("{") && !preFrom.includes("*")) {
-                importedSymbols.push(preFrom.split(" as ")[0].trim());
+             if (preFrom) {
+               // Handle namespace imports: import * as Utils from "./utils"
+               const namespaceMatch = preFrom.match(/\*\s+as\s+([A-Za-z0-9_$]+)/);
+               if (namespaceMatch) {
+                 importedSymbols.push(namespaceMatch[1].trim());
+               } else if (!preFrom.includes("{") && !preFrom.includes("*")) {
+                 // Handle default imports: import X from "./x"
+                 importedSymbols.push(preFrom.split(" as ")[0].trim());
+               }
              }
+           } else {
+             // Note: lines like `import "./utils";` or `import "./styles.css";` are side-effect-only imports.
+             // In these cases (and if we otherwise fail to parse), we intentionally leave `importedSymbols` empty
+             // to distinguish "no named symbols, just side effects" from the presence of explicit imported identifiers.
            }
         }
-
-        break; // Found the import line, stop (assuming one import per file for simplicity)
       }
     }
 
@@ -215,21 +243,30 @@ export const impactAnalyzer: Analyzer = {
 
       if (dependents.length > 0) {
         // Detailed analysis for each dependent
-        const impactedFilesInfo: Array<{ file: string; details: any }> = [];
+        const impactedFilesInfo: Array<{ file: string; details: DependencyDetails }> = [];
 
         for (const dep of dependents) {
-            // We analyze only the first few dependents deeply to avoid perf hit on massive impact
-            // Or maybe we analyze all? Let's analyze all for now, assuming typical impact < 100 files.
-            // If massive, we might want to limit.
+            // We analyze only the first 20 dependents deeply to avoid perf hit on massive impact.
+            // For dependents beyond the 20th, we still include them but with minimal details.
             if (impactedFilesInfo.length < 20) {
                  const details = await analyzeDependency(dep, source.path);
                  if (details) {
                      impactedFilesInfo.push({ file: dep, details });
                  } else {
-                     impactedFilesInfo.push({ file: dep, details: { isTestFile: false } });
+                     // If analysis fails, provide a complete default object
+                     impactedFilesInfo.push({
+                         file: dep,
+                         details: { importedSymbols: [], usageContext: "", isTestFile: false },
+                     });
                  }
             } else {
-                impactedFilesInfo.push({ file: dep, details: { isTestFile: false } });
+                // For files beyond the 20th, add them with default details
+                // Note: We still need to check if they're test files for accurate reporting
+                const isTestFile = TEST_FILE_PATTERNS.some(p => p.test(dep));
+                impactedFilesInfo.push({
+                    file: dep,
+                    details: { importedSymbols: [], usageContext: "", isTestFile },
+                });
             }
         }
 
@@ -237,7 +274,7 @@ export const impactAnalyzer: Analyzer = {
             createEvidence(source.path, `Modified file ${source.path} is imported by ${dependents.length} other file(s).`),
             ...impactedFilesInfo.slice(0, 5).map(info => {
                 let text = `Depends on ${source.path}`;
-                if (info.details.importedSymbols?.length > 0) {
+                if (info.details.importedSymbols.length > 0) {
                     text += ` (imports: ${info.details.importedSymbols.join(", ")})`;
                 }
                 if (info.details.isTestFile) {
@@ -249,7 +286,7 @@ export const impactAnalyzer: Analyzer = {
 
         // Collect all symbols for the finding summary
         const allSymbols = new Set<string>();
-        impactedFilesInfo.forEach(i => i.details.importedSymbols?.forEach((s: string) => allSymbols.add(s)));
+        impactedFilesInfo.forEach(i => i.details.importedSymbols.forEach(s => allSymbols.add(s)));
 
         findings.push({
           type: "impact-analysis",

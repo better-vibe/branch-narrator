@@ -4,7 +4,6 @@ import { impactAnalyzer } from "../src/analyzers/impact.js";
 import type { ChangeSet } from "../src/core/types.js";
 import { execa } from "execa";
 import fs from "node:fs/promises";
-import path from "node:path";
 
 // Mock execa and fs
 vi.mock("execa", () => {
@@ -163,5 +162,63 @@ describe("impactAnalyzer", () => {
 
       const findings = await impactAnalyzer.analyze(mockChangeSet);
       expect((findings[0] as any).isTestFile).toBe(false);
+  });
+
+  it("should handle namespace imports", async () => {
+      mockChangeSet.files = [
+          { path: "src/utils/helpers.ts", status: "modified" }
+      ];
+
+      mockGitGrep([
+          "src/app.ts:import * as Helpers from './utils/helpers'"
+      ]);
+
+      mockFileContent({
+          "src/app.ts": "import * as Helpers from './utils/helpers';\n\nHelpers.doSomething();"
+      });
+
+      const findings = await impactAnalyzer.analyze(mockChangeSet);
+      expect(findings).toHaveLength(1);
+      const finding = findings[0] as any;
+      expect(finding.importedSymbols).toContain("Helpers");
+  });
+
+  it("should handle multiple imports from same source", async () => {
+      mockChangeSet.files = [
+          { path: "src/types/user.ts", status: "modified" }
+      ];
+
+      mockGitGrep([
+          "src/app.ts:import { type User } from './types/user'"
+      ]);
+
+      mockFileContent({
+          "src/app.ts": "import { type User } from './types/user';\nimport { loginUser } from './types/user';\n\nconst u: User = {};"
+      });
+
+      const findings = await impactAnalyzer.analyze(mockChangeSet);
+      expect(findings).toHaveLength(1);
+      const finding = findings[0] as any;
+      expect(finding.importedSymbols).toContain("User");
+      expect(finding.importedSymbols).toContain("loginUser");
+  });
+
+  it("should handle side-effect imports without symbols", async () => {
+      mockChangeSet.files = [
+          { path: "src/styles/global.css", status: "modified" }
+      ];
+
+      mockGitGrep([
+          "src/app.ts:import './styles/global.css'"
+      ]);
+
+      mockFileContent({
+          "src/app.ts": "import './styles/global.css';\n\nconsole.log('app loaded');"
+      });
+
+      const findings = await impactAnalyzer.analyze(mockChangeSet);
+      expect(findings).toHaveLength(1);
+      const finding = findings[0] as any;
+      expect(finding.importedSymbols).toHaveLength(0); // No symbols extracted for side-effect imports
   });
 });
