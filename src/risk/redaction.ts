@@ -15,6 +15,18 @@ const SECRET_KEY_PATTERNS = [
   /auth[_-]?token/i,
 ];
 
+// Pre-compiled regex patterns for secret keys
+const COMPILED_SECRET_PATTERNS = SECRET_KEY_PATTERNS.map((pattern) => ({
+  eqPattern: new RegExp(
+    `(${pattern.source})\\s*=\\s*['"]?([^'"\\s}<]+)['"]?`,
+    "gi"
+  ),
+  colonPattern: new RegExp(
+    `(${pattern.source})\\s*:\\s*['"]?([^'"\\s,}<]+)['"]?`,
+    "gi"
+  ),
+}));
+
 /**
  * GitHub token patterns.
  */
@@ -36,19 +48,28 @@ export function redactLine(line: string): string {
   redacted = redacted.replace(GITHUB_TOKEN_PATTERN, "<redacted-github-token>");
 
   // Redact values after = or : for secret keys
-  for (const pattern of SECRET_KEY_PATTERNS) {
-    // Match key=value or key: value patterns
-    // Use consistent character exclusions for both patterns
-    const eqPattern = new RegExp(`(${pattern.source})\\s*=\\s*['"]?([^'"\\s}<]+)['"]?`, "gi");
-    const colonPattern = new RegExp(`(${pattern.source})\\s*:\\s*['"]?([^'"\\s,}<]+)['"]?`, "gi");
+  for (const { eqPattern, colonPattern } of COMPILED_SECRET_PATTERNS) {
+    // Reset lastIndex for global patterns to ensure consistent matching
+    eqPattern.lastIndex = 0;
+    colonPattern.lastIndex = 0;
 
-    redacted = redacted.replace(eqPattern, (_match, key) => `${key}=<redacted>`);
-    redacted = redacted.replace(colonPattern, (_match, key) => `${key}: <redacted>`);
+    redacted = redacted.replace(
+      eqPattern,
+      (_match, key) => `${key}=<redacted>`
+    );
+    redacted = redacted.replace(
+      colonPattern,
+      (_match, key) => `${key}: <redacted>`
+    );
   }
 
   // Redact long base64/hex strings (but not if they look like hashes in code)
   // Only do this if not already redacted
-  if (!redacted.includes("<redacted") && !redacted.includes("hash") && !redacted.includes("checksum")) {
+  if (
+    !redacted.includes("<redacted") &&
+    !redacted.includes("hash") &&
+    !redacted.includes("checksum")
+  ) {
     redacted = redacted.replace(LONG_SECRET_PATTERN, "<redacted-value>");
   }
 
