@@ -5,6 +5,7 @@ A local-first CLI that reads `git diff` and generates structured **PR descriptio
 ## Features
 
 - **Heuristics-only**: No LLM calls, no network calls. Fully deterministic and grounded in git diff.
+- **Agent-grade reliability**: JSON outputs are deterministic, parseable, and pipe-safe (e.g., `branch-narrator facts | jq .`). Global `--quiet` and `--debug` flags control diagnostics.
 - **Risk Analysis**: Framework-agnostic security and quality risk scoring (0-100) with evidence-backed flags.
 - **SvelteKit-aware**: Detects routes, layouts, endpoints, and HTTP methods.
 - **React Router support**: Detects route changes in React apps (JSX `<Route>` and data routers like `createBrowserRouter`).
@@ -24,6 +25,23 @@ npm install -D branch-narrator
 ```
 
 ## Usage
+
+### Global Flags
+
+All commands support the following global flags:
+
+```bash
+# Suppress non-fatal diagnostic output (warnings, info messages)
+branch-narrator --quiet facts
+
+# Show debug diagnostics on stderr (timings, detector counts, etc.)
+branch-narrator --debug risk-report
+
+# Combine flags (--quiet overrides --debug)
+branch-narrator --quiet --debug facts
+```
+
+**Note:** In JSON mode (`facts`, `risk-report --format json`, `dump-diff --format json`), all diagnostic output goes to stderr to ensure stdout contains only valid JSON. This makes the output safe for piping to `jq` or other JSON parsers.
 
 ### Preview Changes (for Humans)
 
