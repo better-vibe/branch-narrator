@@ -9,20 +9,20 @@ import {
   detectPullRequestTarget,
   detectRemoteScriptDownload,
   detectCIPipelineChanged,
-} from "../src/risk/detectors/security-ci.js";
+} from "../src/commands/risk/detectors/security-ci.js";
 import {
   detectNewProdDependency,
   detectMajorBump,
   detectLockfileWithoutManifest,
-} from "../src/risk/detectors/deps.js";
+} from "../src/commands/risk/detectors/deps.js";
 import {
   detectMigrationsChanged,
   detectDestructiveSQL,
   detectRiskySchemaChange,
   detectUnscopedDataModification,
-} from "../src/risk/detectors/database.js";
-import { detectLargeDiff } from "../src/risk/detectors/churn.js";
-import { detectPossibleTestGap } from "../src/risk/detectors/tests.js";
+} from "../src/commands/risk/detectors/database.js";
+import { detectLargeDiff } from "../src/commands/risk/detectors/churn.js";
+import { detectPossibleTestGap } from "../src/commands/risk/detectors/tests.js";
 
 describe("Security/CI Detectors", () => {
   it("should detect workflow permissions broadened", () => {

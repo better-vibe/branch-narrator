@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { aggregateCategories, buildSummaryByArea } from "../src/facts/categories.js";
-import { deriveActions } from "../src/facts/actions.js";
+import { aggregateCategories, buildSummaryByArea } from "../src/commands/facts/categories.js";
+import { deriveActions } from "../src/commands/facts/actions.js";
 import type { Finding, RiskFactor, Evidence } from "../src/core/types.js";
 
 describe("aggregateCategories", () => {

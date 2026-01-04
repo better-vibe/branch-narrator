@@ -6,7 +6,7 @@ import type {
   Action,
   Finding,
   ProfileName,
-} from "../core/types.js";
+} from "../../core/types.js";
 
 /**
  * Derive actionable recommendations from findings and risk.

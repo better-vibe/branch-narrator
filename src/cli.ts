@@ -327,7 +327,7 @@ program
   .action(async (options) => {
     try {
       // Import buildFacts dynamically to avoid circular dependencies
-      const { buildFacts } = await import("./facts/index.js");
+      const { buildFacts } = await import("./commands/facts/index.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -556,7 +556,7 @@ program
   .action(async (options) => {
     try {
       // Import risk report dynamically
-      const { generateRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./risk/index.js");
+      const { generateRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./commands/risk/index.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;

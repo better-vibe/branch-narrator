@@ -2,12 +2,12 @@
  * Main risk report engine.
  */
 
-import type { ChangeSet, RiskFlag, RiskReport } from "../core/types.js";
+import type { ChangeSet, RiskFlag, RiskReport } from "../../core/types.js";
 import { ALL_DETECTORS } from "./detectors/index.js";
 import { shouldSkipFile } from "./exclusions.js";
 import { redactLines } from "./redaction.js";
 import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
-import { sortRiskFlagEvidence } from "../core/sorting.js";
+import { sortRiskFlagEvidence } from "../../core/sorting.js";
 
 /**
  * Options for generating risk report.

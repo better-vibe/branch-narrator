@@ -8,7 +8,7 @@ import type {
   Evidence,
   Finding,
   RiskFactor,
-} from "../core/types.js";
+} from "../../core/types.js";
 
 /**
  * Map risk factor kind to category.
