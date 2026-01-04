@@ -14,6 +14,7 @@ import { collectChangeSet } from "./git/collector.js";
 import { getProfile, resolveProfileName } from "./profiles/index.js";
 import { renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
+import { configureLogger, error as logError, warn, info } from "./core/logger.js";
 
 const program = new Command();
 
@@ -22,7 +23,17 @@ program
   .description(
     "A local-first CLI that reads git diff and generates structured PR descriptions"
   )
-  .version("0.1.0");
+  .version("0.1.0")
+  .option("--quiet", "Suppress all non-fatal diagnostic output (warnings, info)")
+  .option("--debug", "Show debug diagnostics on stderr")
+  .hook("preAction", (thisCommand) => {
+    // Configure logger from global options
+    const opts = thisCommand.opts();
+    configureLogger({
+      quiet: opts.quiet,
+      debug: opts.debug,
+    });
+  });
 
 /**
  * Prompt user for input.
@@ -175,7 +186,7 @@ program
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
-        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        logError(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
         process.exit(1);
       }
 
@@ -184,7 +195,7 @@ program
         const baseProvided = options.base !== "main";
         const headProvided = options.head !== "HEAD";
         if (baseProvided || headProvided) {
-          console.error(
+          warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`
           );
         }
@@ -321,7 +332,7 @@ program
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
-        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        logError(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
         process.exit(1);
       }
 
@@ -330,7 +341,7 @@ program
         const baseProvided = options.base !== "main";
         const headProvided = options.head !== "HEAD";
         if (baseProvided || headProvided) {
-          console.error(
+          warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`
           );
         }
@@ -338,7 +349,7 @@ program
 
       // Validate format
       if (options.format !== "json") {
-        console.error(`Invalid format: ${options.format}. Only json is supported.`);
+        logError(`Invalid format: ${options.format}. Only json is supported.`);
         process.exit(1);
       }
 
@@ -457,19 +468,19 @@ program
       // Validate mode
       const mode = options.mode as "branch" | "unstaged" | "staged" | "all";
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
-        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        logError(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
         process.exit(1);
       }
 
       const format = options.format as "text" | "md" | "json";
       if (!["text", "md", "json"].includes(format)) {
-        console.error(`Invalid format: ${options.format}. Use text, md, or json.`);
+        logError(`Invalid format: ${options.format}. Use text, md, or json.`);
         process.exit(1);
       }
 
       const unified = parseInt(options.unified, 10);
       if (isNaN(unified) || unified < 0) {
-        console.error(`Invalid unified context: ${options.unified}. Must be a non-negative integer.`);
+        logError(`Invalid unified context: ${options.unified}. Must be a non-negative integer.`);
         process.exit(1);
       }
 
@@ -477,7 +488,7 @@ program
         ? parseInt(options.maxChars, 10)
         : undefined;
       if (maxChars !== undefined && (isNaN(maxChars) || maxChars <= 0)) {
-        console.error(`Invalid max-chars: ${options.maxChars}. Must be a positive integer.`);
+        logError(`Invalid max-chars: ${options.maxChars}. Must be a positive integer.`);
         process.exit(1);
       }
 
@@ -530,7 +541,7 @@ program
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
-        console.error(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        logError(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
         process.exit(1);
       }
 
@@ -539,7 +550,7 @@ program
         const baseProvided = options.base !== "main";
         const headProvided = options.head !== "HEAD";
         if (baseProvided || headProvided) {
-          console.error(
+          warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`
           );
         }
@@ -548,14 +559,14 @@ program
       // Validate format
       const format = options.format as "json" | "md" | "text";
       if (!["json", "md", "text"].includes(format)) {
-        console.error(`Invalid format: ${options.format}. Use json, md, or text.`);
+        logError(`Invalid format: ${options.format}. Use json, md, or text.`);
         process.exit(1);
       }
 
       // Parse options
       const maxEvidenceLines = parseInt(options.maxEvidenceLines, 10);
       if (isNaN(maxEvidenceLines) || maxEvidenceLines < 1) {
-        console.error(`Invalid max-evidence-lines: ${options.maxEvidenceLines}. Must be a positive integer.`);
+        logError(`Invalid max-evidence-lines: ${options.maxEvidenceLines}. Must be a positive integer.`);
         process.exit(1);
       }
 
@@ -563,7 +574,7 @@ program
         ? parseInt(options.failOnScore, 10)
         : undefined;
       if (failOnScore !== undefined && (isNaN(failOnScore) || failOnScore < 0 || failOnScore > 100)) {
-        console.error(`Invalid fail-on-score: ${options.failOnScore}. Must be 0-100.`);
+        logError(`Invalid fail-on-score: ${options.failOnScore}. Must be 0-100.`);
         process.exit(1);
       }
 
@@ -611,14 +622,14 @@ program
         const { dirname } = await import("node:path");
         await mkdir(dirname(options.out), { recursive: true });
         await writeFile(options.out, output, "utf-8");
-        console.error(`Risk report written to ${options.out}`);
+        info(`Risk report written to ${options.out}`);
       } else {
         console.log(output);
       }
 
       // Check fail-on-score threshold
       if (failOnScore !== undefined && report.riskScore >= failOnScore) {
-        console.error(`Risk score ${report.riskScore} >= threshold ${failOnScore}`);
+        logError(`Risk score ${report.riskScore} >= threshold ${failOnScore}`);
         process.exit(2);
       }
 
@@ -655,17 +666,17 @@ program
  */
 function handleError(error: unknown): never {
   if (error instanceof BranchNarratorError) {
-    console.error(`Error: ${error.message}`);
+    logError(`Error: ${error.message}`);
     process.exit(error.exitCode);
   }
 
   if (error instanceof Error) {
-    console.error(`Unexpected error: ${error.message}`);
+    logError(`Unexpected error: ${error.message}`);
     if (process.env.DEBUG) {
-      console.error(error.stack);
+      logError(error.stack || "");
     }
   } else {
-    console.error("An unexpected error occurred");
+    logError("An unexpected error occurred");
   }
 
   process.exit(1);

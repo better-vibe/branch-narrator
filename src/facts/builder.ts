@@ -19,6 +19,7 @@ import { redactEvidence } from "../core/evidence.js";
 import { aggregateCategories, buildSummaryByArea } from "./categories.js";
 import { deriveActions } from "./actions.js";
 import { DEFAULT_EXCLUDES } from "../core/filters.js";
+import { sortFindings as sortFindingsDeterministically } from "../core/sorting.js";
 
 /**
  * Build facts output options.
@@ -101,33 +102,6 @@ function calculateStats(
 }
 
 /**
- * Sort findings deterministically.
- */
-function sortFindings(findings: Finding[]): Finding[] {
-  return [...findings].sort((a, b) => {
-    // Sort by category
-    if (a.category !== b.category) {
-      return a.category.localeCompare(b.category);
-    }
-    // Then by kind
-    if (a.kind !== b.kind) {
-      return a.kind.localeCompare(b.kind);
-    }
-    // Then by specific fields
-    if (a.type === "route-change" && b.type === "route-change") {
-      return a.file.localeCompare(b.file);
-    }
-    if (a.type === "dependency-change" && b.type === "dependency-change") {
-      return a.name.localeCompare(b.name);
-    }
-    if (a.type === "env-var" && b.type === "env-var") {
-      return a.name.localeCompare(b.name);
-    }
-    return 0;
-  });
-}
-
-/**
  * Build highlights from findings.
  */
 function buildHighlights(findings: Finding[]): string[] {
@@ -191,7 +165,7 @@ export async function buildFacts(
   }
 
   // Sort findings deterministically
-  findings = sortFindings(findings);
+  findings = sortFindingsDeterministically(findings);
 
   // Apply max findings limit
   if (userFilters?.maxFindings && findings.length > userFilters.maxFindings) {
