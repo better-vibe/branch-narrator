@@ -92,11 +92,15 @@ describe.skipIf(!existsSync(CLI_PATH))("CLI Reliability Guarantees", () => {
         }
       );
 
-      // Should exit cleanly (0 or 1 if no changes)
-      expect([0, 1]).toContain(result.exitCode);
+      // Should exit cleanly
+      expect(result.exitCode).toBe(0);
 
-      if (result.exitCode === 0) {
-        // stdout should be parseable JSON
+      // stdout should contain either valid JSON or "No changes found."
+      if (result.stdout.includes("No changes found.")) {
+        // This is acceptable for dump-diff when there are no changes
+        expect(result.stdout).toContain("No changes found.");
+      } else {
+        // Otherwise it should be parseable JSON
         expect(() => JSON.parse(result.stdout)).not.toThrow();
 
         const output = JSON.parse(result.stdout);
