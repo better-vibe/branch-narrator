@@ -182,6 +182,11 @@ branch-narrator dump-diff [options]
 | `--chunk-dir <path>` | `.ai/diff-chunks` | Directory for chunk files |
 | `--name <prefix>` | `diff` | Chunk file name prefix |
 | `--dry-run` | `false` | Preview what would be included/excluded |
+| `--name-only` | `false` | Output only file list (no diff content) |
+| `--stat` | `false` | Output file statistics (additions/deletions) |
+| `--patch-for <path>` | (none) | Output diff for a specific file only |
+
+**Note:** `--name-only`, `--stat`, and `--patch-for` are mutually exclusive.
 
 ### Diff Modes
 
@@ -246,11 +251,104 @@ branch-narrator dump-diff --dry-run
 
 # More context lines
 branch-narrator dump-diff --unified 3
+
+# Agent workflows - list files first
+branch-narrator dump-diff --name-only --format json > files.json
+
+# Agent workflows - get stats for all files
+branch-narrator dump-diff --stat --format json > stats.json
+
+# Agent workflows - retrieve specific file diff
+branch-narrator dump-diff --patch-for src/index.ts --format json --unified 3
+
+# Agent workflows - get structured hunks for a file
+branch-narrator dump-diff --patch-for src/app.ts --format json
+
+# Markdown table of file statistics
+branch-narrator dump-diff --stat --format md
+
+# Plain text file list
+branch-narrator dump-diff --name-only
 ```
 
 ### JSON Output Schema
 
-When using `--format json`, the output follows this schema (v1.1):
+#### Schema v1.0 (Agent-Grade, Structured)
+
+When using `--format json` with `--name-only`, `--stat`, or `--patch-for`, the output uses schema v1.0 with structured data:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "command": {
+    "name": "dump-diff",
+    "args": ["--mode", "branch", "--base", "main", "--head", "HEAD", "--format", "json", "--stat"]
+  },
+  "git": {
+    "mode": "branch",
+    "base": "main",
+    "head": "HEAD"
+  },
+  "options": {
+    "unified": 0,
+    "include": [],
+    "exclude": [],
+    "nameOnly": false,
+    "stat": true
+  },
+  "files": [
+    {
+      "path": "src/index.ts",
+      "status": "M",
+      "stats": { "added": 10, "removed": 5 }
+    }
+  ],
+  "skippedFiles": [
+    {
+      "path": "pnpm-lock.yaml",
+      "status": "M",
+      "reason": "excluded-by-default",
+      "note": "Lockfile"
+    }
+  ],
+  "summary": {
+    "changedFileCount": 5,
+    "includedFileCount": 4,
+    "skippedFileCount": 1
+  }
+}
+```
+
+**Schema v1.0 fields:**
+- `schemaVersion`: Always `"1.0"`
+- `command`: Command metadata (name and args)
+- `git`: Git context (mode, base, head, isDirty)
+- `options`: Options used for this run
+- `files`: Array of changed files with structured diff data
+- `skippedFiles`: Array of excluded files with reasons
+- `summary`: Aggregated counts
+
+**File object (v1.0):**
+- `path`: Current file path
+- `oldPath`: Previous path (for renames)
+- `status`: File status (`A`, `M`, `D`, `R`, etc.)
+- `binary`: `true` if file is binary
+- `stats`: `{ added, removed }` (only with `--stat` or `--patch-for`)
+- `hunks`: Array of diff hunks (only with `--patch-for`)
+
+**Hunk object:**
+- `header`: Hunk header line (e.g., `@@ -1,4 +1,6 @@`)
+- `oldStart`, `oldLines`: Old file position/length
+- `newStart`, `newLines`: New file position/length
+- `lines`: Array of diff lines
+
+**Line object:**
+- `kind`: `"add"`, `"del"`, or `"context"`
+- `text`: Full line text (includes `+`, `-`, or space prefix)
+
+#### Schema v1.1 (Legacy)
+
+When using `--format json` without `--name-only`, `--stat`, or `--patch-for`, the output uses schema v1.1 (legacy format):
 
 ```json
 {

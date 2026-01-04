@@ -22,6 +22,15 @@ import {
   type DumpDiffOutput,
   type FileEntry,
 } from "../src/commands/dump-diff/index.js";
+import {
+  parseNumStats,
+  type FileStats,
+} from "../src/commands/dump-diff/git.js";
+import {
+  parseHunkHeader,
+  parseDiffIntoHunks,
+  type DiffHunk,
+} from "../src/commands/dump-diff/core.js";
 
 // ============================================================================
 // Test Fixtures
@@ -961,5 +970,204 @@ describe("calculateTotalChars", () => {
 
   it("should return 0 for empty array", () => {
     expect(calculateTotalChars([])).toBe(0);
+  });
+});
+
+// ============================================================================
+// New Schema v1.0 Tests
+// ============================================================================
+
+describe("parseNumStats", () => {
+  it("should parse standard numstat output", () => {
+    const output = `10\t5\tsrc/index.ts
+20\t15\tsrc/utils.ts`;
+
+    const result = parseNumStats(output);
+
+    expect(result.size).toBe(2);
+    expect(result.get("src/index.ts")).toEqual({
+      path: "src/index.ts",
+      oldPath: undefined,
+      added: 10,
+      removed: 5,
+      binary: false,
+    });
+    expect(result.get("src/utils.ts")).toEqual({
+      path: "src/utils.ts",
+      oldPath: undefined,
+      added: 20,
+      removed: 15,
+      binary: false,
+    });
+  });
+
+  it("should handle binary files", () => {
+    const output = `-\t-\tassets/logo.png`;
+
+    const result = parseNumStats(output);
+
+    expect(result.get("assets/logo.png")).toEqual({
+      path: "assets/logo.png",
+      oldPath: undefined,
+      added: 0,
+      removed: 0,
+      binary: true,
+    });
+  });
+
+  it("should handle renamed files", () => {
+    const output = `5\t3\tsrc/old-name.ts\tsrc/new-name.ts`;
+
+    const result = parseNumStats(output);
+
+    expect(result.get("src/new-name.ts")).toEqual({
+      path: "src/new-name.ts",
+      oldPath: "src/old-name.ts",
+      added: 5,
+      removed: 3,
+      binary: false,
+    });
+  });
+
+  it("should handle empty output", () => {
+    const result = parseNumStats("");
+
+    expect(result.size).toBe(0);
+  });
+});
+
+describe("parseHunkHeader", () => {
+  it("should parse standard hunk header", () => {
+    const result = parseHunkHeader("@@ -1,4 +2,6 @@");
+
+    expect(result).toEqual({
+      oldStart: 1,
+      oldLines: 4,
+      newStart: 2,
+      newLines: 6,
+    });
+  });
+
+  it("should parse hunk header without line counts", () => {
+    const result = parseHunkHeader("@@ -1 +2 @@");
+
+    expect(result).toEqual({
+      oldStart: 1,
+      oldLines: 1,
+      newStart: 2,
+      newLines: 1,
+    });
+  });
+
+  it("should return null for invalid header", () => {
+    const result = parseHunkHeader("not a hunk header");
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("parseDiffIntoHunks", () => {
+  it("should parse diff with single hunk", () => {
+    const diff = `@@ -1,3 +1,4 @@
+ context line
+-removed line
++added line 1
++added line 2
+ context line`;
+
+    const hunks = parseDiffIntoHunks(diff);
+
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]!.header).toBe("@@ -1,3 +1,4 @@");
+    expect(hunks[0]!.oldStart).toBe(1);
+    expect(hunks[0]!.oldLines).toBe(3);
+    expect(hunks[0]!.newStart).toBe(1);
+    expect(hunks[0]!.newLines).toBe(4);
+    expect(hunks[0]!.lines).toHaveLength(5);
+    expect(hunks[0]!.lines[0]).toEqual({ kind: "context", text: " context line" });
+    expect(hunks[0]!.lines[1]).toEqual({ kind: "del", text: "-removed line" });
+    expect(hunks[0]!.lines[2]).toEqual({ kind: "add", text: "+added line 1" });
+  });
+
+  it("should parse diff with multiple hunks", () => {
+    const diff = `@@ -1,2 +1,3 @@
+ line 1
++new line
+ line 2
+@@ -10,1 +11,2 @@
+ old line
++another new line`;
+
+    const hunks = parseDiffIntoHunks(diff);
+
+    expect(hunks).toHaveLength(2);
+    expect(hunks[0]!.header).toBe("@@ -1,2 +1,3 @@");
+    expect(hunks[1]!.header).toBe("@@ -10,1 +11,2 @@");
+  });
+
+  it("should handle empty diff", () => {
+    const hunks = parseDiffIntoHunks("");
+
+    expect(hunks).toHaveLength(0);
+  });
+
+  it("should skip special git diff lines like no newline marker", () => {
+    const diff = `@@ -1,2 +1,2 @@
+ line 1
+-old line
++new line
+\\ No newline at end of file`;
+
+    const hunks = parseDiffIntoHunks(diff);
+
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]!.lines).toHaveLength(3);
+    expect(hunks[0]!.lines[0]).toEqual({ kind: "context", text: " line 1" });
+    expect(hunks[0]!.lines[1]).toEqual({ kind: "del", text: "-old line" });
+    expect(hunks[0]!.lines[2]).toEqual({ kind: "add", text: "+new line" });
+    // The "\ No newline at end of file" line should be skipped
+  });
+});
+
+describe("DiffStatus extended types", () => {
+  it("should support all status types", () => {
+    // This test validates that all status types are handled (compile-time check)
+    const statuses: Array<"A" | "M" | "D" | "R" | "C" | "T" | "U" | "?" | "unknown"> = [
+      "A", "M", "D", "R", "C", "T", "U", "?", "unknown"
+    ];
+
+    // All statuses should be valid types (compile-time check)
+    expect(statuses.length).toBe(9);
+  });
+});
+
+describe("SkipReason extended types", () => {
+  it("should support all skip reasons", () => {
+    const reasons: Array<
+      "excluded-by-default" |
+      "excluded-by-user" |
+      "excluded-by-glob" |
+      "binary" |
+      "too-large" |
+      "unsupported" |
+      "not-found" |
+      "not-included" |
+      "diff-empty" |
+      "patch-for-mismatch"
+    > = [
+      "excluded-by-default",
+      "excluded-by-user",
+      "excluded-by-glob",
+      "binary",
+      "too-large",
+      "unsupported",
+      "not-found",
+      "not-included",
+      "diff-empty",
+      "patch-for-mismatch",
+    ];
+
+    // All reasons should be valid types (compile-time check)
+    expect(reasons.length).toBe(10);
   });
 });

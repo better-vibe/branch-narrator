@@ -335,3 +335,115 @@ export async function getFullDiff(options: GetFullDiffOptions): Promise<string> 
     throw error;
   }
 }
+
+// ============================================================================
+// Stats (numstat for accurate additions/deletions)
+// ============================================================================
+
+export interface FileStats {
+  path: string;
+  oldPath?: string;
+  added: number;
+  removed: number;
+  binary: boolean;
+}
+
+export interface GetNumStatsOptions {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+  cwd?: string;
+}
+
+/**
+ * Get file statistics (additions/deletions) using git diff --numstat.
+ * Returns a map of path -> stats for efficient lookup.
+ */
+export async function getNumStats(
+  options: GetNumStatsOptions
+): Promise<Map<string, FileStats>> {
+  const cwd = options.cwd ?? process.cwd();
+
+  const args = ["diff", "--numstat", "--find-renames"];
+
+  switch (options.mode) {
+    case "branch":
+      args.push(`${options.base}..${options.head}`);
+      break;
+    case "unstaged":
+      break;
+    case "staged":
+      args.push("--staged");
+      break;
+    case "all":
+      args.push("HEAD");
+      break;
+  }
+
+  try {
+    const result = await execa("git", args, { cwd });
+    return parseNumStats(result.stdout);
+  } catch (error) {
+    if (error instanceof Error && "stderr" in error) {
+      throw new GitCommandError(
+        `git ${args.join(" ")}`,
+        String((error as { stderr: unknown }).stderr)
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Parse git diff --numstat output into a map.
+ * Format: <added>\t<removed>\t<path>
+ * For renames: <added>\t<removed>\t<oldPath>\t<newPath>
+ * For binary files: -\t-\t<path>
+ */
+export function parseNumStats(output: string): Map<string, FileStats> {
+  const statsMap = new Map<string, FileStats>();
+
+  if (!output.trim()) {
+    return statsMap;
+  }
+
+  const lines = output.trim().split("\n");
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+
+    const parts = line.split("\t");
+    if (parts.length < 3) continue;
+
+    const addedStr = parts[0]!;
+    const removedStr = parts[1]!;
+
+    // Check for binary file (marked with -)
+    const isBinary = addedStr === "-" && removedStr === "-";
+
+    // Check for rename (4 parts)
+    const isRename = parts.length >= 4;
+
+    let path: string;
+    let oldPath: string | undefined;
+
+    if (isRename) {
+      oldPath = parts[2];
+      path = parts[3]!;
+    } else {
+      path = parts[2]!;
+    }
+
+    const stats: FileStats = {
+      path,
+      oldPath,
+      added: isBinary ? 0 : parseInt(addedStr, 10),
+      removed: isBinary ? 0 : parseInt(removedStr, 10),
+      binary: isBinary,
+    };
+
+    statsMap.set(path, stats);
+  }
+
+  return statsMap;
+}
