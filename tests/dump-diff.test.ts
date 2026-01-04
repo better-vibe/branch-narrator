@@ -3,7 +3,7 @@
  * These are unit tests that do NOT require an actual git repo.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   buildNameStatusArgs,
   buildPerFileDiffArgs,

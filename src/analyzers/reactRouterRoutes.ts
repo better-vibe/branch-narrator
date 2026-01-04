@@ -13,7 +13,12 @@ import type {
   RouteChangeFinding,
 } from "../core/types.js";
 import { createEvidence } from "../core/evidence.js";
-import { batchGetFileContent } from "../git/batch.js";
+import { batchGetFileContent as defaultBatchGetFileContent } from "../git/batch.js";
+
+// Allow injection for testing
+export const dependencies = {
+  batchGetFileContent: defaultBatchGetFileContent,
+};
 
 // ============================================================================
 // Route Extraction
@@ -333,7 +338,7 @@ export const reactRouterRoutesAnalyzer: Analyzer = {
     // but ideally ChangeSet should provide it. Since we don't have it in ChangeSet,
     // we assume process.cwd() is correct as per other analyzers).
     // Note: In benchmarks we chdir to the repo.
-    const contentMap = await batchGetFileContent(batchRequest);
+    const contentMap = await dependencies.batchGetFileContent(batchRequest);
 
     // Extract routes from base and head for each file
     for (const file of candidateFiles) {

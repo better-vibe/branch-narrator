@@ -1,13 +1,13 @@
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, mock, type Mock } from "bun:test";
 import { testParityAnalyzer, _resetCacheForTesting } from "../src/analyzers/test-parity.js";
 import type { ChangeSet } from "../src/core/types.js";
 import { execa } from "execa";
 
 // Mock execa
-vi.mock("execa", () => {
+mock.module("execa", () => {
   return {
-    execa: vi.fn(),
+    execa: mock(),
   };
 });
 
@@ -20,14 +20,14 @@ describe("testParityAnalyzer", () => {
   };
 
   beforeEach(() => {
-    vi.resetAllMocks();
+    (execa as unknown as Mock<typeof execa>).mockReset();
     _resetCacheForTesting();
     // Default mock
-    vi.mocked(execa).mockResolvedValue({ stdout: "" } as any);
+    (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout: "" } as any);
   });
 
   const mockGitFiles = (files: string[]) => {
-      vi.mocked(execa).mockResolvedValue({ stdout: files.join("\n") } as any);
+      (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout: files.join("\n") } as any);
   };
 
   it("should detect missing test for source file", async () => {

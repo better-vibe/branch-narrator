@@ -2,7 +2,7 @@
  * Redaction tests.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { redactLine, redactLines } from "../src/risk/redaction.js";
 
 describe("redactLine", () => {

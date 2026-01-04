@@ -2,24 +2,24 @@
  * React Router analyzer tests.
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, mock, type Mock, afterAll, spyOn } from "bun:test";
 import {
   extractJsxRoutes,
   extractDataRoutes,
   extractRoutesFromContent,
   normalizePath,
   joinPaths,
+  dependencies,
 } from "../src/analyzers/reactRouterRoutes.js";
 import type { RouteChangeFinding } from "../src/core/types.js";
 import { reactRouterRoutesAnalyzer } from "../src/analyzers/reactRouterRoutes.js";
 import { createChangeSet, createFileDiff } from "./fixtures/index.js";
-import { batchGetFileContent } from "../src/git/batch.js";
 
-// Mock the batch git operation
-vi.mock("../src/git/batch.js", () => {
-  return {
-    batchGetFileContent: vi.fn(),
-  };
+const batchGetFileContentMock = mock();
+const spy = spyOn(dependencies, "batchGetFileContent").mockImplementation(batchGetFileContentMock);
+
+afterAll(() => {
+  spy.mockRestore();
 });
 
 // ============================================================================
@@ -243,8 +243,8 @@ describe("React Router route extraction", () => {
 
 describe("reactRouterRoutesAnalyzer", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(batchGetFileContent).mockResolvedValue(new Map());
+    batchGetFileContentMock.mockClear();
+    batchGetFileContentMock.mockResolvedValue(new Map());
   });
 
   it("should return empty array for non-candidate files", async () => {
@@ -262,7 +262,7 @@ describe("reactRouterRoutesAnalyzer", () => {
     const findings = await reactRouterRoutesAnalyzer.analyze(changeSet);
     expect(findings).toEqual([]);
     // Should not call batchGetFileContent as no files match extension
-    expect(batchGetFileContent).not.toHaveBeenCalled();
+    expect(batchGetFileContentMock).not.toHaveBeenCalled();
   });
 
   it("should deduplicate routes", async () => {
@@ -283,7 +283,7 @@ describe("reactRouterRoutesAnalyzer", () => {
       );
     `);
 
-    vi.mocked(batchGetFileContent).mockResolvedValue(contentMap);
+    batchGetFileContentMock.mockResolvedValue(contentMap);
 
     const findings = await reactRouterRoutesAnalyzer.analyze(changeSet);
     const routeIds = findings.map((f) => (f as RouteChangeFinding).routeId);
@@ -310,7 +310,7 @@ describe("reactRouterRoutesAnalyzer", () => {
       );
     `);
 
-    vi.mocked(batchGetFileContent).mockResolvedValue(contentMap);
+    batchGetFileContentMock.mockResolvedValue(contentMap);
 
     const findings = await reactRouterRoutesAnalyzer.analyze(changeSet);
     const routeIds = findings.map((f) => (f as RouteChangeFinding).routeId);
@@ -364,8 +364,8 @@ describe("Path joining", () => {
 
 describe("File filtering", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(batchGetFileContent).mockResolvedValue(new Map());
+    batchGetFileContentMock.mockClear();
+    batchGetFileContentMock.mockResolvedValue(new Map());
   });
 
   it("should only process .ts, .tsx, .js, .jsx files", async () => {
@@ -388,9 +388,9 @@ describe("File filtering", () => {
     
     // Should call batchGetFileContent for App.tsx and routes.ts
     // config.json and README.md should be filtered out
-    expect(batchGetFileContent).toHaveBeenCalled();
-    const args = vi.mocked(batchGetFileContent).mock.calls[0][0];
-    const requestedPaths = new Set(args.map(a => a.path));
+    expect(batchGetFileContentMock).toHaveBeenCalled();
+    const args = batchGetFileContentMock.mock.calls[0][0];
+    const requestedPaths = new Set(args.map((a: any) => a.path));
     
     expect(requestedPaths.has("App.tsx")).toBe(true);
     expect(requestedPaths.has("routes.ts")).toBe(true);

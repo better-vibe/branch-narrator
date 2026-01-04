@@ -2,7 +2,7 @@
  * Tests for untracked files detection.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseNameStatus } from "../src/core/change-set.js";
 
 describe("parseNameStatus", () => {
@@ -93,7 +93,7 @@ describe("untracked files integration", () => {
       diffs: [
         createTestFileDiff(
           "src/tests/e2e/chat.test.ts",
-          ['import { test } from "vitest";', "test('chat', () => {});"],
+          ['import { test } from "bun:test";', "test('chat', () => {});"],
           "added"
         ),
         createTestFileDiff(
