@@ -1,5 +1,5 @@
 /**
- * Main risk report engine.
+ * Risk report command.
  */
 
 import type { ChangeSet, RiskFlag, RiskReport } from "../../core/types.js";
@@ -86,6 +86,17 @@ export function generateRiskReport(
     skippedFiles,
     { explainScore }
   );
+}
+
+/**
+ * Execute the risk-report command.
+ * This is the standard command handler that follows the execute* naming convention.
+ */
+export function executeRiskReport(
+  changeSet: ChangeSet,
+  options: RiskReportOptions = {}
+): RiskReport {
+  return generateRiskReport(changeSet, options);
 }
 
 export * from "./detectors/index.js";

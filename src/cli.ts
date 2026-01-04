@@ -326,8 +326,8 @@ program
   )
   .action(async (options) => {
     try {
-      // Import buildFacts dynamically to avoid circular dependencies
-      const { buildFacts } = await import("./commands/facts/index.js");
+      // Import executeFacts dynamically to avoid circular dependencies
+      const { executeFacts } = await import("./commands/facts/index.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -387,7 +387,7 @@ program
       const riskScore = computeRiskScore(findings);
 
       // Build facts output
-      const facts = await buildFacts({
+      const facts = await executeFacts({
         changeSet,
         findings,
         riskScore,
@@ -555,8 +555,8 @@ program
   .option("--explain-score", "Include score breakdown in output", false)
   .action(async (options) => {
     try {
-      // Import risk report dynamically
-      const { generateRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./commands/risk/index.js");
+      // Import risk report command dynamically
+      const { executeRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./commands/risk/index.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -613,8 +613,8 @@ program
         includeUntracked: mode === "all",
       });
 
-      // Generate risk report
-      const report = generateRiskReport(changeSet, {
+      // Execute risk report command
+      const report = executeRiskReport(changeSet, {
         only,
         exclude,
         maxEvidenceLines,

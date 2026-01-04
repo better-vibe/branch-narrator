@@ -119,7 +119,7 @@ CLI command implementations live under `src/commands/`, with each command having
 | `commands/facts/` | Generate structured JSON facts output |
 | `commands/risk/` | Generate risk reports and scoring |
 
-Each command module exports a handler function (e.g., `executeDumpDiff`, `executeIntegrate`) that is called from `cli.ts`.
+Each command module exports an `execute*` handler function (e.g., `executeDumpDiff`, `executeIntegrate`, `executeFacts`, `executeRiskReport`) that is called from `cli.ts`.
 
 ### Render
 
