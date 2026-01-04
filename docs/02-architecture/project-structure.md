@@ -32,6 +32,12 @@ branch-narrator/
 │   │   ├── dependencies.ts       # Package.json analysis
 │   │   └── security-files.ts     # Security file detection
 │   │
+│   ├── commands/
+│   │   ├── dump-diff/            # Diff export command
+│   │   ├── integrate/            # Integration command
+│   │   ├── facts/                # Facts command
+│   │   └── risk/                 # Risk report command
+│   │
 │   ├── profiles/
 │   │   ├── index.ts              # Profile resolution
 │   │   ├── sveltekit.ts          # SvelteKit profile
@@ -101,6 +107,19 @@ Each analyzer is a single file implementing the `Analyzer` interface.
 | `profiles/index.ts` | Profile detection and resolution |
 | `profiles/sveltekit.ts` | SvelteKit-specific analyzer set |
 | `profiles/default.ts` | Generic analyzer set |
+
+### Commands
+
+CLI command implementations live under `src/commands/`, with each command having its own subdirectory:
+
+| Directory | Purpose |
+|-----------|---------|
+| `commands/dump-diff/` | Export git diffs in various formats |
+| `commands/integrate/` | Generate provider-specific integration rules |
+| `commands/facts/` | Generate structured JSON facts output |
+| `commands/risk/` | Generate risk reports and scoring |
+
+Each command module exports a handler function (e.g., `executeDumpDiff`, `executeIntegrate`) that is called from `cli.ts`.
 
 ### Render
 

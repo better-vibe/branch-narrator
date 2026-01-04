@@ -39,6 +39,7 @@ This file contains instructions for AI agents (Jules) working on the `branch-nar
 | Path | Purpose |
 | :--- | :--- |
 | `src/analyzers/` | **Core Logic.** Pure functions that analyze `ChangeSet` -> `Finding[]`. |
+| `src/commands/` | **CLI Commands.** Command implementations (dump-diff, integrate, facts, risk). |
 | `src/profiles/` | **Configuration.** Sets of analyzers enabled for specific project types (e.g., SvelteKit). |
 | `src/core/types.ts` | **Types.** Central definitions. All shared types live here. |
 | `src/render/` | **Output.** Converts `Finding[]` to Markdown, JSON, etc. |
