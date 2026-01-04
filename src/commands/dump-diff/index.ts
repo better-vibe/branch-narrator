@@ -336,8 +336,13 @@ async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<vo
     }
   }
 
+  // Filter out binary files from included list
+  const nonBinaryFiles = included.filter((f) => {
+    return !skipped.some((s) => s.path === f.path && s.reason === "binary");
+  });
+
   // Sort for deterministic output
-  const sortedIncluded = included.sort((a, b) => a.path.localeCompare(b.path));
+  const sortedIncluded = nonBinaryFiles.sort((a, b) => a.path.localeCompare(b.path));
   const sortedSkipped = skipped.sort((a, b) => a.path.localeCompare(b.path));
 
   // Output based on format
@@ -360,7 +365,6 @@ async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<vo
         exclude: options.exclude,
         nameOnly: true,
         stat: false,
-        patchFor: undefined,
       },
       files: sortedIncluded.map((f) => ({
         path: f.path,
@@ -508,7 +512,6 @@ async function handleStat(options: DumpDiffOptions, cwd: string): Promise<void> 
         exclude: options.exclude,
         nameOnly: false,
         stat: true,
-        patchFor: undefined,
       },
       files: sortedFiles,
       skippedFiles: sortedSkipped.map((s) => ({
@@ -803,7 +806,7 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
 }
 
 // ============================================================================
-// Helpers
+// Diff Fetching Helpers
 // ============================================================================
 
 /**

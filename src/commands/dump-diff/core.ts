@@ -562,6 +562,11 @@ export function parseDiffIntoHunks(diff: string): DiffHunk[] {
         lines: [],
       };
     } else if (currentHunk) {
+      // Skip special git diff lines (e.g., "\ No newline at end of file")
+      if (line.startsWith("\\")) {
+        continue;
+      }
+
       // Add line to current hunk
       let kind: "add" | "del" | "context";
       if (line.startsWith("+")) {

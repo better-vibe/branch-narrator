@@ -1110,6 +1110,23 @@ describe("parseDiffIntoHunks", () => {
 
     expect(hunks).toHaveLength(0);
   });
+
+  it("should skip special git diff lines like no newline marker", () => {
+    const diff = `@@ -1,2 +1,2 @@
+ line 1
+-old line
++new line
+\\ No newline at end of file`;
+
+    const hunks = parseDiffIntoHunks(diff);
+
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]!.lines).toHaveLength(3);
+    expect(hunks[0]!.lines[0]).toEqual({ kind: "context", text: " line 1" });
+    expect(hunks[0]!.lines[1]).toEqual({ kind: "del", text: "-old line" });
+    expect(hunks[0]!.lines[2]).toEqual({ kind: "add", text: "+new line" });
+    // The "\ No newline at end of file" line should be skipped
+  });
 });
 
 describe("DiffStatus extended types", () => {

@@ -294,28 +294,13 @@ When using `--format json` with `--name-only`, `--stat`, or `--patch-for`, the o
     "include": [],
     "exclude": [],
     "nameOnly": false,
-    "stat": true,
-    "patchFor": undefined
+    "stat": true
   },
   "files": [
     {
       "path": "src/index.ts",
       "status": "M",
-      "stats": { "added": 10, "removed": 5 },
-      "hunks": [
-        {
-          "header": "@@ -1,4 +1,6 @@",
-          "oldStart": 1,
-          "oldLines": 4,
-          "newStart": 1,
-          "newLines": 6,
-          "lines": [
-            { "kind": "context", "text": " unchanged line" },
-            { "kind": "del", "text": "-removed line" },
-            { "kind": "add", "text": "+added line" }
-          ]
-        }
-      ]
+      "stats": { "added": 10, "removed": 5 }
     }
   ],
   "skippedFiles": [
