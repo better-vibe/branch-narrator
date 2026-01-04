@@ -4,10 +4,32 @@
  * This module exports the core types and functions for programmatic use.
  */
 
-// Core types
+// Core types and utilities
 export * from "./core/types.js";
 export * from "./core/change-set.js";
 export * from "./core/errors.js";
+
+// Export logger and sorting explicitly to avoid conflicts
+export {
+  configureLogger,
+  getLoggerState,
+  resetLogger,
+  warn,
+  info,
+  debug,
+  error,
+} from "./core/logger.js";
+
+export {
+  normalizePath,
+  comparePaths,
+  sortRiskFlags,
+  sortFindings,
+  sortEvidence,
+  sortRiskFlagEvidence,
+  sortFilePaths,
+  createSortedObject,
+} from "./core/sorting.js";
 
 // Git utilities
 export { collectChangeSet, isGitRepo, refExists } from "./git/collector.js";

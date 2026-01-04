@@ -19,7 +19,7 @@ import { redactEvidence } from "../core/evidence.js";
 import { aggregateCategories, buildSummaryByArea } from "./categories.js";
 import { deriveActions } from "./actions.js";
 import { DEFAULT_EXCLUDES } from "../core/filters.js";
-import { sortFindings as sortFindingsDeterministically } from "../core/sorting.js";
+import { sortFindings as sortFindingsDeterministically, sortEvidence } from "../core/sorting.js";
 
 /**
  * Build facts output options.
@@ -160,7 +160,13 @@ export async function buildFacts(
   if (userFilters?.redact) {
     findings = rawFindings.map(finding => ({
       ...finding,
-      evidence: finding.evidence.map(redactEvidence),
+      evidence: sortEvidence(finding.evidence.map(redactEvidence)),
+    }));
+  } else {
+    // Sort evidence even when not redacting
+    findings = rawFindings.map(finding => ({
+      ...finding,
+      evidence: sortEvidence(finding.evidence),
     }));
   }
 

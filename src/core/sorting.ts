@@ -2,7 +2,7 @@
  * Sorting utilities for deterministic output ordering.
  */
 
-import type { Finding, RiskFlag, Evidence } from "./types.js";
+import type { Finding, RiskFlag, Evidence, RiskFlagEvidence } from "./types.js";
 
 /**
  * Normalize path for consistent sorting across platforms.
@@ -98,6 +98,29 @@ export function sortEvidence(evidence: Evidence[]): Evidence[] {
     const lineB = b.line ?? (b.hunk?.newStart ?? 0);
     
     return lineA - lineB;
+  });
+}
+
+/**
+ * Sort risk flag evidence deterministically.
+ * Order: file asc, preserve line order within each file
+ */
+export function sortRiskFlagEvidence(evidence: RiskFlagEvidence[]): RiskFlagEvidence[] {
+  return [...evidence].sort((a, b) => {
+    // File ascending
+    const fileCompare = comparePaths(a.file, b.file);
+    if (fileCompare !== 0) return fileCompare;
+
+    // Hunk order (if available) - extract line numbers from hunk string
+    if (a.hunk && b.hunk) {
+      const extractLineNum = (hunk: string): number => {
+        const match = hunk.match(/\+(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      };
+      return extractLineNum(a.hunk) - extractLineNum(b.hunk);
+    }
+    
+    return 0;
   });
 }
 

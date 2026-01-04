@@ -6,7 +6,7 @@
  * They will be skipped if dist/cli.js doesn't exist.
  */
 
-import { describe, expect, it, beforeAll } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { execa } from "execa";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
@@ -95,18 +95,12 @@ describe.skipIf(!existsSync(CLI_PATH))("CLI Reliability Guarantees", () => {
       // Should exit cleanly
       expect(result.exitCode).toBe(0);
 
-      // stdout should contain either valid JSON or "No changes found."
-      if (result.stdout.includes("No changes found.")) {
-        // This is acceptable for dump-diff when there are no changes
-        expect(result.stdout).toContain("No changes found.");
-      } else {
-        // Otherwise it should be parseable JSON
-        expect(() => JSON.parse(result.stdout)).not.toThrow();
+      // stdout should be parseable JSON (even when there are no changes)
+      expect(() => JSON.parse(result.stdout)).not.toThrow();
 
-        const output = JSON.parse(result.stdout);
-        expect(output.schemaVersion).toBeDefined();
-        expect(output.mode).toBeDefined();
-      }
+      const output = JSON.parse(result.stdout);
+      expect(output.schemaVersion).toBeDefined();
+      expect(output.mode).toBeDefined();
     });
   });
 
@@ -277,7 +271,7 @@ describe.skipIf(!existsSync(CLI_PATH))("CLI Reliability Guarantees", () => {
           }
         } catch (err) {
           // jq not available - skip this assertion
-          console.log("jq not available, skipping jq test");
+          console.error("jq not available, skipping jq test");
         }
       }
     });
@@ -307,7 +301,7 @@ describe.skipIf(!existsSync(CLI_PATH))("CLI Reliability Guarantees", () => {
           }
         } catch (err) {
           // jq not available - skip this assertion
-          console.log("jq not available, skipping jq test");
+          console.error("jq not available, skipping jq test");
         }
       }
     });

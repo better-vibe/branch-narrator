@@ -9,10 +9,11 @@ import {
   sortRiskFlags,
   sortFindings,
   sortEvidence,
+  sortRiskFlagEvidence,
   sortFilePaths,
   createSortedObject,
 } from "../src/core/sorting.js";
-import type { RiskFlag, Finding, Evidence } from "../src/core/types.js";
+import type { RiskFlag, Finding, Evidence, RiskFlagEvidence } from "../src/core/types.js";
 
 describe("Sorting Utilities", () => {
   describe("normalizePath", () => {
@@ -226,6 +227,34 @@ describe("Sorting Utilities", () => {
       expect(sorted[0]!.line).toBe(10);
       expect(sorted[1]!.line).toBe(30);
       expect(sorted[2]!.line).toBe(50);
+    });
+  });
+
+  describe("sortRiskFlagEvidence", () => {
+    it("should sort by file ascending", () => {
+      const evidence: RiskFlagEvidence[] = [
+        { file: "src/z.ts", lines: ["line 1"] },
+        { file: "src/a.ts", lines: ["line 1"] },
+        { file: "src/m.ts", lines: ["line 1"] },
+      ];
+
+      const sorted = sortRiskFlagEvidence(evidence);
+      expect(sorted[0]!.file).toBe("src/a.ts");
+      expect(sorted[1]!.file).toBe("src/m.ts");
+      expect(sorted[2]!.file).toBe("src/z.ts");
+    });
+
+    it("should sort by hunk line number within same file", () => {
+      const evidence: RiskFlagEvidence[] = [
+        { file: "src/a.ts", hunk: "@@ -1,2 +50,3 @@", lines: ["line 1"] },
+        { file: "src/a.ts", hunk: "@@ -1,2 +10,3 @@", lines: ["line 1"] },
+        { file: "src/a.ts", hunk: "@@ -1,2 +30,3 @@", lines: ["line 1"] },
+      ];
+
+      const sorted = sortRiskFlagEvidence(evidence);
+      expect(sorted[0]!.hunk).toContain("+10");
+      expect(sorted[1]!.hunk).toContain("+30");
+      expect(sorted[2]!.hunk).toContain("+50");
     });
   });
 

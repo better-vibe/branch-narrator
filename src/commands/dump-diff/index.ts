@@ -102,6 +102,34 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
   const combinedFiles = [...allFiles, ...untrackedFiles];
 
   if (combinedFiles.length === 0) {
+    // In JSON mode, output valid JSON instead of plain text
+    if (options.format === "json") {
+      const output: DumpDiffOutput = {
+        schemaVersion: "1.1",
+        mode: options.mode,
+        base: options.mode === "branch" ? options.base : null,
+        head: options.mode === "branch" ? options.head : null,
+        unified: options.unified,
+        included: [],
+        skipped: [],
+        stats: {
+          filesConsidered: 0,
+          filesIncluded: 0,
+          filesSkipped: 0,
+          chars: 0,
+        },
+      };
+      const json = renderJson(output);
+      if (options.out) {
+        await writeOutput(options.out, json);
+        info(`Wrote JSON output to ${options.out}`);
+      } else {
+        console.log(json);
+      }
+      return;
+    }
+    
+    // For non-JSON formats, output plain text
     console.log("No changes found.");
     return;
   }
