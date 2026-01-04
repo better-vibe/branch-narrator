@@ -1,5 +1,5 @@
 
-import { describe, expect, it, beforeEach, mock, type Mock } from "bun:test";
+import { describe, expect, it, beforeEach, afterAll, mock, type Mock } from "bun:test";
 import { testParityAnalyzer, _resetCacheForTesting } from "../src/analyzers/test-parity.js";
 import type { ChangeSet } from "../src/core/types.js";
 import { execa } from "execa";
@@ -24,6 +24,11 @@ describe("testParityAnalyzer", () => {
     _resetCacheForTesting();
     // Default mock
     (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout: "" } as any);
+  });
+
+  afterAll(() => {
+    // Restore the original modules to avoid affecting other tests
+    mock.restore();
   });
 
   const mockGitFiles = (files: string[]) => {
