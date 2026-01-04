@@ -96,7 +96,6 @@ describe("batchGetFileContent", () => {
   it("should return empty map for empty input", async () => {
     const result = await batchGetFileContent([]);
     expect(result.size).toBe(0);
-    // expect(execa).not.toHaveBeenCalled();
   });
 
   it("should handle execa failure gracefully", async () => {
