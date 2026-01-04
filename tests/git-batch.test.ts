@@ -1,5 +1,5 @@
 
-import { describe, expect, it, beforeEach, mock, type Mock, spyOn } from "bun:test";
+import { describe, expect, it, beforeEach, afterAll, mock, type Mock, spyOn } from "bun:test";
 import { batchGetFileContent } from "../src/git/batch.js";
 import { execa } from "execa";
 import { Buffer } from "node:buffer";
@@ -14,6 +14,11 @@ mock.module("execa", () => {
 describe("batchGetFileContent", () => {
   beforeEach(() => {
     (execa as unknown as Mock<typeof execa>).mockClear();
+  });
+
+  afterAll(() => {
+    // Restore the original modules to avoid affecting other tests
+    mock.restore();
   });
 
   it("should parse git cat-file output correctly", async () => {

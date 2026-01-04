@@ -1,19 +1,19 @@
 
-import { describe, expect, it, beforeEach, mock, type Mock } from "bun:test";
+import { describe, expect, it, beforeEach, afterAll, mock, type Mock } from "bun:test";
 import { impactAnalyzer } from "../src/analyzers/impact.js";
 import type { ChangeSet } from "../src/core/types.js";
 import { execa } from "execa";
 import fs from "node:fs/promises";
 
 // Mock execa and fs
-mock.module("execa", () => {
+const execaMock = mock.module("execa", () => {
   return {
     execa: mock(),
   };
 });
 
 const readFileMock = mock();
-mock.module("node:fs/promises", () => {
+const fsMock = mock.module("node:fs/promises", () => {
   return {
     default: {
       readFile: readFileMock,
@@ -35,6 +35,11 @@ describe("impactAnalyzer", () => {
     readFileMock.mockClear();
   });
 
+  afterAll(() => {
+    // Restore the original modules to avoid affecting other tests
+    mock.restore();
+  });
+
   const mockGitGrep = (results: string[]) => {
       // Results format for batch: filename\0content
       const stdout = results.map(r => {
@@ -49,12 +54,15 @@ describe("impactAnalyzer", () => {
   };
 
   const mockFileContent = (pathMap: Record<string, string>) => {
-    (fs.readFile as unknown as Mock<typeof fs.readFile>).mockImplementation(async (filepath) => {
+    readFileMock.mockImplementation(async (filepath: string, encoding?: string) => {
       // The analyzer calls path.join(cwd, filepath), so we just check if the filepath ends with our key
       // or check basename match.
       const key = Object.keys(pathMap).find(k => filepath.toString().endsWith(k));
       if (key) return pathMap[key];
-      throw new Error(`File not found: ${filepath}`);
+      // Fall back to Bun's native file read for files not in the mock map
+      // This prevents the mock from interfering with other tests
+      const file = Bun.file(filepath);
+      return file.text();
     });
   };
 
