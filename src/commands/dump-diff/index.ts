@@ -11,6 +11,7 @@ import {
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
+  parseDiffIntoHunks,
   renderJson,
   renderMarkdown,
   renderText,
@@ -24,6 +25,7 @@ import {
   getFileDiff,
   getFullDiff,
   getNameStatusList,
+  getNumStats,
   getUntrackedFileDiff,
   getUntrackedFiles,
   isBinaryFile,
@@ -49,6 +51,9 @@ export interface DumpDiffOptions {
   dryRun: boolean;
   includeUntracked: boolean;
   cwd?: string;
+  nameOnly?: boolean;
+  stat?: boolean;
+  patchFor?: string;
 }
 
 export interface DryRunResult {
@@ -80,6 +85,78 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
     }
   }
 
+  // Route to specialized handlers for new modes
+  if (options.patchFor) {
+    await handlePatchFor(options, cwd);
+    return;
+  }
+
+  if (options.nameOnly) {
+    await handleNameOnly(options, cwd);
+    return;
+  }
+
+  if (options.stat) {
+    await handleStat(options, cwd);
+    return;
+  }
+
+  // Default: full diff mode (original behavior)
+  await handleFullDiff(options, cwd);
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Build command args array for JSON output metadata.
+ */
+function buildCommandArgs(options: DumpDiffOptions): string[] {
+  const args: string[] = [];
+
+  args.push("--mode", options.mode);
+
+  if (options.mode === "branch") {
+    args.push("--base", options.base);
+    args.push("--head", options.head);
+  }
+
+  if (options.format !== "text") {
+    args.push("--format", options.format);
+  }
+
+  if (options.unified !== 0) {
+    args.push("--unified", String(options.unified));
+  }
+
+  for (const glob of options.include) {
+    args.push("--include", glob);
+  }
+
+  for (const glob of options.exclude) {
+    args.push("--exclude", glob);
+  }
+
+  if (options.nameOnly) {
+    args.push("--name-only");
+  }
+
+  if (options.stat) {
+    args.push("--stat");
+  }
+
+  if (options.patchFor) {
+    args.push("--patch-for", options.patchFor);
+  }
+
+  return args;
+}
+
+/**
+ * Handle full diff mode (default behavior).
+ */
+async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<void> {
   // Get file list from git
   const allFiles = await getNameStatusList({
     mode: options.mode,
@@ -198,6 +275,530 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
     await handleJsonOutput(options, entries, finalSkipped, combinedFiles.length);
   } else {
     await handleTextOrMdOutput(options, entries, finalSkipped, combinedFiles.length, cwd);
+  }
+}
+
+/**
+ * Handle --name-only mode (just list files).
+ */
+async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<void> {
+  // Get file list from git
+  const allFiles = await getNameStatusList({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    cwd,
+  });
+
+  // Get untracked files if requested
+  let untrackedFiles: FileEntry[] = [];
+  if (options.includeUntracked && options.mode !== "branch") {
+    const untrackedPaths = await getUntrackedFiles(cwd);
+    untrackedFiles = untrackedPaths.map((path) => ({
+      path,
+      status: "A" as const,
+      untracked: true,
+    }));
+  }
+
+  const combinedFiles = [...allFiles, ...untrackedFiles];
+
+  // Filter files
+  const { included, skipped } = filterPaths({
+    files: combinedFiles,
+    includeGlobs: options.include,
+    excludeGlobs: options.exclude,
+    defaultExcludes: DEFAULT_EXCLUDES,
+  });
+
+  // Detect binary files and add to skipped
+  for (const file of included) {
+    let isBinary: boolean;
+
+    if (file.untracked) {
+      isBinary = await isUntrackedBinaryFile(file.path, cwd);
+    } else {
+      isBinary = await isBinaryFile({
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        path: file.path,
+        cwd,
+      });
+    }
+
+    if (isBinary) {
+      skipped.push({
+        path: file.path,
+        status: file.status,
+        reason: "binary",
+      });
+    }
+  }
+
+  // Sort for deterministic output
+  const sortedIncluded = included.sort((a, b) => a.path.localeCompare(b.path));
+  const sortedSkipped = skipped.sort((a, b) => a.path.localeCompare(b.path));
+
+  // Output based on format
+  if (options.format === "json") {
+    const output = {
+      schemaVersion: "1.0" as const,
+      command: {
+        name: "dump-diff" as const,
+        args: buildCommandArgs(options),
+      },
+      git: {
+        mode: options.mode,
+        base: options.mode === "branch" ? options.base : undefined,
+        head: options.mode === "branch" ? options.head : undefined,
+        isDirty: options.mode !== "branch" ? true : undefined,
+      },
+      options: {
+        unified: options.unified,
+        include: options.include,
+        exclude: options.exclude,
+        nameOnly: true,
+        stat: false,
+        patchFor: undefined,
+      },
+      files: sortedIncluded.map((f) => ({
+        path: f.path,
+        oldPath: f.oldPath,
+        status: f.status,
+      })),
+      skippedFiles: sortedSkipped.map((s) => ({
+        path: s.path,
+        status: s.status,
+        reason: s.reason,
+        note: s.note,
+      })),
+      summary: {
+        changedFileCount: combinedFiles.length,
+        includedFileCount: sortedIncluded.length,
+        skippedFileCount: sortedSkipped.length,
+      },
+    };
+
+    const json = JSON.stringify(output, null, 2);
+    if (options.out) {
+      await writeOutput(options.out, json);
+      info(`Wrote JSON output to ${options.out}`);
+    } else {
+      console.log(json);
+    }
+  } else if (options.format === "md") {
+    const lines: string[] = [];
+    lines.push("# Changed Files\n");
+    for (const file of sortedIncluded) {
+      lines.push(`- \`${file.path}\``);
+    }
+    const output = lines.join("\n");
+    if (options.out) {
+      await writeOutput(options.out, output);
+      info(`Wrote markdown output to ${options.out}`);
+    } else {
+      console.log(output);
+    }
+  } else {
+    // text format
+    const lines = sortedIncluded.map((f) => f.path);
+    const output = lines.join("\n");
+    if (options.out) {
+      await writeOutput(options.out, output);
+      info(`Wrote text output to ${options.out}`);
+    } else {
+      console.log(output);
+    }
+  }
+}
+
+/**
+ * Handle --stat mode (file statistics).
+ */
+async function handleStat(options: DumpDiffOptions, cwd: string): Promise<void> {
+  // Get file list from git
+  const allFiles = await getNameStatusList({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    cwd,
+  });
+
+  // Get untracked files if requested
+  let untrackedFiles: FileEntry[] = [];
+  if (options.includeUntracked && options.mode !== "branch") {
+    const untrackedPaths = await getUntrackedFiles(cwd);
+    untrackedFiles = untrackedPaths.map((path) => ({
+      path,
+      status: "A" as const,
+      untracked: true,
+    }));
+  }
+
+  const combinedFiles = [...allFiles, ...untrackedFiles];
+
+  // Get stats from git
+  const statsMap = await getNumStats({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    cwd,
+  });
+
+  // Filter files
+  const { included, skipped } = filterPaths({
+    files: combinedFiles,
+    includeGlobs: options.include,
+    excludeGlobs: options.exclude,
+    defaultExcludes: DEFAULT_EXCLUDES,
+  });
+
+  // Add binary files to skipped
+  for (const file of included) {
+    const stats = statsMap.get(file.path);
+    if (stats?.binary) {
+      skipped.push({
+        path: file.path,
+        status: file.status,
+        reason: "binary",
+      });
+    }
+  }
+
+  // Build file list with stats (excluding binaries)
+  const filesWithStats = included
+    .filter((f) => {
+      const stats = statsMap.get(f.path);
+      return !stats?.binary;
+    })
+    .map((f) => {
+      const stats = statsMap.get(f.path);
+      return {
+        path: f.path,
+        oldPath: f.oldPath,
+        status: f.status,
+        stats: stats
+          ? { added: stats.added, removed: stats.removed }
+          : { added: 0, removed: 0 },
+      };
+    });
+
+  // Sort for deterministic output
+  const sortedFiles = filesWithStats.sort((a, b) => a.path.localeCompare(b.path));
+  const sortedSkipped = skipped.sort((a, b) => a.path.localeCompare(b.path));
+
+  // Output based on format
+  if (options.format === "json") {
+    const output = {
+      schemaVersion: "1.0" as const,
+      command: {
+        name: "dump-diff" as const,
+        args: buildCommandArgs(options),
+      },
+      git: {
+        mode: options.mode,
+        base: options.mode === "branch" ? options.base : undefined,
+        head: options.mode === "branch" ? options.head : undefined,
+        isDirty: options.mode !== "branch" ? true : undefined,
+      },
+      options: {
+        unified: options.unified,
+        include: options.include,
+        exclude: options.exclude,
+        nameOnly: false,
+        stat: true,
+        patchFor: undefined,
+      },
+      files: sortedFiles,
+      skippedFiles: sortedSkipped.map((s) => ({
+        path: s.path,
+        status: s.status,
+        reason: s.reason,
+        note: s.note,
+      })),
+      summary: {
+        changedFileCount: combinedFiles.length,
+        includedFileCount: sortedFiles.length,
+        skippedFileCount: sortedSkipped.length,
+      },
+    };
+
+    const json = JSON.stringify(output, null, 2);
+    if (options.out) {
+      await writeOutput(options.out, json);
+      info(`Wrote JSON output to ${options.out}`);
+    } else {
+      console.log(json);
+    }
+  } else if (options.format === "md") {
+    const lines: string[] = [];
+    lines.push("# File Statistics\n");
+    lines.push("| File | Added | Removed |");
+    lines.push("| ---- | -----:| -------:|");
+    for (const file of sortedFiles) {
+      lines.push(
+        `| \`${file.path}\` | ${file.stats.added} | ${file.stats.removed} |`
+      );
+    }
+    const output = lines.join("\n");
+    if (options.out) {
+      await writeOutput(options.out, output);
+      info(`Wrote markdown output to ${options.out}`);
+    } else {
+      console.log(output);
+    }
+  } else {
+    // text format (numstat-like: added<TAB>removed<TAB>path)
+    const lines = sortedFiles.map(
+      (f) => `${f.stats.added}\t${f.stats.removed}\t${f.path}`
+    );
+    const output = lines.join("\n");
+    if (options.out) {
+      await writeOutput(options.out, output);
+      info(`Wrote text output to ${options.out}`);
+    } else {
+      console.log(output);
+    }
+  }
+}
+
+/**
+ * Handle --patch-for mode (single file diff).
+ */
+async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<void> {
+  if (!options.patchFor) {
+    throw new BranchNarratorError("--patch-for requires a file path", 1);
+  }
+
+  const requestedPath = options.patchFor;
+
+  // Get file list from git
+  const allFiles = await getNameStatusList({
+    mode: options.mode,
+    base: options.base,
+    head: options.head,
+    cwd,
+  });
+
+  // Get untracked files if requested
+  let untrackedFiles: FileEntry[] = [];
+  if (options.includeUntracked && options.mode !== "branch") {
+    const untrackedPaths = await getUntrackedFiles(cwd);
+    untrackedFiles = untrackedPaths.map((path) => ({
+      path,
+      status: "A" as const,
+      untracked: true,
+    }));
+  }
+
+  const combinedFiles = [...allFiles, ...untrackedFiles];
+
+  // Find the file (support both old and new paths for renames)
+  let targetFile = combinedFiles.find(
+    (f) => f.path === requestedPath || f.oldPath === requestedPath
+  );
+
+  if (!targetFile) {
+    throw new BranchNarratorError(
+      `File not found in changes: ${requestedPath}. ` +
+        `Run 'branch-narrator dump-diff --name-only' to see changed files.`,
+      1
+    );
+  }
+
+  // Check if file is excluded
+  const { included, skipped } = filterPaths({
+    files: [targetFile],
+    includeGlobs: options.include,
+    excludeGlobs: options.exclude,
+    defaultExcludes: DEFAULT_EXCLUDES,
+  });
+
+  if (included.length === 0) {
+    const skipReason = skipped[0]?.reason || "excluded";
+    throw new BranchNarratorError(
+      `File is excluded: ${requestedPath} (reason: ${skipReason}). ` +
+        `Use --include "${requestedPath}" to include it.`,
+      1
+    );
+  }
+
+  // Check if binary
+  let isBinary: boolean;
+  if (targetFile.untracked) {
+    isBinary = await isUntrackedBinaryFile(targetFile.path, cwd);
+  } else {
+    isBinary = await isBinaryFile({
+      mode: options.mode,
+      base: options.base,
+      head: options.head,
+      path: targetFile.path,
+      cwd,
+    });
+  }
+
+  if (isBinary) {
+    const allSkipped: SkippedEntry[] = [
+      {
+        path: targetFile.path,
+        status: targetFile.status,
+        reason: "binary",
+      },
+    ];
+
+    // Still report in JSON format
+    if (options.format === "json") {
+      const output = {
+        schemaVersion: "1.0" as const,
+        command: {
+          name: "dump-diff" as const,
+          args: buildCommandArgs(options),
+        },
+        git: {
+          mode: options.mode,
+          base: options.mode === "branch" ? options.base : undefined,
+          head: options.mode === "branch" ? options.head : undefined,
+          isDirty: options.mode !== "branch" ? true : undefined,
+        },
+        options: {
+          unified: options.unified,
+          include: options.include,
+          exclude: options.exclude,
+          nameOnly: false,
+          stat: false,
+          patchFor: requestedPath,
+        },
+        files: [],
+        skippedFiles: allSkipped.map((s) => ({
+          path: s.path,
+          status: s.status,
+          reason: s.reason,
+        })),
+        summary: {
+          changedFileCount: 1,
+          includedFileCount: 0,
+          skippedFileCount: 1,
+        },
+      };
+
+      const json = JSON.stringify(output, null, 2);
+      if (options.out) {
+        await writeOutput(options.out, json);
+        info(`Wrote JSON output to ${options.out}`);
+      } else {
+        console.log(json);
+      }
+    } else {
+      throw new BranchNarratorError(
+        `File is binary: ${requestedPath}`,
+        1
+      );
+    }
+    return;
+  }
+
+  // Get diff for the file
+  let diff: string;
+  if (targetFile.untracked) {
+    diff = await getUntrackedFileDiff(targetFile.path, options.unified, cwd);
+  } else {
+    diff = await getFileDiff({
+      mode: options.mode,
+      base: options.base,
+      head: options.head,
+      path: targetFile.path,
+      oldPath: targetFile.oldPath,
+      unified: options.unified,
+      cwd,
+    });
+  }
+
+  // Get stats if in JSON format
+  let stats: { added: number; removed: number } | undefined;
+  if (options.format === "json") {
+    const statsMap = await getNumStats({
+      mode: options.mode,
+      base: options.base,
+      head: options.head,
+      cwd,
+    });
+    const fileStats = statsMap.get(targetFile.path);
+    if (fileStats && !fileStats.binary) {
+      stats = { added: fileStats.added, removed: fileStats.removed };
+    }
+  }
+
+  // Output based on format
+  if (options.format === "json") {
+    const hunks = parseDiffIntoHunks(diff);
+
+    const output = {
+      schemaVersion: "1.0" as const,
+      command: {
+        name: "dump-diff" as const,
+        args: buildCommandArgs(options),
+      },
+      git: {
+        mode: options.mode,
+        base: options.mode === "branch" ? options.base : undefined,
+        head: options.mode === "branch" ? options.head : undefined,
+        isDirty: options.mode !== "branch" ? true : undefined,
+      },
+      options: {
+        unified: options.unified,
+        include: options.include,
+        exclude: options.exclude,
+        nameOnly: false,
+        stat: false,
+        patchFor: requestedPath,
+      },
+      files: [
+        {
+          path: targetFile.path,
+          oldPath: targetFile.oldPath,
+          status: targetFile.status,
+          binary: false,
+          stats,
+          hunks,
+        },
+      ],
+      skippedFiles: [],
+      summary: {
+        changedFileCount: 1,
+        includedFileCount: 1,
+        skippedFileCount: 0,
+      },
+    };
+
+    const json = JSON.stringify(output, null, 2);
+    if (options.out) {
+      await writeOutput(options.out, json);
+      info(`Wrote JSON output to ${options.out}`);
+    } else {
+      console.log(json);
+    }
+  } else if (options.format === "md") {
+    const lines: string[] = [];
+    lines.push(`# Diff for \`${targetFile.path}\`\n`);
+    lines.push("```diff");
+    lines.push(diff);
+    lines.push("```");
+    const output = lines.join("\n");
+    if (options.out) {
+      await writeOutput(options.out, output);
+      info(`Wrote markdown output to ${options.out}`);
+    } else {
+      console.log(output);
+    }
+  } else {
+    // text format
+    if (options.out) {
+      await writeOutput(options.out, diff);
+      info(`Wrote text output to ${options.out}`);
+    } else {
+      console.log(diff);
+    }
   }
 }
 

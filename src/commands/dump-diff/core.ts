@@ -8,7 +8,7 @@ import picomatch from "picomatch";
 // Types
 // ============================================================================
 
-export type DiffStatus = "A" | "M" | "D" | "R";
+export type DiffStatus = "A" | "M" | "D" | "R" | "C" | "T" | "U" | "?" | "unknown";
 
 export type DiffMode = "branch" | "unstaged" | "staged" | "all";
 
@@ -25,14 +25,21 @@ export interface DiffFileEntry extends FileEntry {
 
 export type SkipReason =
   | "excluded-by-default"
+  | "excluded-by-user"
   | "excluded-by-glob"
   | "binary"
+  | "too-large"
+  | "unsupported"
+  | "not-found"
   | "not-included"
-  | "diff-empty";
+  | "diff-empty"
+  | "patch-for-mismatch";
 
 export interface SkippedEntry {
   path: string;
+  status?: DiffStatus;
   reason: SkipReason;
+  note?: string;
 }
 
 export interface DumpDiffOutput {
@@ -48,6 +55,66 @@ export interface DumpDiffOutput {
     filesIncluded: number;
     filesSkipped: number;
     chars: number;
+  };
+}
+
+// ============================================================================
+// New Schema v1.0 Types (for agent-grade output)
+// ============================================================================
+
+export interface DiffLine {
+  kind: "add" | "del" | "context";
+  text: string;
+}
+
+export interface DiffHunk {
+  header: string; // "@@ -1,0 +1,10 @@"
+  oldStart?: number;
+  oldLines?: number;
+  newStart?: number;
+  newLines?: number;
+  lines: DiffLine[];
+}
+
+export interface DiffFile {
+  path: string;
+  oldPath?: string;
+  status: DiffStatus;
+  binary?: boolean;
+  stats?: { added: number; removed: number };
+  hunks?: DiffHunk[];
+}
+
+export interface SkippedFile {
+  path: string;
+  status?: DiffStatus;
+  reason: SkipReason;
+  note?: string;
+}
+
+export interface DumpDiffJson {
+  schemaVersion: "1.0";
+  command: { name: "dump-diff"; args: string[] };
+  git: {
+    mode: DiffMode;
+    base?: string;
+    head?: string;
+    isDirty?: boolean;
+  };
+  options: {
+    unified: number;
+    include: string[];
+    exclude: string[];
+    nameOnly: boolean;
+    stat: boolean;
+    patchFor?: string;
+  };
+  files: DiffFile[];
+  skippedFiles: SkippedFile[];
+  summary: {
+    changedFileCount: number;
+    includedFileCount: number;
+    skippedFileCount: number;
   };
 }
 
@@ -410,6 +477,18 @@ function getStatusLabel(status: DiffStatus): string {
       return "deleted";
     case "R":
       return "renamed";
+    case "C":
+      return "copied";
+    case "T":
+      return "type-changed";
+    case "U":
+      return "unmerged";
+    case "?":
+      return "untracked";
+    case "unknown":
+      return "unknown";
+    default:
+      return "unknown";
   }
 }
 
@@ -422,5 +501,87 @@ function getStatusLabel(status: DiffStatus): string {
  */
 export function calculateTotalChars(entries: DiffFileEntry[]): number {
   return entries.reduce((sum, e) => sum + e.diff.length, 0);
+}
+
+// ============================================================================
+// Diff Parsing (for structured JSON output)
+// ============================================================================
+
+/**
+ * Parse a hunk header line like "@@ -1,4 +2,6 @@" into structured data.
+ */
+export function parseHunkHeader(header: string): {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+} | null {
+  // Match: @@ -oldStart[,oldLines] +newStart[,newLines] @@
+  const match = header.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    oldStart: parseInt(match[1]!, 10),
+    oldLines: match[2] ? parseInt(match[2], 10) : 1,
+    newStart: parseInt(match[3]!, 10),
+    newLines: match[4] ? parseInt(match[4], 10) : 1,
+  };
+}
+
+/**
+ * Parse a unified diff string into structured hunks.
+ * This handles the diff content for a single file.
+ */
+export function parseDiffIntoHunks(diff: string): DiffHunk[] {
+  if (!diff.trim()) {
+    return [];
+  }
+
+  const lines = diff.split("\n");
+  const hunks: DiffHunk[] = [];
+  let currentHunk: DiffHunk | null = null;
+
+  for (const line of lines) {
+    // Check if this is a hunk header
+    if (line.startsWith("@@")) {
+      // Save previous hunk if exists
+      if (currentHunk) {
+        hunks.push(currentHunk);
+      }
+
+      // Parse header
+      const parsed = parseHunkHeader(line);
+      currentHunk = {
+        header: line,
+        oldStart: parsed?.oldStart,
+        oldLines: parsed?.oldLines,
+        newStart: parsed?.newStart,
+        newLines: parsed?.newLines,
+        lines: [],
+      };
+    } else if (currentHunk) {
+      // Add line to current hunk
+      let kind: "add" | "del" | "context";
+      if (line.startsWith("+")) {
+        kind = "add";
+      } else if (line.startsWith("-")) {
+        kind = "del";
+      } else {
+        kind = "context";
+      }
+
+      currentHunk.lines.push({ kind, text: line });
+    }
+    // Ignore lines before first hunk (file headers, etc.)
+  }
+
+  // Don't forget the last hunk
+  if (currentHunk) {
+    hunks.push(currentHunk);
+  }
+
+  return hunks;
 }
 

@@ -463,6 +463,9 @@ program
   )
   .option("--name <prefix>", "Chunk file name prefix", "diff")
   .option("--dry-run", "Preview what would be included/excluded", false)
+  .option("--name-only", "Output only file list (no diffs)", false)
+  .option("--stat", "Output file statistics (additions/deletions)", false)
+  .option("--patch-for <path>", "Output diff for a specific file only")
   .action(async (options) => {
     try {
       // Validate mode
@@ -492,6 +495,20 @@ program
         process.exit(1);
       }
 
+      // Validate mutual exclusivity of --name-only, --stat, and --patch-for
+      const nameOnly = options.nameOnly === true;
+      const stat = options.stat === true;
+      const patchFor = options.patchFor !== undefined;
+
+      const exclusiveCount = [nameOnly, stat, patchFor].filter(Boolean).length;
+      if (exclusiveCount > 1) {
+        logError(
+          "Options --name-only, --stat, and --patch-for are mutually exclusive. " +
+          "Use only one at a time."
+        );
+        process.exit(1);
+      }
+
       await executeDumpDiff({
         mode,
         base: options.base,
@@ -506,6 +523,9 @@ program
         name: options.name,
         dryRun: options.dryRun,
         includeUntracked: options.untracked !== false, // default true, --no-untracked sets to false
+        nameOnly,
+        stat,
+        patchFor: options.patchFor,
       });
 
       process.exit(0);
