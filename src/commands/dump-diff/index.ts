@@ -5,6 +5,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { BranchNarratorError } from "../../core/errors.js";
+import { warn, info } from "../../core/logger.js";
 import {
   calculateTotalChars,
   chunkByBudget,
@@ -73,7 +74,7 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
     const baseProvided = options.base !== "main";
     const headProvided = options.head !== "HEAD";
     if (baseProvided || headProvided) {
-      console.error(
+      warn(
         `Warning: --base and --head are ignored when --mode is "${options.mode}"`
       );
     }
@@ -101,6 +102,34 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
   const combinedFiles = [...allFiles, ...untrackedFiles];
 
   if (combinedFiles.length === 0) {
+    // In JSON mode, output valid JSON instead of plain text
+    if (options.format === "json") {
+      const output: DumpDiffOutput = {
+        schemaVersion: "1.1",
+        mode: options.mode,
+        base: options.mode === "branch" ? options.base : null,
+        head: options.mode === "branch" ? options.head : null,
+        unified: options.unified,
+        included: [],
+        skipped: [],
+        stats: {
+          filesConsidered: 0,
+          filesIncluded: 0,
+          filesSkipped: 0,
+          chars: 0,
+        },
+      };
+      const json = renderJson(output);
+      if (options.out) {
+        await writeOutput(options.out, json);
+        info(`Wrote JSON output to ${options.out}`);
+      } else {
+        console.log(json);
+      }
+      return;
+    }
+    
+    // For non-JSON formats, output plain text
     console.log("No changes found.");
     return;
   }
@@ -338,7 +367,7 @@ async function handleJsonOutput(
 
   if (options.out) {
     await writeOutput(options.out, json);
-    console.error(`Wrote JSON output to ${options.out}`);
+    info(`Wrote JSON output to ${options.out}`);
   } else {
     console.log(json);
   }
@@ -397,10 +426,10 @@ async function handleTextOrMdOutput(
       }
 
       await writeFile(filepath, content, "utf-8");
-      console.error(`Wrote chunk ${i + 1}/${chunks.length} to ${filepath}`);
+      info(`Wrote chunk ${i + 1}/${chunks.length} to ${filepath}`);
     }
 
-    console.error(
+    info(
       `\nTotal: ${chunks.length} chunks, ${entries.length} files, ${totalChars.toLocaleString()} chars`
     );
   } else {
@@ -414,7 +443,7 @@ async function handleTextOrMdOutput(
 
     if (options.out) {
       await writeOutput(options.out, content);
-      console.error(`Wrote ${options.format} output to ${options.out}`);
+      info(`Wrote ${options.format} output to ${options.out}`);
     } else {
       console.log(content);
     }

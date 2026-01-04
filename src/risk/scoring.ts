@@ -9,20 +9,22 @@ import type {
   RiskReportLevel,
   ScoreBreakdown,
 } from "../core/types.js";
+import { sortRiskFlags } from "../core/sorting.js";
 
 /**
  * Compute category scores from flags.
  */
 function computeCategoryScores(flags: RiskFlag[]): Record<RiskCategory, number> {
+  // Create categories in alphabetical order for determinism
   const scores: Record<RiskCategory, number> = {
-    security: 0,
-    ci: 0,
-    deps: 0,
-    db: 0,
-    infra: 0,
     api: 0,
-    tests: 0,
     churn: 0,
+    ci: 0,
+    db: 0,
+    deps: 0,
+    infra: 0,
+    security: 0,
+    tests: 0,
   };
 
   for (const flag of flags) {
@@ -124,24 +126,6 @@ export function filterFlagsByCategory(
 }
 
 /**
- * Sort flags deterministically.
- */
-export function sortFlags(flags: RiskFlag[]): RiskFlag[] {
-  return [...flags].sort((a, b) => {
-    // First by category
-    if (a.category !== b.category) {
-      return a.category.localeCompare(b.category);
-    }
-    // Then by effectiveScore descending
-    if (a.effectiveScore !== b.effectiveScore) {
-      return b.effectiveScore - a.effectiveScore;
-    }
-    // Finally by id
-    return a.id.localeCompare(b.id);
-  });
-}
-
-/**
  * Compute risk report from flags.
  */
 export function computeRiskReport(
@@ -163,7 +147,7 @@ export function computeRiskReport(
     riskScore,
     riskLevel,
     categoryScores,
-    flags: sortFlags(flags),
+    flags: sortRiskFlags(flags),
     skippedFiles,
   };
 

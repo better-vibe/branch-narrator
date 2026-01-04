@@ -7,6 +7,7 @@ import { ALL_DETECTORS } from "./detectors/index.js";
 import { shouldSkipFile } from "./exclusions.js";
 import { redactLines } from "./redaction.js";
 import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
+import { sortRiskFlagEvidence } from "../core/sorting.js";
 
 /**
  * Options for generating risk report.
@@ -58,16 +59,22 @@ export function generateRiskReport(
   // Filter by category if requested
   allFlags = filterFlagsByCategory(allFlags, only, exclude);
 
-  // Apply redaction and evidence line limits
+  // Apply redaction and evidence line limits, and sort evidence
   if (redact || maxEvidenceLines !== 5) {
     allFlags = allFlags.map(flag => ({
       ...flag,
-      evidence: flag.evidence.map(ev => ({
+      evidence: sortRiskFlagEvidence(flag.evidence.map(ev => ({
         ...ev,
         lines: redact 
           ? redactLines(ev.lines.slice(0, maxEvidenceLines))
           : ev.lines.slice(0, maxEvidenceLines),
-      })),
+      }))),
+    }));
+  } else {
+    // Sort evidence even when not redacting or limiting lines
+    allFlags = allFlags.map(flag => ({
+      ...flag,
+      evidence: sortRiskFlagEvidence(flag.evidence),
     }));
   }
 
