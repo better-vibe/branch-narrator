@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.11.0
+
+### Minor Changes
+
+- 11ff7fe: Migrate test suite from Vitest to bun test for improved performance and compatibility
+
 ## 0.10.0
 
 ### Minor Changes
