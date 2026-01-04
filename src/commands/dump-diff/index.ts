@@ -1087,17 +1087,22 @@ export {
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
+  parseHunkHeader,
+  parseDiffIntoHunks,
   parseLsFilesOutput,
   renderJson,
   renderMarkdown,
   renderText,
 } from "./core.js";
-export { parseNameStatus } from "./git.js";
+export { parseNameStatus, parseNumStats } from "./git.js";
 export type {
   DiffFileEntry,
+  DiffHunk,
+  DiffLine,
   DiffMode,
   DumpDiffOutput,
   FileEntry,
   FilterResult,
   SkippedEntry,
 } from "./core.js";
+export type { FileStats } from "./git.js";
