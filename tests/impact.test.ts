@@ -1,22 +1,23 @@
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, mock, type Mock } from "bun:test";
 import { impactAnalyzer } from "../src/analyzers/impact.js";
 import type { ChangeSet } from "../src/core/types.js";
 import { execa } from "execa";
 import fs from "node:fs/promises";
 
 // Mock execa and fs
-vi.mock("execa", () => {
+mock.module("execa", () => {
   return {
-    execa: vi.fn(),
+    execa: mock(),
   };
 });
 
-vi.mock("node:fs/promises", () => {
+mock.module("node:fs/promises", () => {
   return {
     default: {
-      readFile: vi.fn(),
+      readFile: mock(),
     },
+    readFile: mock(),
   };
 });
 
@@ -29,7 +30,7 @@ describe("impactAnalyzer", () => {
   };
 
   beforeEach(() => {
-    vi.resetAllMocks();
+    mock.restore();
   });
 
   const mockGitGrep = (results: string[]) => {
@@ -42,11 +43,11 @@ describe("impactAnalyzer", () => {
           return `${file}\0${content}`;
       }).join("\n");
 
-      vi.mocked(execa).mockResolvedValue({ stdout } as any);
+      (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout } as any);
   };
 
   const mockFileContent = (pathMap: Record<string, string>) => {
-    vi.mocked(fs.readFile).mockImplementation(async (filepath) => {
+    (fs.readFile as unknown as Mock<typeof fs.readFile>).mockImplementation(async (filepath) => {
       // The analyzer calls path.join(cwd, filepath), so we just check if the filepath ends with our key
       // or check basename match.
       const key = Object.keys(pathMap).find(k => filepath.toString().endsWith(k));

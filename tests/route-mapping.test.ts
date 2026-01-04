@@ -2,7 +2,7 @@
  * Route detector tests.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   detectMethods,
   getRouteType,

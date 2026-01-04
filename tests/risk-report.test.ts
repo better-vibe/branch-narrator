@@ -2,7 +2,7 @@
  * Risk report tests.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { generateRiskReport } from "../src/risk/index.js";
 import { createChangeSet } from "./fixtures/index.js";
 

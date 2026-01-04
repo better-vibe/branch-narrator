@@ -3,7 +3,7 @@
  * These tests verify that facts and risk-report commands work with different modes.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 // ============================================================================
 // Mode Validation Tests

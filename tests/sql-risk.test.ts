@@ -2,7 +2,7 @@
  * Supabase SQL risk scanning tests.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   determineMigrationRisk,
   isMigrationFile,

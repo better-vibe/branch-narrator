@@ -2,7 +2,7 @@
  * Detector tests for risk-report.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { createChangeSet } from "./fixtures/index.js";
 import {
   detectWorkflowPermissionsBroadened,

@@ -2,7 +2,7 @@
  * Tests for evidence extraction and redaction.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import {
   createEvidence,
   redactSecrets,
