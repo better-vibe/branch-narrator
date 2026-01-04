@@ -12,12 +12,13 @@ mock.module("execa", () => {
   };
 });
 
+const readFileMock = mock();
 mock.module("node:fs/promises", () => {
   return {
     default: {
-      readFile: mock(),
+      readFile: readFileMock,
     },
-    readFile: mock(),
+    readFile: readFileMock,
   };
 });
 
@@ -30,7 +31,8 @@ describe("impactAnalyzer", () => {
   };
 
   beforeEach(() => {
-    mock.restore();
+    (execa as unknown as Mock<typeof execa>).mockClear();
+    readFileMock.mockClear();
   });
 
   const mockGitGrep = (results: string[]) => {

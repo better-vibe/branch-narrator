@@ -20,7 +20,7 @@ describe("testParityAnalyzer", () => {
   };
 
   beforeEach(() => {
-    mock.restore();
+    (execa as unknown as Mock<typeof execa>).mockReset();
     _resetCacheForTesting();
     // Default mock
     (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout: "" } as any);
