@@ -42,25 +42,8 @@ export interface SkippedEntry {
   note?: string;
 }
 
-export interface DumpDiffOutput {
-  schemaVersion: "1.1";
-  generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
-  mode: DiffMode;
-  base: string | null;
-  head: string | null;
-  unified: number;
-  included: DiffFileEntry[];
-  skipped: SkippedEntry[];
-  stats: {
-    filesConsidered: number;
-    filesIncluded: number;
-    filesSkipped: number;
-    chars: number;
-  };
-}
-
 // ============================================================================
-// New Schema v1.0 Types (for agent-grade output)
+// JSON Schema v2.0 Types (unified agent-grade output)
 // ============================================================================
 
 export interface DiffLine {
@@ -77,13 +60,19 @@ export interface DiffHunk {
   lines: DiffLine[];
 }
 
+export interface DiffFilePatch {
+  text: string;
+  hunks?: DiffHunk[];
+}
+
 export interface DiffFile {
   path: string;
   oldPath?: string;
   status: DiffStatus;
+  untracked?: boolean;
   binary?: boolean;
   stats?: { added: number; removed: number };
-  hunks?: DiffHunk[];
+  patch?: DiffFilePatch;
 }
 
 export interface SkippedFile {
@@ -93,22 +82,24 @@ export interface SkippedFile {
   note?: string;
 }
 
-export interface DumpDiffJson {
-  schemaVersion: "1.0";
+export interface DumpDiffJsonV2 {
+  schemaVersion: "2.0";
+  generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
   command: { name: "dump-diff"; args: string[] };
   git: {
     mode: DiffMode;
-    base?: string;
-    head?: string;
-    isDirty?: boolean;
+    base: string | null;
+    head: string | null;
+    isDirty: boolean;
   };
   options: {
     unified: number;
     include: string[];
     exclude: string[];
+    includeUntracked: boolean;
     nameOnly: boolean;
     stat: boolean;
-    patchFor?: string;
+    patchFor: string | null;
   };
   files: DiffFile[];
   skippedFiles: SkippedFile[];
@@ -459,13 +450,6 @@ export function renderMarkdown(
 }
 
 /**
- * Render full output as JSON.
- */
-export function renderJson(output: DumpDiffOutput, pretty: boolean = false): string {
-  return pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
-}
-
-/**
  * Get human-readable label for status.
  */
 function getStatusLabel(status: DiffStatus): string {
@@ -589,5 +573,120 @@ export function parseDiffIntoHunks(diff: string): DiffHunk[] {
   }
 
   return hunks;
+}
+
+// ============================================================================
+// JSON Builder (v2.0 unified schema)
+// ============================================================================
+
+export interface BuildDumpDiffJsonV2Options {
+  mode: DiffMode;
+  base: string;
+  head: string;
+  unified: number;
+  include: string[];
+  exclude: string[];
+  includeUntracked: boolean;
+  nameOnly: boolean;
+  stat: boolean;
+  patchFor: string | null;
+  noTimestamp: boolean;
+}
+
+/**
+ * Build the command args array for JSON output metadata.
+ */
+function buildCommandArgs(options: BuildDumpDiffJsonV2Options): string[] {
+  const args: string[] = [];
+
+  args.push("--mode", options.mode);
+
+  if (options.mode === "branch") {
+    args.push("--base", options.base);
+    args.push("--head", options.head);
+  }
+
+  args.push("--format", "json");
+
+  if (options.unified !== 0) {
+    args.push("--unified", String(options.unified));
+  }
+
+  for (const glob of options.include) {
+    args.push("--include", glob);
+  }
+
+  for (const glob of options.exclude) {
+    args.push("--exclude", glob);
+  }
+
+  if (options.nameOnly) {
+    args.push("--name-only");
+  }
+
+  if (options.stat) {
+    args.push("--stat");
+  }
+
+  if (options.patchFor) {
+    args.push("--patch-for", options.patchFor);
+  }
+
+  return args;
+}
+
+/**
+ * Build unified v2.0 JSON output for dump-diff command.
+ */
+export function buildDumpDiffJsonV2(
+  options: BuildDumpDiffJsonV2Options,
+  files: DiffFile[],
+  skippedFiles: SkippedFile[],
+  changedFileCount: number
+): DumpDiffJsonV2 {
+  const output: DumpDiffJsonV2 = {
+    schemaVersion: "2.0",
+    generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
+    command: {
+      name: "dump-diff",
+      args: buildCommandArgs(options),
+    },
+    git: {
+      mode: options.mode,
+      base: options.mode === "branch" ? options.base : null,
+      head: options.mode === "branch" ? options.head : null,
+      isDirty: options.mode !== "branch",
+    },
+    options: {
+      unified: options.unified,
+      include: options.include,
+      exclude: options.exclude,
+      includeUntracked: options.includeUntracked,
+      nameOnly: options.nameOnly,
+      stat: options.stat,
+      patchFor: options.patchFor,
+    },
+    files,
+    skippedFiles,
+    summary: {
+      changedFileCount,
+      includedFileCount: files.length,
+      skippedFileCount: skippedFiles.length,
+    },
+  };
+
+  // Remove undefined generatedAt for cleaner output
+  if (output.generatedAt === undefined) {
+    delete output.generatedAt;
+  }
+
+  return output;
+}
+
+/**
+ * Render DumpDiffJsonV2 as JSON string.
+ */
+export function renderDumpDiffJson(output: DumpDiffJsonV2, pretty: boolean = false): string {
+  return pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
 }
 

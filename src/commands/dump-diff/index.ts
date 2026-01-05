@@ -7,19 +7,21 @@ import { dirname, join } from "node:path";
 import { BranchNarratorError } from "../../core/errors.js";
 import { warn, info } from "../../core/logger.js";
 import {
+  buildDumpDiffJsonV2,
   calculateTotalChars,
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
   parseDiffIntoHunks,
-  renderJson,
+  renderDumpDiffJson,
   renderMarkdown,
   renderText,
+  type DiffFile,
   type DiffFileEntry,
   type DiffMode,
-  type DumpDiffOutput,
   type FileEntry,
   type SkippedEntry,
+  type SkippedFile,
 } from "./core.js";
 import {
   getFileDiff,
@@ -112,50 +114,6 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
 // ============================================================================
 
 /**
- * Build command args array for JSON output metadata.
- */
-function buildCommandArgs(options: DumpDiffOptions): string[] {
-  const args: string[] = [];
-
-  args.push("--mode", options.mode);
-
-  if (options.mode === "branch") {
-    args.push("--base", options.base);
-    args.push("--head", options.head);
-  }
-
-  if (options.format !== "text") {
-    args.push("--format", options.format);
-  }
-
-  if (options.unified !== 0) {
-    args.push("--unified", String(options.unified));
-  }
-
-  for (const glob of options.include) {
-    args.push("--include", glob);
-  }
-
-  for (const glob of options.exclude) {
-    args.push("--exclude", glob);
-  }
-
-  if (options.nameOnly) {
-    args.push("--name-only");
-  }
-
-  if (options.stat) {
-    args.push("--stat");
-  }
-
-  if (options.patchFor) {
-    args.push("--patch-for", options.patchFor);
-  }
-
-  return args;
-}
-
-/**
  * Handle full diff mode (default behavior).
  */
 async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<void> {
@@ -183,23 +141,25 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
   if (combinedFiles.length === 0) {
     // In JSON mode, output valid JSON instead of plain text
     if (options.format === "json") {
-      const output: DumpDiffOutput = {
-        schemaVersion: "1.1",
-        generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
-        mode: options.mode,
-        base: options.mode === "branch" ? options.base : null,
-        head: options.mode === "branch" ? options.head : null,
-        unified: options.unified,
-        included: [],
-        skipped: [],
-        stats: {
-          filesConsidered: 0,
-          filesIncluded: 0,
-          filesSkipped: 0,
-          chars: 0,
+      const output = buildDumpDiffJsonV2(
+        {
+          mode: options.mode,
+          base: options.base,
+          head: options.head,
+          unified: options.unified,
+          include: options.include,
+          exclude: options.exclude,
+          includeUntracked: options.includeUntracked,
+          nameOnly: false,
+          stat: false,
+          patchFor: null,
+          noTimestamp: options.noTimestamp ?? false,
         },
-      };
-      const json = renderJson(output, options.pretty);
+        [],
+        [],
+        0
+      );
+      const json = renderDumpDiffJson(output, options.pretty);
       if (options.out) {
         await writeOutput(options.out, json);
         info(`Wrote JSON output to ${options.out}`);
@@ -275,7 +235,62 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
 
   // Handle output based on format
   if (options.format === "json") {
-    await handleJsonOutput(options, entries, finalSkipped, combinedFiles.length);
+    const totalChars = calculateTotalChars(entries);
+
+    // Check if chunking would be needed
+    if (options.maxChars !== undefined && totalChars > options.maxChars) {
+      throw new BranchNarratorError(
+        `JSON output (${totalChars.toLocaleString()} chars) exceeds --max-chars ` +
+          `(${options.maxChars.toLocaleString()}). JSON format does not support chunking. ` +
+          `Use --format text or --format md for chunked output, or increase --max-chars.`,
+        1
+      );
+    }
+
+    // Convert DiffFileEntry[] to DiffFile[] with patch.text
+    const files: DiffFile[] = entries.map((entry) => ({
+      path: entry.path,
+      oldPath: entry.oldPath,
+      status: entry.status,
+      untracked: entry.untracked,
+      binary: false,
+      patch: { text: entry.diff },
+    }));
+
+    // Convert SkippedEntry[] to SkippedFile[]
+    const skippedFiles: SkippedFile[] = finalSkipped.map((s) => ({
+      path: s.path,
+      status: s.status,
+      reason: s.reason,
+      note: s.note,
+    }));
+
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        unified: options.unified,
+        include: options.include,
+        exclude: options.exclude,
+        includeUntracked: options.includeUntracked,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: options.noTimestamp ?? false,
+      },
+      files,
+      skippedFiles,
+      combinedFiles.length
+    );
+
+    const json = renderDumpDiffJson(output, options.pretty);
+    if (options.out) {
+      await writeOutput(options.out, json);
+      info(`Wrote JSON output to ${options.out}`);
+    } else {
+      console.log(json);
+    }
   } else {
     await handleTextOrMdOutput(options, entries, finalSkipped, combinedFiles.length, cwd);
   }
@@ -350,45 +365,42 @@ async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<vo
 
   // Output based on format
   if (options.format === "json") {
-    const output = {
-      schemaVersion: "1.0" as const,
-      generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
-      command: {
-        name: "dump-diff" as const,
-        args: buildCommandArgs(options),
-      },
-      git: {
+    // Convert FileEntry[] to DiffFile[] (no patch for name-only)
+    const files: DiffFile[] = sortedIncluded.map((f) => ({
+      path: f.path,
+      oldPath: f.oldPath,
+      status: f.status,
+      untracked: f.untracked,
+    }));
+
+    // Convert SkippedEntry[] to SkippedFile[]
+    const skippedFiles: SkippedFile[] = sortedSkipped.map((s) => ({
+      path: s.path,
+      status: s.status,
+      reason: s.reason,
+      note: s.note,
+    }));
+
+    const output = buildDumpDiffJsonV2(
+      {
         mode: options.mode,
-        base: options.mode === "branch" ? options.base : undefined,
-        head: options.mode === "branch" ? options.head : undefined,
-        isDirty: options.mode !== "branch" ? true : undefined,
-      },
-      options: {
+        base: options.base,
+        head: options.head,
         unified: options.unified,
         include: options.include,
         exclude: options.exclude,
+        includeUntracked: options.includeUntracked,
         nameOnly: true,
         stat: false,
+        patchFor: null,
+        noTimestamp: options.noTimestamp ?? false,
       },
-      files: sortedIncluded.map((f) => ({
-        path: f.path,
-        oldPath: f.oldPath,
-        status: f.status,
-      })),
-      skippedFiles: sortedSkipped.map((s) => ({
-        path: s.path,
-        status: s.status,
-        reason: s.reason,
-        note: s.note,
-      })),
-      summary: {
-        changedFileCount: combinedFiles.length,
-        includedFileCount: sortedIncluded.length,
-        skippedFileCount: sortedSkipped.length,
-      },
-    };
+      files,
+      skippedFiles,
+      combinedFiles.length
+    );
 
-    const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
+    const json = renderDumpDiffJson(output, options.pretty);
     if (options.out) {
       await writeOutput(options.out, json);
       info(`Wrote JSON output to ${options.out}`);
@@ -498,41 +510,42 @@ async function handleStat(options: DumpDiffOptions, cwd: string): Promise<void> 
 
   // Output based on format
   if (options.format === "json") {
-    const output = {
-      schemaVersion: "1.0" as const,
-      generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
-      command: {
-        name: "dump-diff" as const,
-        args: buildCommandArgs(options),
-      },
-      git: {
+    // Convert to DiffFile[] with stats
+    const files: DiffFile[] = sortedFiles.map((f) => ({
+      path: f.path,
+      oldPath: f.oldPath,
+      status: f.status,
+      stats: f.stats,
+    }));
+
+    // Convert SkippedEntry[] to SkippedFile[]
+    const skippedFilesOutput: SkippedFile[] = sortedSkipped.map((s) => ({
+      path: s.path,
+      status: s.status,
+      reason: s.reason,
+      note: s.note,
+    }));
+
+    const output = buildDumpDiffJsonV2(
+      {
         mode: options.mode,
-        base: options.mode === "branch" ? options.base : undefined,
-        head: options.mode === "branch" ? options.head : undefined,
-        isDirty: options.mode !== "branch" ? true : undefined,
-      },
-      options: {
+        base: options.base,
+        head: options.head,
         unified: options.unified,
         include: options.include,
         exclude: options.exclude,
+        includeUntracked: options.includeUntracked,
         nameOnly: false,
         stat: true,
+        patchFor: null,
+        noTimestamp: options.noTimestamp ?? false,
       },
-      files: sortedFiles,
-      skippedFiles: sortedSkipped.map((s) => ({
-        path: s.path,
-        status: s.status,
-        reason: s.reason,
-        note: s.note,
-      })),
-      summary: {
-        changedFileCount: combinedFiles.length,
-        includedFileCount: sortedFiles.length,
-        skippedFileCount: sortedSkipped.length,
-      },
-    };
+      files,
+      skippedFilesOutput,
+      combinedFiles.length
+    );
 
-    const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
+    const json = renderDumpDiffJson(output, options.pretty);
     if (options.out) {
       await writeOutput(options.out, json);
       info(`Wrote JSON output to ${options.out}`);
@@ -647,51 +660,36 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
   }
 
   if (isBinary) {
-    const allSkipped: SkippedEntry[] = [
-      {
-        path: targetFile.path,
-        status: targetFile.status,
-        reason: "binary",
-      },
-    ];
-
     // Still report in JSON format
     if (options.format === "json") {
-      const output = {
-        schemaVersion: "1.0" as const,
-        generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
-        command: {
-          name: "dump-diff" as const,
-          args: buildCommandArgs(options),
+      const skippedFiles: SkippedFile[] = [
+        {
+          path: targetFile.path,
+          status: targetFile.status,
+          reason: "binary",
         },
-        git: {
+      ];
+
+      const output = buildDumpDiffJsonV2(
+        {
           mode: options.mode,
-          base: options.mode === "branch" ? options.base : undefined,
-          head: options.mode === "branch" ? options.head : undefined,
-          isDirty: options.mode !== "branch" ? true : undefined,
-        },
-        options: {
+          base: options.base,
+          head: options.head,
           unified: options.unified,
           include: options.include,
           exclude: options.exclude,
+          includeUntracked: options.includeUntracked,
           nameOnly: false,
           stat: false,
           patchFor: requestedPath,
+          noTimestamp: options.noTimestamp ?? false,
         },
-        files: [],
-        skippedFiles: allSkipped.map((s) => ({
-          path: s.path,
-          status: s.status,
-          reason: s.reason,
-        })),
-        summary: {
-          changedFileCount: 1,
-          includedFileCount: 0,
-          skippedFileCount: 1,
-        },
-      };
+        [],
+        skippedFiles,
+        1
+      );
 
-      const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
+      const json = renderDumpDiffJson(output, options.pretty);
       if (options.out) {
         await writeOutput(options.out, json);
         info(`Wrote JSON output to ${options.out}`);
@@ -742,46 +740,39 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
   if (options.format === "json") {
     const hunks = parseDiffIntoHunks(diff);
 
-    const output = {
-      schemaVersion: "1.0" as const,
-      generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
-      command: {
-        name: "dump-diff" as const,
-        args: buildCommandArgs(options),
+    // Build file with both patch.text and patch.hunks for --patch-for
+    const files: DiffFile[] = [
+      {
+        path: targetFile.path,
+        oldPath: targetFile.oldPath,
+        status: targetFile.status,
+        untracked: targetFile.untracked,
+        binary: false,
+        stats,
+        patch: { text: diff, hunks },
       },
-      git: {
+    ];
+
+    const output = buildDumpDiffJsonV2(
+      {
         mode: options.mode,
-        base: options.mode === "branch" ? options.base : undefined,
-        head: options.mode === "branch" ? options.head : undefined,
-        isDirty: options.mode !== "branch" ? true : undefined,
-      },
-      options: {
+        base: options.base,
+        head: options.head,
         unified: options.unified,
         include: options.include,
         exclude: options.exclude,
+        includeUntracked: options.includeUntracked,
         nameOnly: false,
         stat: false,
         patchFor: requestedPath,
+        noTimestamp: options.noTimestamp ?? false,
       },
-      files: [
-        {
-          path: targetFile.path,
-          oldPath: targetFile.oldPath,
-          status: targetFile.status,
-          binary: false,
-          stats,
-          hunks,
-        },
-      ],
-      skippedFiles: [],
-      summary: {
-        changedFileCount: 1,
-        includedFileCount: 1,
-        skippedFileCount: 0,
-      },
-    };
+      files,
+      [],
+      1
+    );
 
-    const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
+    const json = renderDumpDiffJson(output, options.pretty);
     if (options.out) {
       await writeOutput(options.out, json);
       info(`Wrote JSON output to ${options.out}`);
@@ -938,54 +929,6 @@ async function handleDryRun(
 }
 
 /**
- * Handle JSON format output.
- */
-async function handleJsonOutput(
-  options: DumpDiffOptions,
-  entries: DiffFileEntry[],
-  skipped: SkippedEntry[],
-  totalFiles: number
-): Promise<void> {
-  const totalChars = calculateTotalChars(entries);
-
-  // Check if chunking would be needed
-  if (options.maxChars !== undefined && totalChars > options.maxChars) {
-    throw new BranchNarratorError(
-      `JSON output (${totalChars.toLocaleString()} chars) exceeds --max-chars ` +
-        `(${options.maxChars.toLocaleString()}). JSON format does not support chunking. ` +
-        `Use --format text or --format md for chunked output, or increase --max-chars.`,
-      1
-    );
-  }
-
-  const output: DumpDiffOutput = {
-    schemaVersion: "1.1",
-    generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
-    mode: options.mode,
-    base: options.mode === "branch" ? options.base : null,
-    head: options.mode === "branch" ? options.head : null,
-    unified: options.unified,
-    included: entries,
-    skipped: skipped,
-    stats: {
-      filesConsidered: totalFiles,
-      filesIncluded: entries.length,
-      filesSkipped: skipped.length,
-      chars: totalChars,
-    },
-  };
-
-  const json = renderJson(output, options.pretty);
-
-  if (options.out) {
-    await writeOutput(options.out, json);
-    info(`Wrote JSON output to ${options.out}`);
-  } else {
-    console.log(json);
-  }
-}
-
-/**
  * Handle text or markdown format output.
  */
 async function handleTextOrMdOutput(
@@ -1091,6 +1034,7 @@ function getStatusEmoji(status: string): string {
 
 // Re-export types and utilities for testing
 export {
+  buildDumpDiffJsonV2,
   buildNameStatusArgs,
   buildPerFileDiffArgs,
   buildUntrackedDiffArgs,
@@ -1101,19 +1045,22 @@ export {
   parseHunkHeader,
   parseDiffIntoHunks,
   parseLsFilesOutput,
-  renderJson,
+  renderDumpDiffJson,
   renderMarkdown,
   renderText,
 } from "./core.js";
 export { parseNameStatus, parseNumStats } from "./git.js";
 export type {
+  DiffFile,
   DiffFileEntry,
+  DiffFilePatch,
   DiffHunk,
   DiffLine,
   DiffMode,
-  DumpDiffOutput,
+  DumpDiffJsonV2,
   FileEntry,
   FilterResult,
   SkippedEntry,
+  SkippedFile,
 } from "./core.js";
 export type { FileStats } from "./git.js";

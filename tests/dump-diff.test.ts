@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "bun:test";
 import {
+  buildDumpDiffJsonV2,
   buildNameStatusArgs,
   buildPerFileDiffArgs,
   buildUntrackedDiffArgs,
@@ -14,13 +15,15 @@ import {
   filterPaths,
   parseNameStatus,
   parseLsFilesOutput,
-  renderJson,
+  renderDumpDiffJson,
   renderMarkdown,
   renderText,
+  type DiffFile,
   type DiffFileEntry,
   type DiffMode,
-  type DumpDiffOutput,
+  type DumpDiffJsonV2,
   type FileEntry,
+  type SkippedFile,
 } from "../src/commands/dump-diff/index.js";
 import {
   parseNumStats,
@@ -546,199 +549,430 @@ describe("chunkByBudget", () => {
 });
 
 // ============================================================================
-// JSON Schema Tests (v1.1)
+// JSON Schema Tests (v2.0)
 // ============================================================================
 
-describe("renderJson - schema validation", () => {
-  it("should produce valid JSON with schemaVersion 1.1 and mode", () => {
-    const output: DumpDiffOutput = {
-      schemaVersion: "1.1",
-      mode: "branch",
-      base: "main",
-      head: "HEAD",
-      unified: 3,
-      included: [
-        {
-          path: "src/index.ts",
-          status: "M",
-          diff: "--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1 +1 @@\n-old\n+new",
-        },
-      ],
-      skipped: [
-        { path: "pnpm-lock.yaml", reason: "excluded-by-default" },
-        { path: "assets/logo.png", reason: "binary" },
-      ],
-      stats: {
-        filesConsidered: 3,
-        filesIncluded: 1,
-        filesSkipped: 2,
-        chars: 50,
+describe("buildDumpDiffJsonV2 - schema validation", () => {
+  it("should produce valid JSON with schemaVersion 2.0", () => {
+    const files: DiffFile[] = [
+      {
+        path: "src/index.ts",
+        status: "M",
+        patch: { text: "--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1 +1 @@\n-old\n+new" },
       },
-    };
+    ];
+    const skippedFiles: SkippedFile[] = [
+      { path: "pnpm-lock.yaml", reason: "excluded-by-default" },
+      { path: "assets/logo.png", reason: "binary" },
+    ];
 
-    const json = renderJson(output);
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 3,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      files,
+      skippedFiles,
+      3
+    );
+
+    const json = renderDumpDiffJson(output);
     const parsed = JSON.parse(json);
 
-    expect(parsed.schemaVersion).toBe("1.1");
-    expect(parsed.mode).toBe("branch");
-    expect(parsed.base).toBe("main");
-    expect(parsed.head).toBe("HEAD");
-    expect(parsed.unified).toBe(3);
-    expect(parsed.included).toHaveLength(1);
-    expect(parsed.included[0].path).toBe("src/index.ts");
-    expect(parsed.included[0].status).toBe("M");
-    expect(parsed.included[0].diff).toContain("--- a/src/index.ts");
-    expect(parsed.skipped).toHaveLength(2);
-    expect(parsed.stats.filesConsidered).toBe(3);
-    expect(parsed.stats.filesIncluded).toBe(1);
-    expect(parsed.stats.filesSkipped).toBe(2);
-    expect(parsed.stats.chars).toBe(50);
+    expect(parsed.schemaVersion).toBe("2.0");
+    expect(parsed.git.mode).toBe("branch");
+    expect(parsed.git.base).toBe("main");
+    expect(parsed.git.head).toBe("HEAD");
+    expect(parsed.git.isDirty).toBe(false);
+    expect(parsed.options.unified).toBe(3);
+    expect(parsed.files).toHaveLength(1);
+    expect(parsed.files[0].path).toBe("src/index.ts");
+    expect(parsed.files[0].status).toBe("M");
+    expect(parsed.files[0].patch.text).toContain("--- a/src/index.ts");
+    expect(parsed.skippedFiles).toHaveLength(2);
+    expect(parsed.summary.changedFileCount).toBe(3);
+    expect(parsed.summary.includedFileCount).toBe(1);
+    expect(parsed.summary.skippedFileCount).toBe(2);
   });
 
-  it("should have null base/head for non-branch modes", () => {
-    const output: DumpDiffOutput = {
-      schemaVersion: "1.1",
-      mode: "unstaged",
-      base: null,
-      head: null,
-      unified: 0,
-      included: [],
-      skipped: [],
-      stats: {
-        filesConsidered: 0,
-        filesIncluded: 0,
-        filesSkipped: 0,
-        chars: 0,
+  it("should have null base/head and isDirty true for non-branch modes", () => {
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "unstaged",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
       },
-    };
+      [],
+      [],
+      0
+    );
 
-    const json = renderJson(output);
+    const json = renderDumpDiffJson(output);
     const parsed = JSON.parse(json);
 
-    expect(parsed.mode).toBe("unstaged");
-    expect(parsed.base).toBeNull();
-    expect(parsed.head).toBeNull();
+    expect(parsed.git.mode).toBe("unstaged");
+    expect(parsed.git.base).toBeNull();
+    expect(parsed.git.head).toBeNull();
+    expect(parsed.git.isDirty).toBe(true);
   });
 
   it("should handle all mode values", () => {
     const modes: DiffMode[] = ["branch", "unstaged", "staged", "all"];
 
     for (const mode of modes) {
-      const output: DumpDiffOutput = {
-        schemaVersion: "1.1",
-        mode,
-        base: mode === "branch" ? "main" : null,
-        head: mode === "branch" ? "HEAD" : null,
-        unified: 0,
-        included: [],
-        skipped: [],
-        stats: {
-          filesConsidered: 0,
-          filesIncluded: 0,
-          filesSkipped: 0,
-          chars: 0,
+      const output = buildDumpDiffJsonV2(
+        {
+          mode,
+          base: "main",
+          head: "HEAD",
+          unified: 0,
+          include: [],
+          exclude: [],
+          includeUntracked: true,
+          nameOnly: false,
+          stat: false,
+          patchFor: null,
+          noTimestamp: true,
         },
-      };
+        [],
+        [],
+        0
+      );
 
-      const json = renderJson(output);
+      const json = renderDumpDiffJson(output);
       const parsed = JSON.parse(json);
-      expect(parsed.mode).toBe(mode);
+      expect(parsed.git.mode).toBe(mode);
+      expect(parsed.git.isDirty).toBe(mode !== "branch");
     }
   });
 
   it("should handle renamed files with oldPath", () => {
-    const output: DumpDiffOutput = {
-      schemaVersion: "1.1",
-      mode: "branch",
-      base: "main",
-      head: "feature",
-      unified: 0,
-      included: [
-        {
-          path: "src/new-name.ts",
-          oldPath: "src/old-name.ts",
-          status: "R",
-          diff: "rename diff",
-        },
-      ],
-      skipped: [],
-      stats: {
-        filesConsidered: 1,
-        filesIncluded: 1,
-        filesSkipped: 0,
-        chars: 11,
+    const files: DiffFile[] = [
+      {
+        path: "src/new-name.ts",
+        oldPath: "src/old-name.ts",
+        status: "R",
+        patch: { text: "rename diff" },
       },
-    };
+    ];
 
-    const json = renderJson(output);
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "feature",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      files,
+      [],
+      1
+    );
+
+    const json = renderDumpDiffJson(output);
     const parsed = JSON.parse(json);
 
-    expect(parsed.included[0].oldPath).toBe("src/old-name.ts");
-    expect(parsed.included[0].status).toBe("R");
+    expect(parsed.files[0].oldPath).toBe("src/old-name.ts");
+    expect(parsed.files[0].status).toBe("R");
   });
 
   it("should include untracked flag for untracked files", () => {
-    const output: DumpDiffOutput = {
-      schemaVersion: "1.1",
-      mode: "all",
-      base: null,
-      head: null,
-      unified: 0,
-      included: [
-        {
-          path: "src/new-file.ts",
-          status: "A",
-          diff: "new file diff",
-          untracked: true,
-        },
-      ],
-      skipped: [],
-      stats: {
-        filesConsidered: 1,
-        filesIncluded: 1,
-        filesSkipped: 0,
-        chars: 13,
+    const files: DiffFile[] = [
+      {
+        path: "src/new-file.ts",
+        status: "A",
+        untracked: true,
+        patch: { text: "new file diff" },
       },
-    };
+    ];
 
-    const json = renderJson(output);
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "all",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      files,
+      [],
+      1
+    );
+
+    const json = renderDumpDiffJson(output);
     const parsed = JSON.parse(json);
 
-    expect(parsed.included[0].untracked).toBe(true);
+    expect(parsed.files[0].untracked).toBe(true);
   });
 
   it("should include all skip reasons", () => {
-    const output: DumpDiffOutput = {
-      schemaVersion: "1.1",
-      mode: "branch",
-      base: "main",
-      head: "HEAD",
-      unified: 0,
-      included: [],
-      skipped: [
-        { path: "pnpm-lock.yaml", reason: "excluded-by-default" },
-        { path: "ignored.ts", reason: "excluded-by-glob" },
-        { path: "logo.png", reason: "binary" },
-        { path: "other.ts", reason: "not-included" },
-        { path: "empty-diff.ts", reason: "diff-empty" },
-      ],
-      stats: {
-        filesConsidered: 5,
-        filesIncluded: 0,
-        filesSkipped: 5,
-        chars: 0,
-      },
-    };
+    const skippedFiles: SkippedFile[] = [
+      { path: "pnpm-lock.yaml", reason: "excluded-by-default" },
+      { path: "ignored.ts", reason: "excluded-by-glob" },
+      { path: "logo.png", reason: "binary" },
+      { path: "other.ts", reason: "not-included" },
+      { path: "empty-diff.ts", reason: "diff-empty" },
+    ];
 
-    const json = renderJson(output);
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      [],
+      skippedFiles,
+      5
+    );
+
+    const json = renderDumpDiffJson(output);
     const parsed = JSON.parse(json);
 
-    const reasons = parsed.skipped.map((s: { reason: string }) => s.reason);
+    const reasons = parsed.skippedFiles.map((s: { reason: string }) => s.reason);
     expect(reasons).toContain("excluded-by-default");
     expect(reasons).toContain("excluded-by-glob");
     expect(reasons).toContain("binary");
     expect(reasons).toContain("not-included");
     expect(reasons).toContain("diff-empty");
+  });
+
+  it("should include command metadata", () => {
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "feature",
+        unified: 3,
+        include: ["src/**"],
+        exclude: ["**/*.test.ts"],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: true,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      [],
+      [],
+      0
+    );
+
+    const json = renderDumpDiffJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.command.name).toBe("dump-diff");
+    expect(parsed.command.args).toContain("--mode");
+    expect(parsed.command.args).toContain("branch");
+    expect(parsed.command.args).toContain("--stat");
+    expect(parsed.options.include).toEqual(["src/**"]);
+    expect(parsed.options.exclude).toEqual(["**/*.test.ts"]);
+    expect(parsed.options.stat).toBe(true);
+  });
+
+  it("should omit generatedAt when noTimestamp is true", () => {
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      [],
+      [],
+      0
+    );
+
+    const json = renderDumpDiffJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.generatedAt).toBeUndefined();
+  });
+
+  it("should include generatedAt when noTimestamp is false", () => {
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: false,
+      },
+      [],
+      [],
+      0
+    );
+
+    const json = renderDumpDiffJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.generatedAt).toBeDefined();
+    expect(typeof parsed.generatedAt).toBe("string");
+  });
+
+  it("should handle --name-only mode (no patch field)", () => {
+    const files: DiffFile[] = [
+      { path: "src/index.ts", status: "M" },
+      { path: "src/utils.ts", status: "A" },
+    ];
+
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: true,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      files,
+      [],
+      2
+    );
+
+    const json = renderDumpDiffJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.options.nameOnly).toBe(true);
+    expect(parsed.files[0].patch).toBeUndefined();
+    expect(parsed.files[1].patch).toBeUndefined();
+  });
+
+  it("should handle --stat mode (stats without patch)", () => {
+    const files: DiffFile[] = [
+      { path: "src/index.ts", status: "M", stats: { added: 10, removed: 5 } },
+    ];
+
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: true,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      files,
+      [],
+      1
+    );
+
+    const json = renderDumpDiffJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.options.stat).toBe(true);
+    expect(parsed.files[0].stats).toEqual({ added: 10, removed: 5 });
+  });
+
+  it("should handle --patch-for mode (patch.text and patch.hunks)", () => {
+    const files: DiffFile[] = [
+      {
+        path: "src/index.ts",
+        status: "M",
+        stats: { added: 1, removed: 1 },
+        patch: {
+          text: "@@ -1 +1 @@\n-old\n+new",
+          hunks: [
+            {
+              header: "@@ -1 +1 @@",
+              oldStart: 1,
+              oldLines: 1,
+              newStart: 1,
+              newLines: 1,
+              lines: [
+                { kind: "del", text: "-old" },
+                { kind: "add", text: "+new" },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 0,
+        include: [],
+        exclude: [],
+        includeUntracked: true,
+        nameOnly: false,
+        stat: false,
+        patchFor: "src/index.ts",
+        noTimestamp: true,
+      },
+      files,
+      [],
+      1
+    );
+
+    const json = renderDumpDiffJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.options.patchFor).toBe("src/index.ts");
+    expect(parsed.files[0].patch.text).toBeDefined();
+    expect(parsed.files[0].patch.hunks).toHaveLength(1);
+    expect(parsed.files[0].patch.hunks[0].lines).toHaveLength(2);
   });
 });
 
@@ -974,7 +1208,7 @@ describe("calculateTotalChars", () => {
 });
 
 // ============================================================================
-// New Schema v1.0 Tests
+// Diff Parsing Tests
 // ============================================================================
 
 describe("parseNumStats", () => {
