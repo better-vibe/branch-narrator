@@ -19,6 +19,9 @@
 - [x] JSON facts output
 - [x] Uncommitted changes support
 - [x] Interactive mode
+- [x] React profile (React Router support)
+- [x] Test parity analyzer
+- [x] Impact/blast radius analyzer
 
 ---
 

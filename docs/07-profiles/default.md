@@ -20,6 +20,8 @@ The default profile is used when:
 | `vitest` | Detect test changes |
 | `dependencies` | Analyze package.json |
 | `security-files` | Detect security-sensitive files |
+| `test-parity` | Enforce test file convention |
+| `impact` | Analyze blast radius of changes |
 
 ## What's NOT Included
 
@@ -78,6 +80,8 @@ export const defaultProfile: Profile = {
     vitestAnalyzer,
     dependencyAnalyzer,
     securityFilesAnalyzer,
+    testParityAnalyzer,
+    impactAnalyzer,
   ],
 };
 ```

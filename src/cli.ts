@@ -178,7 +178,7 @@ program
   .option("--head <ref>", "Head branch (branch mode)", "HEAD")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit)",
+    "Profile to use (auto|sveltekit|react)",
     "auto"
   )
   .action(async (options) => {
@@ -233,7 +233,7 @@ program
   .option("-u, --uncommitted", "Include uncommitted changes", false)
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit)",
+    "Profile to use (auto|sveltekit|react)",
     "auto"
   )
   .option("--interactive", "Prompt for additional context", false)
@@ -292,7 +292,7 @@ program
   .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit)",
+    "Profile to use (auto|sveltekit|react)",
     "auto"
   )
   .option("--format <type>", "Output format: json", "json")
@@ -411,7 +411,7 @@ program
       const json = options.pretty
         ? JSON.stringify(facts, null, 2)
         : JSON.stringify(facts);
-      
+
       console.log(json);
       process.exit(0);
     } catch (error) {

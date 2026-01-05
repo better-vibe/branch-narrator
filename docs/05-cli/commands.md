@@ -17,7 +17,7 @@ branch-narrator pretty [options]
 | `--mode <type>` | `branch` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | `main` | Base git reference (branch mode only) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 
 ### Diff Modes
 
@@ -72,7 +72,7 @@ branch-narrator pr-body [options]
 | `--base <ref>` | `main` | Base git reference |
 | `--head <ref>` | `HEAD` | Head git reference |
 | `-u, --uncommitted` | `false` | Include uncommitted changes |
-| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 | `--interactive` | `false` | Prompt for context |
 
 ### Examples
@@ -114,7 +114,7 @@ branch-narrator facts [options]
 | `--mode <type>` | `branch` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | `main` | Base git reference (branch mode only) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto` or `sveltekit` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 | `--format <type>` | `json` | Output format: `json` |
 | `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
 | `--redact` | `false` | Redact obvious secret values in evidence excerpts |
@@ -517,6 +517,7 @@ branch-narrator integrate cursor --force
 |------|-------------|
 | `0` | Success |
 | `1` | Expected failure (not a git repo, invalid refs) |
+| `2` | Risk threshold exceeded (`--fail-on-score` in `risk-report`) |
 
 ---
 

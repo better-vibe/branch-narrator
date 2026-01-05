@@ -11,10 +11,18 @@ function computeRiskScore(findings: Finding[]): RiskScore;
 ## Output
 
 ```typescript
+interface RiskFactor {
+  kind: string;            // e.g., "risk-high", "db-migration", "route-deleted"
+  weight: number;          // Points contributed to score
+  explanation: string;     // Human-readable description
+  evidence: Evidence[];    // Source evidence
+}
+
 interface RiskScore {
   score: number;           // 0-100
   level: RiskLevel;        // "low" | "medium" | "high"
-  evidenceBullets: string[];
+  factors: RiskFactor[];   // Detailed breakdown of risk factors
+  evidenceBullets?: string[]; // Legacy field for compatibility
 }
 ```
 

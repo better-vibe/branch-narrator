@@ -67,10 +67,18 @@ Aggregate risk assessment.
 ```typescript
 type RiskLevel = "high" | "medium" | "low";
 
+interface RiskFactor {
+  kind: string;
+  weight: number;
+  explanation: string;
+  evidence: Evidence[];
+}
+
 interface RiskScore {
   score: number;           // 0-100
   level: RiskLevel;
-  evidenceBullets: string[];
+  factors: RiskFactor[];   // Detailed breakdown of risk factors
+  evidenceBullets?: string[]; // Legacy field for compatibility
 }
 ```
 
@@ -91,7 +99,7 @@ Interface for all analyzers.
 ```typescript
 interface Analyzer {
   name: string;
-  analyze(changeSet: ChangeSet): Finding[];
+  analyze(changeSet: ChangeSet): Finding[] | Promise<Finding[]>;
 }
 ```
 
@@ -102,7 +110,7 @@ interface Analyzer {
 Profile configuration.
 
 ```typescript
-type ProfileName = "auto" | "sveltekit";
+type ProfileName = "auto" | "sveltekit" | "react";
 
 interface Profile {
   name: ProfileName;

@@ -111,12 +111,14 @@ branch-narrator facts --profile <name>
 |---------|-------------|
 | `auto` | Auto-detect based on project |
 | `sveltekit` | SvelteKit-specific analyzers |
+| `react` | React + React Router analyzers |
 
 ### Auto-Detection Logic
 
 1. Check for `src/routes/` directory → SvelteKit
 2. Check for `@sveltejs/kit` in package.json → SvelteKit
-3. Otherwise → Default profile
+3. Check for `react` + `react-router-dom` (without `next`) → React
+4. Otherwise → Default profile
 
 ---
 

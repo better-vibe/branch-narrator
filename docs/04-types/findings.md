@@ -15,7 +15,9 @@ type Finding =
   | CloudflareChangeFinding
   | TestChangeFinding
   | RiskFlagFinding
-  | SecurityFileFinding;
+  | SecurityFileFinding
+  | ConventionViolationFinding
+  | ImpactAnalysisFinding;
 ```
 
 ## Class Diagram

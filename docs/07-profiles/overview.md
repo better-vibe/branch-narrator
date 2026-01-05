@@ -25,9 +25,14 @@ flowchart TD
     E -->|Yes| D
     E -->|No| F{@sveltejs/kit in package.json?}
     F -->|Yes| D
-    F -->|No| G[Use Default]
+    F -->|No| J{react + react-router-dom?}
+    J -->|Yes| K{next in package.json?}
+    K -->|No| L[Use React]
+    K -->|Yes| G[Use Default]
+    J -->|No| G[Use Default]
 
     D --> H[SvelteKit Analyzers]
+    L --> M[React Analyzers]
     G --> I[Default Analyzers]
 ```
 
@@ -36,6 +41,7 @@ flowchart TD
 | Profile | Description | Detection |
 |---------|-------------|-----------|
 | `sveltekit` | SvelteKit fullstack apps | `src/routes/` or `@sveltejs/kit` |
+| `react` | React + React Router apps | `react` + `react-router-dom` (no `next`) |
 | `auto` (default) | Generic projects | Fallback when no framework detected |
 
 ## Profile Comparison
@@ -50,6 +56,8 @@ graph LR
         D5[vitest]
         D6[dependencies]
         D7[security-files]
+        D8[test-parity]
+        D9[impact]
     end
 
     subgraph SvelteKit["SvelteKit Profile"]
@@ -63,11 +71,29 @@ graph LR
         S8[dependencies]
         S9[security-files]
     end
+
+    subgraph React["React Profile"]
+        R1[file-summary]
+        R2[file-category]
+        R3[react-router-routes]
+        R4[env-var]
+        R5[cloudflare]
+        R6[vitest]
+        R7[dependencies]
+        R8[security-files]
+    end
 ```
+
+**Default-specific:**
+- `test-parity` - Convention enforcement for test coverage
+- `impact` - Blast radius analysis for modified files
 
 **SvelteKit-specific:**
 - `route-detector` - SvelteKit routes
 - `supabase` - Migration analysis
+
+**React-specific:**
+- `react-router-routes` - React Router route detection
 
 ## API
 
