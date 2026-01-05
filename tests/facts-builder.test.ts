@@ -489,7 +489,8 @@ describe("buildFacts", () => {
     const changeSet = createMockChangeSet();
     
     // Create findings with unsorted evidence
-    // VAR1 has evidence starting with 'a.ts' so it will sort before VAR2 which starts with 'b.ts'
+    // VAR1 has evidence starting with 'z.ts' and VAR2 starts with 'y.ts',
+    // so VAR2 will sort before VAR1 when findings are ordered by first evidence file.
     const findings: Finding[] = [
       {
         type: "env-var",
