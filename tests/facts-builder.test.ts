@@ -5,7 +5,8 @@
 import { describe, it, expect } from "bun:test";
 import { aggregateCategories, buildSummaryByArea } from "../src/commands/facts/categories.js";
 import { deriveActions } from "../src/commands/facts/actions.js";
-import type { Finding, RiskFactor, Evidence } from "../src/core/types.js";
+import { buildFacts } from "../src/commands/facts/builder.js";
+import type { Finding, RiskFactor, Evidence, ChangeSet, RiskScore } from "../src/core/types.js";
 
 describe("aggregateCategories", () => {
   it("should aggregate findings by category", () => {
@@ -350,5 +351,338 @@ describe("deriveActions", () => {
     // Non-blocking should come after
     const lastAction = actions[actions.length - 1];
     expect(lastAction.blocking).toBe(false);
+  });
+});
+
+describe("buildFacts", () => {
+  // Helper to create a minimal ChangeSet
+  const createMockChangeSet = (): ChangeSet => ({
+    base: "main",
+    head: "HEAD",
+    files: [{ path: "src/test.ts", status: "modified" }],
+    diffs: [{
+      path: "src/test.ts",
+      status: "modified",
+      hunks: [{
+        oldStart: 1,
+        oldLines: 1,
+        newStart: 1,
+        newLines: 2,
+        content: "@@ -1,1 +1,2 @@\n-old line\n+new line 1\n+new line 2",
+        additions: ["+new line 1", "+new line 2"],
+        deletions: ["-old line"],
+      }],
+    }],
+    basePackageJson: undefined,
+    headPackageJson: undefined,
+  });
+
+  // Helper to create a minimal RiskScore
+  const createMockRiskScore = (): RiskScore => ({
+    total: 50,
+    category: "medium",
+    factors: [],
+  });
+
+  it("should use provided repoRoot instead of calling git", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/custom/repo/root",
+      isDirty: false,
+    });
+
+    expect(facts.git.repoRoot).toBe("/custom/repo/root");
+    expect(facts.git.isDirty).toBe(false);
+  });
+
+  it("should use provided isDirty instead of calling git", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: true,
+    });
+
+    expect(facts.git.isDirty).toBe(true);
+  });
+
+  it("should apply --max-findings limit deterministically", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence: [{ file: "a.ts", excerpt: "test" }],
+        routeId: "/a",
+        file: "a.ts",
+        change: "added",
+        routeType: "page",
+      },
+      {
+        type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence: [{ file: "b.ts", excerpt: "test" }],
+        routeId: "/b",
+        file: "b.ts",
+        change: "added",
+        routeType: "page",
+      },
+      {
+        type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence: [{ file: "c.ts", excerpt: "test" }],
+        routeId: "/c",
+        file: "c.ts",
+        change: "added",
+        routeType: "page",
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      filters: {
+        maxFindings: 2,
+      },
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.findings.length).toBe(2);
+    // Should keep first 2 after deterministic sorting
+    expect(facts.findings[0].routeId).toBe("/a");
+    expect(facts.findings[1].routeId).toBe("/b");
+  });
+
+  it("should sort evidence only for findings that remain after maxFindings", async () => {
+    const changeSet = createMockChangeSet();
+    
+    // Create findings with unsorted evidence
+    // VAR1 has evidence starting with 'a.ts' so it will sort before VAR2 which starts with 'b.ts'
+    const findings: Finding[] = [
+      {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence: [
+          { file: "z.ts", excerpt: "last" },
+          { file: "a.ts", excerpt: "first" },
+        ],
+        name: "VAR1",
+        change: "added",
+        evidenceFiles: ["z.ts", "a.ts"],
+      },
+      {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence: [
+          { file: "y.ts", excerpt: "second" },
+          { file: "b.ts", excerpt: "first" },
+        ],
+        name: "VAR2",
+        change: "added",
+        evidenceFiles: ["y.ts", "b.ts"],
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      filters: {
+        maxFindings: 1,
+      },
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.findings.length).toBe(1);
+    // First finding is sorted by its first evidence file (originally z.ts before sorting)
+    // After deterministic finding sort, VAR2 comes first because 'y.ts' < 'z.ts' 
+    // (first file in unsorted evidence determines finding order)
+    // But wait - we sort findings by first file in evidence BEFORE sorting evidence
+    // So VAR2 (y.ts) < VAR1 (z.ts), meaning VAR2 is kept
+    expect(facts.findings[0].name).toBe("VAR2");
+    // Evidence within VAR2 should be sorted: b.ts < y.ts
+    expect(facts.findings[0].evidence[0].file).toBe("b.ts");
+    expect(facts.findings[0].evidence[1].file).toBe("y.ts");
+  });
+
+  it("should redact evidence only for findings kept after maxFindings", async () => {
+    const changeSet = createMockChangeSet();
+    
+    const findings: Finding[] = [
+      {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence: [
+          { file: "a.ts", excerpt: 'password="secret123"' },
+        ],
+        name: "VAR1",
+        change: "added",
+        evidenceFiles: ["a.ts"],
+      },
+      {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence: [
+          { file: "b.ts", excerpt: 'password="another_secret"' },
+        ],
+        name: "VAR2",
+        change: "added",
+        evidenceFiles: ["b.ts"],
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      filters: {
+        maxFindings: 1,
+        redact: true,
+      },
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.findings.length).toBe(1);
+    // Evidence should be redacted
+    expect(facts.findings[0].evidence[0].excerpt).toContain("***REDACTED***");
+    expect(facts.findings[0].evidence[0].excerpt).not.toContain("secret123");
+  });
+
+  it("should maintain deterministic sorting with maxFindings", async () => {
+    const changeSet = createMockChangeSet();
+    
+    // Create findings that will sort deterministically
+    // Sorting is by type first, then by first evidence file
+    const findings: Finding[] = [
+      {
+        type: "test-change",
+        kind: "test-change",
+        category: "tests",
+        confidence: "high",
+        evidence: [{ file: "z.test.ts", excerpt: "test" }],
+        framework: "vitest",
+        files: ["z.test.ts"],
+      },
+      {
+        type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence: [{ file: "b.ts", excerpt: "route b" }],
+        routeId: "/b",
+        file: "b.ts",
+        change: "added",
+        routeType: "page",
+      },
+      {
+        type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence: [{ file: "a.ts", excerpt: "route a" }],
+        routeId: "/a",
+        file: "a.ts",
+        change: "added",
+        routeType: "page",
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      filters: {
+        maxFindings: 2,
+      },
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.findings.length).toBe(2);
+    // Should be sorted by type first (route-change comes before test-change alphabetically)
+    // Then by first evidence file within same type (a.ts < b.ts)
+    expect(facts.findings[0].type).toBe("route-change");
+    expect(facts.findings[0].routeId).toBe("/a");
+    expect(facts.findings[1].type).toBe("route-change");
+    expect(facts.findings[1].routeId).toBe("/b");
+  });
+
+  it("should calculate stats correctly", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.stats.filesChanged).toBe(1);
+    expect(facts.stats.insertions).toBe(2);
+    expect(facts.stats.deletions).toBe(1);
   });
 });
