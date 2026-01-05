@@ -2,7 +2,6 @@
  * Facts output builder - assembles complete agent-grade facts.
  */
 
-import { execa } from "execa";
 import type {
   ChangeSet,
   FactsOutput,
@@ -20,6 +19,7 @@ import { aggregateCategories, buildSummaryByArea } from "./categories.js";
 import { deriveActions } from "./actions.js";
 import { DEFAULT_EXCLUDES } from "../../core/filters.js";
 import { sortFindings as sortFindingsDeterministically, sortEvidence } from "../../core/sorting.js";
+import { getRepoRoot, isWorkingDirDirty } from "../../git/collector.js";
 
 /**
  * Build facts output options.
@@ -43,38 +43,10 @@ export interface BuildFactsOptions {
   skippedFiles?: SkippedFile[];
   warnings?: string[];
   noTimestamp?: boolean;
-}
-
-/**
- * Get git repository root.
- */
-async function getRepoRoot(): Promise<string> {
-  try {
-    const result = await execa("git", [
-      "rev-parse",
-      "--show-toplevel",
-    ]);
-    return result.stdout.trim();
-  } catch {
-    return process.cwd();
-  }
-}
-
-/**
- * Check if working directory is dirty.
- */
-async function isWorkingDirDirty(): Promise<boolean> {
-  try {
-    const result = await execa("git", [
-      "diff-index",
-      "--quiet",
-      "HEAD",
-      "--",
-    ], { reject: false });
-    return result.exitCode !== 0;
-  } catch {
-    return false;
-  }
+  /** Pre-computed git repository root (avoids git call if provided) */
+  repoRoot?: string;
+  /** Pre-computed working directory dirty status (avoids git call if provided) */
+  isDirty?: boolean;
 }
 
 /**
@@ -155,34 +127,55 @@ export async function buildFacts(
     skippedFiles: userSkippedFiles,
     warnings: userWarnings,
     noTimestamp,
+    repoRoot: providedRepoRoot,
+    isDirty: providedIsDirty,
   } = options;
 
-  // Apply redaction if requested
-  let findings = rawFindings;
+  // Sort findings deterministically first (without touching evidence yet)
+  let findings = sortFindingsDeterministically(rawFindings);
+
+  // Apply max findings limit early to avoid processing evidence for discarded findings
+  if (userFilters?.maxFindings && findings.length > userFilters.maxFindings) {
+    findings = findings.slice(0, userFilters.maxFindings);
+  }
+
+  // Now process evidence only for the findings we're keeping
   if (userFilters?.redact) {
-    findings = rawFindings.map(finding => ({
+    findings = findings.map(finding => ({
       ...finding,
       evidence: sortEvidence(finding.evidence.map(redactEvidence)),
     }));
   } else {
     // Sort evidence even when not redacting
-    findings = rawFindings.map(finding => ({
+    findings = findings.map(finding => ({
       ...finding,
       evidence: sortEvidence(finding.evidence),
     }));
   }
 
-  // Sort findings deterministically
-  findings = sortFindingsDeterministically(findings);
-
-  // Apply max findings limit
-  if (userFilters?.maxFindings && findings.length > userFilters.maxFindings) {
-    findings = findings.slice(0, userFilters.maxFindings);
+  // Get git info - use provided values if available, otherwise fetch in parallel
+  let repoRoot: string;
+  let isDirty: boolean;
+  
+  if (providedRepoRoot !== undefined && providedIsDirty !== undefined) {
+    // Both provided, use them directly
+    repoRoot = providedRepoRoot;
+    isDirty = providedIsDirty;
+  } else if (providedRepoRoot !== undefined) {
+    // Only repoRoot provided, fetch isDirty
+    repoRoot = providedRepoRoot;
+    isDirty = await isWorkingDirDirty();
+  } else if (providedIsDirty !== undefined) {
+    // Only isDirty provided, fetch repoRoot
+    repoRoot = await getRepoRoot();
+    isDirty = providedIsDirty;
+  } else {
+    // Neither provided, fetch both in parallel
+    [repoRoot, isDirty] = await Promise.all([
+      getRepoRoot(),
+      isWorkingDirDirty(),
+    ]);
   }
-
-  // Get git info
-  const repoRoot = await getRepoRoot();
-  const isDirty = await isWorkingDirDirty();
 
   const git: GitInfo = {
     base: changeSet.base,

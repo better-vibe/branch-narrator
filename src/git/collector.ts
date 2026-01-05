@@ -580,3 +580,35 @@ async function collectChangeSetByMode(
     headPackageJson,
   });
 }
+
+/**
+ * Get git repository root.
+ */
+export async function getRepoRoot(cwd: string = process.cwd()): Promise<string> {
+  try {
+    const result = await execa("git", [
+      "rev-parse",
+      "--show-toplevel",
+    ], { cwd });
+    return result.stdout.trim();
+  } catch {
+    return cwd;
+  }
+}
+
+/**
+ * Check if working directory is dirty.
+ */
+export async function isWorkingDirDirty(cwd: string = process.cwd()): Promise<boolean> {
+  try {
+    const result = await execa("git", [
+      "diff-index",
+      "--quiet",
+      "HEAD",
+      "--",
+    ], { cwd, reject: false });
+    return result.exitCode !== 0;
+  } catch {
+    return false;
+  }
+}

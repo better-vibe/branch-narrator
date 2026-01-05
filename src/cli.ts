@@ -298,11 +298,12 @@ program
     "Maximum number of findings to include"
   )
   .option("--out <path>", "Write output to file instead of stdout")
-  .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
+  .option("--no-timestamp", "Omit generatedAt for deterministic output")
   .action(async (options) => {
     try {
       // Import executeFacts dynamically to avoid circular dependencies
       const { executeFacts } = await import("./commands/facts/index.js");
+      const { getRepoRoot, isWorkingDirDirty } = await import("./git/collector.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -343,6 +344,12 @@ program
         includeUntracked: mode === "all",
       });
 
+      // Compute git metadata once (parallel for efficiency)
+      const [repoRoot, isDirty] = await Promise.all([
+        getRepoRoot(),
+        isWorkingDirDirty(),
+      ]);
+
       // Resolve profile
       const resolvedProfile = resolveProfileName(
         options.profile as ProfileName,
@@ -381,6 +388,8 @@ program
         skippedFiles: [],
         warnings: [],
         noTimestamp: options.noTimestamp,
+        repoRoot,
+        isDirty,
       });
 
       // Output JSON
