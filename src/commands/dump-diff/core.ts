@@ -694,3 +694,144 @@ export function renderDumpDiffJson(output: DumpDiffJsonV2, pretty: boolean = fal
   return pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
 }
 
+// ============================================================================
+// Diff Splitting Utility
+// ============================================================================
+
+export interface SplitDiffEntry {
+  path: string;
+  oldPath?: string;
+  diffText: string;
+}
+
+/**
+ * Split a full unified diff into per-file chunks.
+ * 
+ * Parses unified diff output from git and splits it into individual file patches.
+ * Handles rename headers and correctly identifies file boundaries using "diff --git" markers.
+ * 
+ * @param fullDiff - The complete unified diff output from git diff
+ * @returns Array of per-file diff entries with path and diff text
+ */
+export function splitFullDiff(fullDiff: string): SplitDiffEntry[] {
+  if (!fullDiff.trim()) {
+    return [];
+  }
+
+  const entries: SplitDiffEntry[] = [];
+  const lines = fullDiff.split("\n");
+  
+  let currentPath: string | null = null;
+  let currentOldPath: string | undefined;
+  let currentLines: string[] = [];
+
+  const flushCurrent = () => {
+    if (currentPath && currentLines.length > 0) {
+      entries.push({
+        path: currentPath,
+        oldPath: currentOldPath,
+        diffText: currentLines.join("\n"),
+      });
+    }
+    currentPath = null;
+    currentOldPath = undefined;
+    currentLines = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    
+    // Check for new file boundary: "diff --git a/... b/..."
+    if (line.startsWith("diff --git ")) {
+      // Save previous file if exists
+      flushCurrent();
+
+      // Parse file paths from "diff --git a/old b/new"
+      // Use greedy matching to handle paths containing " b/"
+      const match = line.match(/^diff --git a\/(.+) b\/(.+)$/);
+      if (match) {
+        const newPath = match[2]!;
+        currentPath = newPath;
+        
+        // Check subsequent lines for rename markers to detect oldPath
+        // Look ahead for "rename from" line
+        let j = i + 1;
+        while (j < lines.length && !lines[j]!.startsWith("diff --git ")) {
+          const nextLine = lines[j]!;
+          if (nextLine.startsWith("rename from ")) {
+            currentOldPath = nextLine.substring("rename from ".length);
+            break;
+          }
+          // Stop looking once we hit the hunk headers
+          if (nextLine.startsWith("@@")) {
+            break;
+          }
+          j++;
+        }
+      }
+      currentLines.push(line);
+    } else if (currentPath) {
+      // Add line to current file's diff
+      currentLines.push(line);
+    }
+    // Ignore lines before first "diff --git" marker
+  }
+
+  // Don't forget the last file
+  flushCurrent();
+
+  return entries;
+}
+
+// ============================================================================
+// Concurrency Limiting Utility
+// ============================================================================
+
+/**
+ * Simple concurrency limiter for parallel async operations.
+ * Limits the number of concurrent promises running at once.
+ * 
+ * @param tasks - Array of task functions that return promises
+ * @param limit - Maximum number of concurrent tasks (default: 4)
+ * @returns Promise that resolves to array of results in original order
+ */
+export async function limitConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number = 4
+): Promise<T[]> {
+  if (tasks.length === 0) {
+    return [];
+  }
+
+  const results: T[] = new Array(tasks.length);
+  let currentIndex = 0;
+  let activeCount = 0;
+
+  return new Promise((resolve, reject) => {
+    const startNext = () => {
+      // Check if all tasks are done
+      if (currentIndex >= tasks.length && activeCount === 0) {
+        resolve(results);
+        return;
+      }
+
+      // Start new tasks up to the limit
+      while (activeCount < limit && currentIndex < tasks.length) {
+        const index = currentIndex++;
+        const task = tasks[index]!;
+        
+        activeCount++;
+        task()
+          .then((result) => {
+            results[index] = result;
+            activeCount--;
+            startNext();
+          })
+          .catch(reject);
+      }
+    };
+
+    startNext();
+  });
+}
+
