@@ -24,7 +24,8 @@
     "changeset:add": "changeset add --open",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "bun run build && changeset publish"
+    "release": "bun run build && changeset publish",
+    "benchmark": "bun benchmarks/run.ts"
   },
   "engines": {
     "node": ">=18"
