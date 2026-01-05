@@ -1,20 +1,32 @@
 
-import { describe, expect, it, beforeEach, afterAll, mock, type Mock, spyOn } from "bun:test";
-import { batchGetFileContent } from "../src/git/batch.js";
-import { execa } from "execa";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, afterEach, mock, type Mock, spyOn } from "bun:test";
 import { Buffer } from "node:buffer";
 
-// Mock execa
-mock.module("execa", () => {
-  return {
-    execa: mock(),
-  };
-});
+// We need to declare these at module scope but initialize them in beforeAll
+// to ensure proper mock lifecycle management
+let batchGetFileContent: typeof import("../src/git/batch.js").batchGetFileContent;
+let execa: typeof import("execa").execa;
 
 describe("batchGetFileContent", () => {
+  beforeAll(async () => {
+    // Set up the mock BEFORE importing the module that uses it
+    mock.module("execa", () => {
+      return {
+        execa: mock(),
+      };
+    });
+
+    // Now import the modules that depend on the mock
+    const batchModule = await import("../src/git/batch.js");
+    batchGetFileContent = batchModule.batchGetFileContent;
+
+    const execaModule = await import("execa");
+    execa = execaModule.execa;
+  });
+
   beforeEach(() => {
     // mockReset() clears both call history AND implementation, preventing leaks between tests
-    (execa as unknown as Mock<typeof execa>).mockReset();
+    (execa as unknown as Mock<typeof import("execa").execa>).mockReset();
   });
 
   afterAll(() => {
@@ -41,7 +53,7 @@ describe("batchGetFileContent", () => {
       "" // Trailing newline
     ].join("\n");
 
-    (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout: Buffer.from(outputString) } as any);
+    (execa as unknown as Mock<typeof import("execa").execa>).mockResolvedValue({ stdout: Buffer.from(outputString) } as any);
 
     const result = await batchGetFileContent(items);
 
@@ -69,7 +81,7 @@ describe("batchGetFileContent", () => {
       Buffer.from("\n")
     ]);
 
-    (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout: outputBuffer } as any);
+    (execa as unknown as Mock<typeof import("execa").execa>).mockResolvedValue({ stdout: outputBuffer } as any);
 
     const result = await batchGetFileContent(items);
 
@@ -90,7 +102,7 @@ describe("batchGetFileContent", () => {
       ""
     ].join("\n");
 
-    (execa as unknown as Mock<typeof execa>).mockResolvedValue({ stdout: Buffer.from(outputString) } as any);
+    (execa as unknown as Mock<typeof import("execa").execa>).mockResolvedValue({ stdout: Buffer.from(outputString) } as any);
 
     const result = await batchGetFileContent(items);
 
@@ -105,7 +117,7 @@ describe("batchGetFileContent", () => {
   });
 
   it("should handle execa failure gracefully", async () => {
-    (execa as unknown as Mock<typeof execa>).mockRejectedValue(new Error("Git failed"));
+    (execa as unknown as Mock<typeof import("execa").execa>).mockRejectedValue(new Error("Git failed"));
 
     // Silence console.warn for this test
     const spy = spyOn(console, "warn").mockImplementation(() => {});
