@@ -536,8 +536,8 @@ describe("buildFacts", () => {
     });
 
     expect(facts.findings.length).toBe(1);
-    // Findings are sorted by first evidence file before evidence is sorted.
-    // VAR2's first evidence is 'y.ts', VAR1's is 'z.ts', so VAR2 comes first.
+    // Both findings have same type (env-var), so sorted by first evidence file alphabetically.
+    // VAR2 has 'y.ts', VAR1 has 'z.ts', so VAR2 comes first ('y' < 'z').
     expect(facts.findings[0].name).toBe("VAR2");
     // After maxFindings, evidence within VAR2 is sorted alphabetically.
     expect(facts.findings[0].evidence[0].file).toBe("b.ts");
