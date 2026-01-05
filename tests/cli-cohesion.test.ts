@@ -137,13 +137,13 @@ describe("--no-timestamp option for deterministic output", () => {
 
       // Simulate two runs with --no-timestamp
       const output1 = {
-        schemaVersion: "1.0",
+        schemaVersion: "2.0",
         generatedAt: noTimestamp ? undefined : new Date().toISOString(),
         data: { key: "value" },
       };
 
       const output2 = {
-        schemaVersion: "1.0",
+        schemaVersion: "2.0",
         generatedAt: noTimestamp ? undefined : new Date().toISOString(),
         data: { key: "value" },
       };
@@ -159,7 +159,7 @@ describe("--no-timestamp option for deterministic output", () => {
 
       // First output
       const output1 = {
-        schemaVersion: "1.0",
+        schemaVersion: "2.0",
         generatedAt: noTimestamp ? undefined : new Date().toISOString(),
         data: { key: "value" },
       };
@@ -169,7 +169,7 @@ describe("--no-timestamp option for deterministic output", () => {
 
       // Second output
       const output2 = {
-        schemaVersion: "1.0",
+        schemaVersion: "2.0",
         generatedAt: noTimestamp ? undefined : new Date().toISOString(),
         data: { key: "value" },
       };
@@ -207,7 +207,7 @@ describe("generatedAt timestamp in JSON outputs", () => {
   describe("JSON serialization", () => {
     it("should not include generatedAt when undefined", () => {
       const output = {
-        schemaVersion: "1.0",
+        schemaVersion: "2.0",
         generatedAt: undefined,
         data: {},
       };

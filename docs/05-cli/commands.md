@@ -303,45 +303,51 @@ branch-narrator dump-diff --format json --pretty
 branch-narrator dump-diff --format json --no-timestamp
 ```
 
-### JSON Output Schema
+### JSON Output Schema (v2.0)
 
-#### Schema v1.0 (Agent-Grade, Structured)
-
-When using `--format json` with `--name-only`, `--stat`, or `--patch-for`, the output uses schema v1.0 with structured data:
+All `--format json` output uses a unified schema v2.0, regardless of which flags are used:
 
 ```json
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
   "generatedAt": "2026-01-05T12:34:56.789Z",
   "command": {
     "name": "dump-diff",
-    "args": ["--mode", "branch", "--base", "main", "--head", "HEAD", "--format", "json", "--stat"]
+    "args": ["--mode", "branch", "--base", "main", "--head", "HEAD", "--format", "json"]
   },
   "git": {
     "mode": "branch",
     "base": "main",
-    "head": "HEAD"
+    "head": "HEAD",
+    "isDirty": false
   },
   "options": {
     "unified": 0,
     "include": [],
     "exclude": [],
+    "includeUntracked": true,
     "nameOnly": false,
-    "stat": true
+    "stat": false,
+    "patchFor": null
   },
   "files": [
     {
       "path": "src/index.ts",
+      "oldPath": null,
       "status": "M",
-      "stats": { "added": 10, "removed": 5 }
+      "untracked": false,
+      "binary": false,
+      "stats": { "added": 10, "removed": 5 },
+      "patch": {
+        "text": "diff --git a/src/index.ts b/src/index.ts\n..."
+      }
     }
   ],
   "skippedFiles": [
     {
       "path": "pnpm-lock.yaml",
       "status": "M",
-      "reason": "excluded-by-default",
-      "note": "Lockfile"
+      "reason": "excluded-by-default"
     }
   ],
   "summary": {
@@ -352,25 +358,36 @@ When using `--format json` with `--name-only`, `--stat`, or `--patch-for`, the o
 }
 ```
 
-**Schema v1.0 fields:**
-- `schemaVersion`: Always `"1.0"`
+**Schema v2.0 fields:**
+- `schemaVersion`: Always `"2.0"`
 - `generatedAt`: ISO timestamp (omitted when `--no-timestamp` is used)
 - `command`: Command metadata (name and args)
-- `git`: Git context (mode, base, head, isDirty)
+- `git`: Git context
+  - `mode`: Diff mode used
+  - `base`: Base ref (`null` for non-branch modes)
+  - `head`: Head ref (`null` for non-branch modes)
+  - `isDirty`: `true` for unstaged/staged/all modes, `false` for branch mode
 - `options`: Options used for this run
-- `files`: Array of changed files with structured diff data
+- `files`: Array of changed files
 - `skippedFiles`: Array of excluded files with reasons
 - `summary`: Aggregated counts
 
-**File object (v1.0):**
+**File object fields:**
 - `path`: Current file path
-- `oldPath`: Previous path (for renames)
-- `status`: File status (`A`, `M`, `D`, `R`, etc.)
-- `binary`: `true` if file is binary
-- `stats`: `{ added, removed }` (only with `--stat` or `--patch-for`)
-- `hunks`: Array of diff hunks (only with `--patch-for`)
+- `oldPath`: Previous path (for renames, otherwise omitted)
+- `status`: File status (`A`, `M`, `D`, `R`, `C`, `T`, `U`, `?`)
+- `untracked`: `true` for untracked files (omitted if false)
+- `binary`: `true` if file is binary (omitted if false)
+- `stats`: `{ added, removed }` - present with `--stat` or `--patch-for`
+- `patch`: Diff content object (see below)
 
-**Hunk object:**
+**Patch object (varies by mode):**
+- Default full diff: `{ "text": "..." }` - raw diff text
+- `--name-only`: `patch` field is omitted
+- `--stat`: `patch` field is omitted
+- `--patch-for`: `{ "text": "...", "hunks": [...] }` - includes structured hunks
+
+**Hunk object (only with `--patch-for`):**
 - `header`: Hunk header line (e.g., `@@ -1,4 +1,6 @@`)
 - `oldStart`, `oldLines`: Old file position/length
 - `newStart`, `newLines`: New file position/length
@@ -380,58 +397,17 @@ When using `--format json` with `--name-only`, `--stat`, or `--patch-for`, the o
 - `kind`: `"add"`, `"del"`, or `"context"`
 - `text`: Full line text (includes `+`, `-`, or space prefix)
 
-#### Schema v1.1 (Legacy)
-
-When using `--format json` without `--name-only`, `--stat`, or `--patch-for`, the output uses schema v1.1 (legacy format):
-
-```json
-{
-  "schemaVersion": "1.1",
-  "generatedAt": "2026-01-05T12:34:56.789Z",
-  "mode": "branch",
-  "base": "main",
-  "head": "HEAD",
-  "unified": 0,
-  "included": [
-    {
-      "path": "src/routes/foo/+page.svelte",
-      "status": "M",
-      "diff": "--- a/src/routes/foo/+page.svelte\n+++ b/src/routes/foo/+page.svelte\n..."
-    },
-    {
-      "path": "src/new-file.ts",
-      "status": "A",
-      "untracked": true,
-      "diff": "..."
-    }
-  ],
-  "skipped": [
-    { "path": "pnpm-lock.yaml", "reason": "excluded-by-default" },
-    { "path": "assets/logo.png", "reason": "binary" },
-    { "path": "empty-file.ts", "reason": "diff-empty" }
-  ],
-  "stats": {
-    "filesConsidered": 10,
-    "filesIncluded": 4,
-    "filesSkipped": 6,
-    "chars": 12345
-  }
-}
-```
-
-**Notes:**
-- `generatedAt`: ISO timestamp (omitted when `--no-timestamp` is used)
-- `mode` field indicates which diff mode was used
-- For non-branch modes, `base` and `head` are `null`
-- `untracked: true` is set for untracked files (included by default in non-branch modes)
-- JSON format does not support chunking. If output exceeds `--max-chars`, an error is returned.
-
 **Skip reasons:**
 - `excluded-by-default`: File matches a default exclusion pattern (lockfiles, build artifacts, etc.)
 - `excluded-by-glob`: File matches a user-provided `--exclude` pattern
 - `binary`: File is detected as binary
 - `not-included`: File does not match any `--include` pattern (when includes are specified)
 - `diff-empty`: Diff generation returned empty content (protects agents from blind spots)
+
+**Notes:**
+- JSON format does not support chunking. If output exceeds `--max-chars`, an error is returned.
+- For non-branch modes, `git.base` and `git.head` are `null`.
+- `untracked: true` is set for untracked files (included by default in non-branch modes).
 
 ---
 
