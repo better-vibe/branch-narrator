@@ -620,6 +620,10 @@ function buildCommandArgs(options: BuildDumpDiffJsonV2Options): string[] {
     args.push("--exclude", glob);
   }
 
+  if (!options.includeUntracked) {
+    args.push("--no-untracked");
+  }
+
   if (options.nameOnly) {
     args.push("--name-only");
   }

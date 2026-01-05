@@ -333,10 +333,7 @@ All `--format json` output uses a unified schema v2.0, regardless of which flags
   "files": [
     {
       "path": "src/index.ts",
-      "oldPath": null,
       "status": "M",
-      "untracked": false,
-      "binary": false,
       "stats": { "added": 10, "removed": 5 },
       "patch": {
         "text": "diff --git a/src/index.ts b/src/index.ts\n..."
