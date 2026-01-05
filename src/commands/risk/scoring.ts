@@ -2,10 +2,10 @@
  * Risk scoring engine for risk-report command.
  */
 
-import type { 
-  RiskCategory, 
-  RiskFlag, 
-  RiskReport, 
+import type {
+  RiskCategory,
+  RiskFlag,
+  RiskReport,
   RiskReportLevel,
   ScoreBreakdown,
 } from "../../core/types.js";
@@ -44,7 +44,7 @@ function computeCategoryScores(flags: RiskFlag[]): Record<RiskCategory, number> 
  */
 function computeOverallScore(categoryScores: Record<RiskCategory, number>): number {
   const scores = Object.values(categoryScores);
-  
+
   if (scores.length === 0) return 0;
 
   // Get max category score
@@ -53,7 +53,7 @@ function computeOverallScore(categoryScores: Record<RiskCategory, number>): numb
   // Get top 3 scores
   const sortedScores = [...scores].sort((a, b) => b - a);
   const top3 = sortedScores.slice(0, 3);
-  
+
   // Pad with zeros if less than 3
   while (top3.length < 3) {
     top3.push(0);
@@ -135,6 +135,7 @@ export function computeRiskReport(
   skippedFiles: Array<{ file: string; reason: string }>,
   options?: {
     explainScore?: boolean;
+    noTimestamp?: boolean;
   }
 ): RiskReport {
   const categoryScores = computeCategoryScores(flags);
@@ -150,6 +151,11 @@ export function computeRiskReport(
     flags: sortRiskFlags(flags),
     skippedFiles,
   };
+
+  // Add timestamp unless --no-timestamp is specified
+  if (!options?.noTimestamp) {
+    report.generatedAt = new Date().toISOString();
+  }
 
   if (options?.explainScore) {
     report.scoreBreakdown = buildScoreBreakdown(categoryScores);

@@ -402,7 +402,7 @@ export interface SkippedFile {
 
 export interface FactsOutput {
   schemaVersion: string;
-  generatedAt: string;
+  generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
   git: GitInfo;
   profile: ProfileInfo;
   stats: Stats;
@@ -459,6 +459,7 @@ export interface ScoreBreakdown {
 
 export interface RiskReport {
   schemaVersion: "1.0";
+  generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
   range: { base: string; head: string };
   riskScore: number; // 0..100
   riskLevel: RiskReportLevel;

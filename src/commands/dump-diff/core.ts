@@ -44,6 +44,7 @@ export interface SkippedEntry {
 
 export interface DumpDiffOutput {
   schemaVersion: "1.1";
+  generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
   mode: DiffMode;
   base: string | null;
   head: string | null;
@@ -460,8 +461,8 @@ export function renderMarkdown(
 /**
  * Render full output as JSON.
  */
-export function renderJson(output: DumpDiffOutput): string {
-  return JSON.stringify(output, null, 2);
+export function renderJson(output: DumpDiffOutput, pretty: boolean = false): string {
+  return pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
 }
 
 /**

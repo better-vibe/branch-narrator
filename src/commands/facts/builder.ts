@@ -42,6 +42,7 @@ export interface BuildFactsOptions {
   };
   skippedFiles?: SkippedFile[];
   warnings?: string[];
+  noTimestamp?: boolean;
 }
 
 /**
@@ -153,6 +154,7 @@ export async function buildFacts(
     filters: userFilters,
     skippedFiles: userSkippedFiles,
     warnings: userWarnings,
+    noTimestamp,
   } = options;
 
   // Apply redaction if requested
@@ -227,7 +229,7 @@ export async function buildFacts(
 
   return {
     schemaVersion: "1.0",
-    generatedAt: new Date().toISOString(),
+    generatedAt: noTimestamp ? undefined : new Date().toISOString(),
     git,
     profile,
     stats,

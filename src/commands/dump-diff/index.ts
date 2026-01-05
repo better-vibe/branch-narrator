@@ -54,6 +54,8 @@ export interface DumpDiffOptions {
   nameOnly?: boolean;
   stat?: boolean;
   patchFor?: string;
+  pretty?: boolean;
+  noTimestamp?: boolean;
 }
 
 export interface DryRunResult {
@@ -183,6 +185,7 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
     if (options.format === "json") {
       const output: DumpDiffOutput = {
         schemaVersion: "1.1",
+        generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
         mode: options.mode,
         base: options.mode === "branch" ? options.base : null,
         head: options.mode === "branch" ? options.head : null,
@@ -196,7 +199,7 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
           chars: 0,
         },
       };
-      const json = renderJson(output);
+      const json = renderJson(output, options.pretty);
       if (options.out) {
         await writeOutput(options.out, json);
         info(`Wrote JSON output to ${options.out}`);
@@ -205,7 +208,7 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
       }
       return;
     }
-    
+
     // For non-JSON formats, output plain text
     console.log("No changes found.");
     return;
@@ -349,6 +352,7 @@ async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<vo
   if (options.format === "json") {
     const output = {
       schemaVersion: "1.0" as const,
+      generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
       command: {
         name: "dump-diff" as const,
         args: buildCommandArgs(options),
@@ -384,7 +388,7 @@ async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<vo
       },
     };
 
-    const json = JSON.stringify(output, null, 2);
+    const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
     if (options.out) {
       await writeOutput(options.out, json);
       info(`Wrote JSON output to ${options.out}`);
@@ -496,6 +500,7 @@ async function handleStat(options: DumpDiffOptions, cwd: string): Promise<void> 
   if (options.format === "json") {
     const output = {
       schemaVersion: "1.0" as const,
+      generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
       command: {
         name: "dump-diff" as const,
         args: buildCommandArgs(options),
@@ -527,7 +532,7 @@ async function handleStat(options: DumpDiffOptions, cwd: string): Promise<void> 
       },
     };
 
-    const json = JSON.stringify(output, null, 2);
+    const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
     if (options.out) {
       await writeOutput(options.out, json);
       info(`Wrote JSON output to ${options.out}`);
@@ -654,6 +659,7 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
     if (options.format === "json") {
       const output = {
         schemaVersion: "1.0" as const,
+        generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
         command: {
           name: "dump-diff" as const,
           args: buildCommandArgs(options),
@@ -685,7 +691,7 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
         },
       };
 
-      const json = JSON.stringify(output, null, 2);
+      const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
       if (options.out) {
         await writeOutput(options.out, json);
         info(`Wrote JSON output to ${options.out}`);
@@ -738,6 +744,7 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
 
     const output = {
       schemaVersion: "1.0" as const,
+      generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
       command: {
         name: "dump-diff" as const,
         args: buildCommandArgs(options),
@@ -774,7 +781,7 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
       },
     };
 
-    const json = JSON.stringify(output, null, 2);
+    const json = options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output);
     if (options.out) {
       await writeOutput(options.out, json);
       info(`Wrote JSON output to ${options.out}`);
@@ -953,6 +960,7 @@ async function handleJsonOutput(
 
   const output: DumpDiffOutput = {
     schemaVersion: "1.1",
+    generatedAt: options.noTimestamp ? undefined : new Date().toISOString(),
     mode: options.mode,
     base: options.mode === "branch" ? options.base : null,
     head: options.mode === "branch" ? options.head : null,
@@ -967,7 +975,7 @@ async function handleJsonOutput(
     },
   };
 
-  const json = renderJson(output);
+  const json = renderJson(output, options.pretty);
 
   if (options.out) {
     await writeOutput(options.out, json);

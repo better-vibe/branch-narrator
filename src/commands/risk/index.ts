@@ -18,6 +18,7 @@ export interface RiskReportOptions {
   maxEvidenceLines?: number;
   redact?: boolean;
   explainScore?: boolean;
+  noTimestamp?: boolean;
 }
 
 /**
@@ -33,6 +34,7 @@ export function generateRiskReport(
     maxEvidenceLines = 5,
     redact = false,
     explainScore = false,
+    noTimestamp = false,
   } = options;
 
   // Track skipped files
@@ -65,7 +67,7 @@ export function generateRiskReport(
       ...flag,
       evidence: sortRiskFlagEvidence(flag.evidence.map(ev => ({
         ...ev,
-        lines: redact 
+        lines: redact
           ? redactLines(ev.lines.slice(0, maxEvidenceLines))
           : ev.lines.slice(0, maxEvidenceLines),
       }))),
@@ -84,7 +86,7 @@ export function generateRiskReport(
     changeSet.head,
     allFlags,
     skippedFiles,
-    { explainScore }
+    { explainScore, noTimestamp }
   );
 }
 

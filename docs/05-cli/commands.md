@@ -69,11 +69,21 @@ branch-narrator pr-body [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
-| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--mode <type>` | `branch` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
+| `-u, --uncommitted` | `false` | **[DEPRECATED]** Use `--mode unstaged` instead |
 | `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 | `--interactive` | `false` | Prompt for context |
+
+### Diff Modes
+
+| Mode | Description | Git Command |
+|------|-------------|-------------|
+| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
+| `unstaged` | Working tree vs index (uncommitted) | `git diff` |
+| `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
+| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
 
 ### Examples
 
@@ -84,8 +94,11 @@ branch-narrator pr-body
 # Compare specific branches
 branch-narrator pr-body --base develop --head feature/auth
 
-# Include uncommitted changes
-branch-narrator pr-body -u
+# Analyze unstaged changes
+branch-narrator pr-body --mode unstaged
+
+# Analyze staged changes only
+branch-narrator pr-body --mode staged
 
 # Interactive mode
 branch-narrator pr-body --interactive
@@ -123,6 +136,8 @@ branch-narrator facts [options]
 | `--max-file-bytes <n>` | `1048576` | Maximum file size in bytes to analyze |
 | `--max-diff-bytes <n>` | `5242880` | Maximum diff size in bytes to analyze |
 | `--max-findings <n>` | (none) | Maximum number of findings to include |
+| `--out <path>` | (stdout) | Write output to file instead of stdout |
+| `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 
 ### Diff Modes
 
@@ -153,6 +168,15 @@ branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
 
 # Get risk level
 branch-narrator facts | jq -r '.riskScore.level'
+
+# Write to file
+branch-narrator facts --out facts.json
+
+# Pretty-print JSON
+branch-narrator facts --pretty
+
+# Deterministic output (omit timestamp)
+branch-narrator facts --no-timestamp
 ```
 
 ---
@@ -185,6 +209,8 @@ branch-narrator dump-diff [options]
 | `--name-only` | `false` | Output only file list (no diff content) |
 | `--stat` | `false` | Output file statistics (additions/deletions) |
 | `--patch-for <path>` | (none) | Output diff for a specific file only |
+| `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
+| `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 
 **Note:** `--name-only`, `--stat`, and `--patch-for` are mutually exclusive.
 
@@ -269,6 +295,12 @@ branch-narrator dump-diff --stat --format md
 
 # Plain text file list
 branch-narrator dump-diff --name-only
+
+# Pretty-print JSON output
+branch-narrator dump-diff --format json --pretty
+
+# Deterministic output (omit timestamp)
+branch-narrator dump-diff --format json --no-timestamp
 ```
 
 ### JSON Output Schema
@@ -280,6 +312,7 @@ When using `--format json` with `--name-only`, `--stat`, or `--patch-for`, the o
 ```json
 {
   "schemaVersion": "1.0",
+  "generatedAt": "2026-01-05T12:34:56.789Z",
   "command": {
     "name": "dump-diff",
     "args": ["--mode", "branch", "--base", "main", "--head", "HEAD", "--format", "json", "--stat"]
@@ -321,6 +354,7 @@ When using `--format json` with `--name-only`, `--stat`, or `--patch-for`, the o
 
 **Schema v1.0 fields:**
 - `schemaVersion`: Always `"1.0"`
+- `generatedAt`: ISO timestamp (omitted when `--no-timestamp` is used)
 - `command`: Command metadata (name and args)
 - `git`: Git context (mode, base, head, isDirty)
 - `options`: Options used for this run
@@ -353,6 +387,7 @@ When using `--format json` without `--name-only`, `--stat`, or `--patch-for`, th
 ```json
 {
   "schemaVersion": "1.1",
+  "generatedAt": "2026-01-05T12:34:56.789Z",
   "mode": "branch",
   "base": "main",
   "head": "HEAD",
@@ -385,6 +420,7 @@ When using `--format json` without `--name-only`, `--stat`, or `--patch-for`, th
 ```
 
 **Notes:**
+- `generatedAt`: ISO timestamp (omitted when `--no-timestamp` is used)
 - `mode` field indicates which diff mode was used
 - For non-branch modes, `base` and `head` are `null`
 - `untracked: true` is set for untracked files (included by default in non-branch modes)
@@ -422,6 +458,8 @@ branch-narrator risk-report [options]
 | `--max-evidence-lines <n>` | `5` | Max evidence lines per flag |
 | `--redact` | `false` | Redact secret values in evidence |
 | `--explain-score` | `false` | Include score breakdown in output |
+| `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
+| `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 
 ### Diff Modes
 
@@ -470,6 +508,12 @@ branch-narrator risk-report --redact
 
 # Include score breakdown
 branch-narrator risk-report --explain-score
+
+# Pretty-print JSON output
+branch-narrator risk-report --pretty
+
+# Deterministic output (omit timestamp)
+branch-narrator risk-report --no-timestamp
 ```
 
 ---

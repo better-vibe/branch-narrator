@@ -109,62 +109,6 @@ async function runAnalysisWithMode(options: {
   return { findings, resolvedProfile };
 }
 
-/**
- * Run analysis with legacy options (for pr-body command).
- */
-async function runAnalysis(options: {
-  base: string;
-  head: string;
-  profile: ProfileName;
-  uncommitted?: boolean;
-  showSpinner?: boolean;
-}): Promise<{ findings: Finding[]; resolvedProfile: ProfileName }> {
-  const spinner = options.showSpinner
-    ? ora({
-        text: "Collecting git changes...",
-        color: "cyan",
-      }).start()
-    : null;
-
-  // Collect git data
-  const changeSet = await collectChangeSet({
-    base: options.base,
-    head: options.head,
-    uncommitted: options.uncommitted,
-  });
-
-  if (spinner) {
-    spinner.text = "Resolving profile...";
-  }
-
-  // Resolve profile
-  const resolvedProfile = resolveProfileName(
-    options.profile,
-    changeSet,
-    process.cwd()
-  );
-  const profile = getProfile(resolvedProfile);
-
-  if (spinner) {
-    spinner.text = `Running analyzers (${profile.analyzers.length})...`;
-  }
-
-  // Run analyzers
-  const findings: Finding[] = [];
-  for (const analyzer of profile.analyzers) {
-    const analyzerFindings = await analyzer.analyze(changeSet);
-    findings.push(...analyzerFindings);
-  }
-
-  if (spinner) {
-    spinner.succeed(
-      chalk.green(`Analysis complete (${findings.length} findings)`)
-    );
-  }
-
-  return { findings, resolvedProfile };
-}
-
 // pretty command - colorized terminal output for humans
 program
   .command("pretty")
@@ -228,9 +172,14 @@ program
 program
   .command("pr-body")
   .description("Generate a Markdown PR description")
-  .option("--base <ref>", "Base branch to compare against", "main")
-  .option("--head <ref>", "Head branch (current by default)", "HEAD")
-  .option("-u, --uncommitted", "Include uncommitted changes", false)
+  .option(
+    "--mode <type>",
+    "Diff mode: branch|unstaged|staged|all",
+    "branch"
+  )
+  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
+  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
+  .option("-u, --uncommitted", "[DEPRECATED] Use --mode unstaged instead", false)
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit|react)",
@@ -239,11 +188,35 @@ program
   .option("--interactive", "Prompt for additional context", false)
   .action(async (options) => {
     try {
-      const { findings, resolvedProfile } = await runAnalysis({
-        base: options.base,
-        head: options.head,
+      // Handle deprecated --uncommitted flag
+      let mode = options.mode as DiffMode;
+      if (options.uncommitted) {
+        warn("Warning: --uncommitted is deprecated. Use --mode unstaged instead.");
+        mode = "unstaged";
+      }
+
+      // Validate mode
+      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
+        logError(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      // Warn if base/head provided with non-branch mode
+      if (mode !== "branch") {
+        const baseProvided = options.base !== "main";
+        const headProvided = options.head !== "HEAD";
+        if (baseProvided || headProvided) {
+          warn(
+            `Warning: --base and --head are ignored when --mode is "${mode}"`
+          );
+        }
+      }
+
+      const { findings, resolvedProfile } = await runAnalysisWithMode({
+        mode,
+        base: mode === "branch" ? options.base : undefined,
+        head: mode === "branch" ? options.head : undefined,
         profile: options.profile as ProfileName,
-        uncommitted: options.uncommitted,
         showSpinner: false,
       });
 
@@ -324,6 +297,8 @@ program
     "--max-findings <n>",
     "Maximum number of findings to include"
   )
+  .option("--out <path>", "Write output to file instead of stdout")
+  .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
   .action(async (options) => {
     try {
       // Import executeFacts dynamically to avoid circular dependencies
@@ -405,6 +380,7 @@ program
         },
         skippedFiles: [],
         warnings: [],
+        noTimestamp: options.noTimestamp,
       });
 
       // Output JSON
@@ -412,7 +388,16 @@ program
         ? JSON.stringify(facts, null, 2)
         : JSON.stringify(facts);
 
-      console.log(json);
+      // Write to file or stdout
+      if (options.out) {
+        const { writeFile, mkdir } = await import("node:fs/promises");
+        const { dirname } = await import("node:path");
+        await mkdir(dirname(options.out), { recursive: true });
+        await writeFile(options.out, json, "utf-8");
+        info(`Facts written to ${options.out}`);
+      } else {
+        console.log(json);
+      }
       process.exit(0);
     } catch (error) {
       handleError(error);
@@ -466,6 +451,8 @@ program
   .option("--name-only", "Output only file list (no diffs)", false)
   .option("--stat", "Output file statistics (additions/deletions)", false)
   .option("--patch-for <path>", "Output diff for a specific file only")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
   .action(async (options) => {
     try {
       // Validate mode
@@ -526,6 +513,8 @@ program
         nameOnly,
         stat,
         patchFor: options.patchFor,
+        pretty: options.pretty,
+        noTimestamp: options.noTimestamp,
       });
 
       process.exit(0);
@@ -553,6 +542,8 @@ program
   .option("--max-evidence-lines <n>", "Max evidence lines per flag", "5")
   .option("--redact", "Redact secret values in evidence", false)
   .option("--explain-score", "Include score breakdown in output", false)
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
   .action(async (options) => {
     try {
       // Import risk report command dynamically
@@ -620,13 +611,14 @@ program
         maxEvidenceLines,
         redact: options.redact,
         explainScore: options.explainScore,
+        noTimestamp: options.noTimestamp,
       });
 
       // Render output
       let output: string;
       switch (format) {
         case "json":
-          output = renderRiskReportJSON(report, true);
+          output = renderRiskReportJSON(report, options.pretty);
           break;
         case "md":
           output = renderRiskReportMarkdown(report);
