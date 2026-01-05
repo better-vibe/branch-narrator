@@ -536,13 +536,10 @@ describe("buildFacts", () => {
     });
 
     expect(facts.findings.length).toBe(1);
-    // First finding is sorted by its first evidence file (originally z.ts before sorting)
-    // After deterministic finding sort, VAR2 comes first because 'y.ts' < 'z.ts' 
-    // (first file in unsorted evidence determines finding order)
-    // But wait - we sort findings by first file in evidence BEFORE sorting evidence
-    // So VAR2 (y.ts) < VAR1 (z.ts), meaning VAR2 is kept
+    // Findings are sorted by first evidence file before evidence is sorted.
+    // VAR2's first evidence is 'y.ts', VAR1's is 'z.ts', so VAR2 comes first.
     expect(facts.findings[0].name).toBe("VAR2");
-    // Evidence within VAR2 should be sorted: b.ts < y.ts
+    // After maxFindings, evidence within VAR2 is sorted alphabetically.
     expect(facts.findings[0].evidence[0].file).toBe("b.ts");
     expect(facts.findings[0].evidence[1].file).toBe("y.ts");
   });

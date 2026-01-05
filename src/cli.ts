@@ -298,7 +298,7 @@ program
     "Maximum number of findings to include"
   )
   .option("--out <path>", "Write output to file instead of stdout")
-  .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
+  .option("--no-timestamp", "Omit generatedAt for deterministic output")
   .action(async (options) => {
     try {
       // Import executeFacts dynamically to avoid circular dependencies
