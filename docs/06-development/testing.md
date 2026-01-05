@@ -7,8 +7,8 @@ Guide to testing branch-narrator.
 We use **Bun's built-in test framework** (`bun:test`) for testing.
 
 ```bash
-# Run all tests
-bun test
+# Run all tests (excludes benchmarks)
+bun run test
 
 # Watch mode
 bun run test:watch
@@ -18,6 +18,12 @@ bun test tests/route-mapping.test.ts
 
 # Run matching pattern
 bun test -t "should detect"
+
+# Run benchmark tests
+bun run test:benchmarks
+
+# Run all tests including benchmarks
+bun run test:all
 ```
 
 ## Test Structure
@@ -153,7 +159,7 @@ describe("dependencyAnalyzer", () => {
 ### Running with Coverage
 
 ```bash
-bun test --coverage
+bun run test -- --coverage
 ```
 
 ## Common Assertions

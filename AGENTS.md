@@ -6,7 +6,7 @@ This file contains instructions for AI agents (Jules) working on the `branch-nar
 
 1.  **Package Manager**: ALWAYS use **`bun`**.
     *   Install: `bun install` (or `bun i`)
-    *   Test: `bun test`
+    *   Test: `bun run test`
     *   Build: `bun run build`
     *   Run: `bun run dev`
     *   **NEVER** use `npm` or `yarn`.
@@ -22,7 +22,7 @@ This file contains instructions for AI agents (Jules) working on the `branch-nar
     *   **Mandatory**: ALL code changes must be accompanied by tests.
     *   **Framework**: Bun's test framework (`bun:test`) in the `tests/` directory.
     *   **Pattern**: Create `{name}.test.ts` for every source file `{name}.ts`.
-    *   **Verify**: Run `bun test` to verify your changes pass before submitting.
+    *   **Verify**: Run `bun run test` to verify your changes pass before submitting.
 
 4.  **Documentation**:
     *   **Mandatory Updates**: If you change functionality, you **MUST** update the corresponding documentation in `docs/`.
@@ -81,7 +81,7 @@ This file contains instructions for AI agents (Jules) working on the `branch-nar
 Before submitting any plan step or final change:
 
 1.  [ ] **Lint/Typecheck**: `bun run typecheck`
-2.  [ ] **Test**: `bun test` (Ensure no regressions)
+2.  [ ] **Test**: `bun run test` (Ensure no regressions)
 3.  [ ] **Build**: `bun run build` (Ensure build succeeds)
 4.  [ ] **Docs**: Did I update `docs/` if I changed behavior?
 5.  [ ] **Changeset**: Did I run `bun run changeset:add` if this is user-facing?

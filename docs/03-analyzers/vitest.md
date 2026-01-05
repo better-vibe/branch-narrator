@@ -71,7 +71,7 @@ When tests change, adds to test plan:
 ```markdown
 ## Suggested Test Plan
 
-- [ ] `bun test` - Run test suite
+- [ ] `bun run test` - Run test suite
 ```
 
 ## E2E Config Detection

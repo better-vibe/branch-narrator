@@ -152,7 +152,7 @@ Actionable checklist.
 ```markdown
 ## Suggested Test Plan
 
-- [ ] `bun test` - Run test suite
+- [ ] `bun run test` - Run test suite
 - [ ] `bun run check` - Run SvelteKit type check
 - [ ] Test `GET/POST /api/users` endpoint
 - [ ] Verify `/login` page renders correctly

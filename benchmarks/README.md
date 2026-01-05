@@ -99,14 +99,14 @@ Benchmarks can be run manually in GitHub Actions:
 
 For detailed information, see:
 - [Benchmarking Methodology](../docs/06-development/benchmarking.md)
-- [Test Documentation](../tests/benchmark-temp-repo.test.ts)
+- [Test Documentation](./temp-repo.test.ts)
 
 ## Testing
 
 Run benchmark infrastructure tests:
 
 ```bash
-bun test tests/benchmark-temp-repo.test.ts
+bun run test:benchmarks
 ```
 
 These tests verify:

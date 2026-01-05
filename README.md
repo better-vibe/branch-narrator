@@ -410,7 +410,7 @@ Analyze git diff and emit a risk score (0-100) with evidence-backed flags. Frame
 
 ## Suggested Test Plan
 
-- [ ] `bun test` - Run test suite
+- [ ] `bun run test` - Run test suite
 - [ ] `bun run check` - Run SvelteKit type check
 - [ ] Test `GET/POST /api/users` endpoint
 - [ ] Verify `/dashboard` page renders correctly
@@ -553,7 +553,7 @@ Runs all analyzers optimized for React projects, including:
 bun install
 
 # Run tests
-bun test
+bun run test
 
 # Build
 bun run build

@@ -19,7 +19,7 @@ cd branch-narrator
 bun install
 
 # Verify setup
-bun test
+bun run test
 bun run build
 ```
 
@@ -57,8 +57,10 @@ bun run dev
 
 | Command | Description |
 |---------|-------------|
-| `bun test` | Run all tests |
+| `bun run test` | Run all tests (excludes benchmarks) |
 | `bun run test:watch` | Watch mode for tests |
+| `bun run test:benchmarks` | Run benchmark tests |
+| `bun run test:all` | Run all tests including benchmarks |
 | `bun run build` | Production build |
 | `bun run dev` | Watch mode build |
 | `bun run typecheck` | Type checking only |
@@ -91,7 +93,7 @@ Edit files in `src/`
 ### 3. Run Tests
 
 ```bash
-bun test
+bun run test
 ```
 
 ### 4. Type Check
@@ -134,7 +136,7 @@ This project uses [Changesets](https://github.com/changesets/changesets) for ver
 
 Create a changeset for any PR that includes:
 - New features
-- Bug fixes  
+- Bug fixes
 - Documentation updates
 - Dependency updates
 - Breaking changes
