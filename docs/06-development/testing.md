@@ -4,7 +4,7 @@ Guide to testing branch-narrator.
 
 ## Test Framework
 
-We use **Vitest** for testing.
+We use **Bun's built-in test framework** (`bun:test`) for testing.
 
 ```bash
 # Run all tests
@@ -89,7 +89,7 @@ const changeSet = createChangeSet({
 ### Basic Pattern
 
 ```typescript
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { myAnalyzer } from "../src/analyzers/my-analyzer.js";
 import { createChangeSet, createFileChange } from "./fixtures/index.js";
 

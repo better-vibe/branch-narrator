@@ -20,7 +20,7 @@ This file contains instructions for AI agents (Jules) working on the `branch-nar
 
 3.  **Testing**:
     *   **Mandatory**: ALL code changes must be accompanied by tests.
-    *   **Framework**: Vitest (`tests/` directory).
+    *   **Framework**: Bun's test framework (`bun:test`) in the `tests/` directory.
     *   **Pattern**: Create `{name}.test.ts` for every source file `{name}.ts`.
     *   **Verify**: Run `bun test` to verify your changes pass before submitting.
 
