@@ -738,25 +738,35 @@ export function splitFullDiff(fullDiff: string): SplitDiffEntry[] {
     currentLines = [];
   };
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    
     // Check for new file boundary: "diff --git a/... b/..."
     if (line.startsWith("diff --git ")) {
       // Save previous file if exists
       flushCurrent();
 
       // Parse file paths from "diff --git a/old b/new"
-      const match = line.match(/^diff --git a\/(.+?) b\/(.+?)$/);
+      // Use greedy matching to handle paths containing " b/"
+      const match = line.match(/^diff --git a\/(.+) b\/(.+)$/);
       if (match) {
-        const oldPath = match[1]!;
         const newPath = match[2]!;
+        currentPath = newPath;
         
-        // If paths differ, it might be a rename
-        if (oldPath !== newPath) {
-          currentOldPath = oldPath;
-          currentPath = newPath;
-        } else {
-          currentPath = newPath;
-          currentOldPath = undefined;
+        // Check subsequent lines for rename markers to detect oldPath
+        // Look ahead for "rename from" line
+        let j = i + 1;
+        while (j < lines.length && !lines[j]!.startsWith("diff --git ")) {
+          const nextLine = lines[j]!;
+          if (nextLine.startsWith("rename from ")) {
+            currentOldPath = nextLine.substring("rename from ".length);
+            break;
+          }
+          // Stop looking once we hit the hunk headers
+          if (nextLine.startsWith("@@")) {
+            break;
+          }
+          j++;
         }
       }
       currentLines.push(line);

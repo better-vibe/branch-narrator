@@ -12,10 +12,12 @@ import {
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
+  limitConcurrency,
   parseDiffIntoHunks,
   renderDumpDiffJson,
   renderMarkdown,
   renderText,
+  splitFullDiff,
   type DiffFile,
   type DiffFileEntry,
   type DiffMode,
@@ -67,6 +69,17 @@ export interface DryRunResult {
   wouldChunk: boolean;
   chunkCount?: number;
 }
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Maximum number of concurrent operations for untracked file processing.
+ * This prevents spawning hundreds of concurrent git processes when dealing
+ * with many untracked files (binary checks and diff generation).
+ */
+const UNTRACKED_CONCURRENCY_LIMIT = 8;
 
 // ============================================================================
 // Command Handler
@@ -188,7 +201,7 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
 
   // Batch binary detection for tracked files using numstat
   const trackedFiles = included.filter((f) => !f.untracked);
-  const untrackedFilesIncluded = included.filter((f) => f.untracked);
+  const untrackedFilesFiltered = included.filter((f) => f.untracked);
 
   let statsMap: Map<string, import("./git.js").FileStats> = new Map();
   if (trackedFiles.length > 0) {
@@ -211,14 +224,13 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
   }
 
   // Check untracked files individually with concurrency limit
-  if (untrackedFilesIncluded.length > 0) {
-    const { limitConcurrency } = await import("./core.js");
-    const untrackedBinaryChecks = untrackedFilesIncluded.map((file) => async () => {
+  if (untrackedFilesFiltered.length > 0) {
+    const untrackedBinaryChecks = untrackedFilesFiltered.map((file) => async () => {
       const isBinary = await isUntrackedBinaryFile(file.path, cwd);
       return { file, isBinary };
     });
 
-    const untrackedResults = await limitConcurrency(untrackedBinaryChecks, 8);
+    const untrackedResults = await limitConcurrency(untrackedBinaryChecks, UNTRACKED_CONCURRENCY_LIMIT);
     for (const { file, isBinary } of untrackedResults) {
       if (isBinary) {
         binarySkipped.push({ path: file.path, reason: "binary" });
@@ -351,7 +363,7 @@ async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<vo
   // Detect binary files and add to skipped
   // Batch binary detection for tracked files using numstat
   const trackedFiles = included.filter((f) => !f.untracked);
-  const untrackedFilesIncluded = included.filter((f) => f.untracked);
+  const untrackedFilesFiltered = included.filter((f) => f.untracked);
 
   let statsMap: Map<string, import("./git.js").FileStats> = new Map();
   if (trackedFiles.length > 0) {
@@ -376,14 +388,13 @@ async function handleNameOnly(options: DumpDiffOptions, cwd: string): Promise<vo
   }
 
   // Check untracked files individually with concurrency limit
-  if (untrackedFilesIncluded.length > 0) {
-    const { limitConcurrency } = await import("./core.js");
-    const untrackedBinaryChecks = untrackedFilesIncluded.map((file) => async () => {
+  if (untrackedFilesFiltered.length > 0) {
+    const untrackedBinaryChecks = untrackedFilesFiltered.map((file) => async () => {
       const isBinary = await isUntrackedBinaryFile(file.path, cwd);
       return { file, isBinary };
     });
 
-    const untrackedResults = await limitConcurrency(untrackedBinaryChecks, 8);
+    const untrackedResults = await limitConcurrency(untrackedBinaryChecks, UNTRACKED_CONCURRENCY_LIMIT);
     for (const { file, isBinary } of untrackedResults) {
       if (isBinary) {
         skipped.push({
@@ -860,7 +871,7 @@ async function fetchDiffs(
 
   // Separate tracked and untracked files
   const trackedFiles = files.filter((f) => !f.untracked);
-  const untrackedFilesLocal = files.filter((f) => f.untracked);
+  const untrackedFiles = files.filter((f) => f.untracked);
 
   // Fetch all tracked files in one git diff call
   if (trackedFiles.length > 0) {
@@ -877,7 +888,6 @@ async function fetchDiffs(
       });
 
       // Split the full diff into per-file entries
-      const { splitFullDiff } = await import("./core.js");
       const splitEntries = splitFullDiff(fullDiff);
 
       // Create a map for quick lookup
@@ -917,6 +927,8 @@ async function fetchDiffs(
       }
     } catch (error) {
       // Fallback to per-file diffs if full diff fails
+      warn(`Batch diff failed, falling back to per-file diffs: ${error instanceof Error ? error.message : String(error)}`);
+      
       for (const file of trackedFiles) {
         const diff = await getFileDiff({
           mode: options.mode,
@@ -940,10 +952,8 @@ async function fetchDiffs(
   }
 
   // Fetch untracked files with concurrency limit
-  if (untrackedFilesLocal.length > 0) {
-    const { limitConcurrency } = await import("./core.js");
-    
-    const untrackedTasks = untrackedFilesLocal.map((file) => async () => {
+  if (untrackedFiles.length > 0) {
+    const untrackedTasks = untrackedFiles.map((file) => async () => {
       const diff = await getUntrackedFileDiff(file.path, options.unified, cwd);
       return {
         path: file.path,
@@ -954,7 +964,7 @@ async function fetchDiffs(
       };
     });
 
-    const untrackedEntries = await limitConcurrency(untrackedTasks, 8);
+    const untrackedEntries = await limitConcurrency(untrackedTasks, UNTRACKED_CONCURRENCY_LIMIT);
     entries.push(...untrackedEntries);
   }
 
