@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.15.2
+
+### Patch Changes
+
+- a62a306: Optimize facts command performance by reducing git subprocess calls and avoiding unnecessary evidence processing
+
 ## 0.15.1
 
 ### Patch Changes
