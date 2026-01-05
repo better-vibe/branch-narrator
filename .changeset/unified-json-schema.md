@@ -1,5 +1,5 @@
 ---
-"branch-narrator": major
+"@better-vibe/branch-narrator": minor
 ---
 
 BREAKING CHANGE: Unified dump-diff JSON schema to v2.0
