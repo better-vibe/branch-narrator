@@ -253,7 +253,6 @@ async function handleFullDiff(options: DumpDiffOptions, cwd: string): Promise<vo
       oldPath: entry.oldPath,
       status: entry.status,
       untracked: entry.untracked,
-      binary: false,
       patch: { text: entry.diff },
     }));
 
@@ -747,7 +746,6 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
         oldPath: targetFile.oldPath,
         status: targetFile.status,
         untracked: targetFile.untracked,
-        binary: false,
         stats,
         patch: { text: diff, hunks },
       },

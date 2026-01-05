@@ -803,6 +803,7 @@ describe("buildDumpDiffJsonV2 - schema validation", () => {
     expect(parsed.options.include).toEqual(["src/**"]);
     expect(parsed.options.exclude).toEqual(["**/*.test.ts"]);
     expect(parsed.options.stat).toBe(true);
+    expect(parsed.options.includeUntracked).toBe(true);
   });
 
   it("should omit generatedAt when noTimestamp is true", () => {
@@ -973,6 +974,32 @@ describe("buildDumpDiffJsonV2 - schema validation", () => {
     expect(parsed.files[0].patch.text).toBeDefined();
     expect(parsed.files[0].patch.hunks).toHaveLength(1);
     expect(parsed.files[0].patch.hunks[0].lines).toHaveLength(2);
+  });
+
+  it("should include includeUntracked: false in options", () => {
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: "branch",
+        base: "main",
+        head: "HEAD",
+        unified: 3,
+        include: [],
+        exclude: [],
+        includeUntracked: false,
+        nameOnly: false,
+        stat: false,
+        patchFor: null,
+        noTimestamp: true,
+      },
+      [],
+      [],
+      0
+    );
+
+    const json = renderDumpDiffJson(output);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.options.includeUntracked).toBe(false);
   });
 });
 
