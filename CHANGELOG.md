@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.14.1
+
+### Patch Changes
+
+- d2aa296: add babel-parser as dependency
+
 ## 0.14.0
 
 ### Minor Changes
