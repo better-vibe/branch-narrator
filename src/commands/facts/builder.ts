@@ -153,9 +153,29 @@ export async function buildFacts(
     }));
   }
 
-  // Get git info - use provided values if available, otherwise fetch
-  const repoRoot = providedRepoRoot ?? await getRepoRoot();
-  const isDirty = providedIsDirty ?? await isWorkingDirDirty();
+  // Get git info - use provided values if available, otherwise fetch in parallel
+  let repoRoot: string;
+  let isDirty: boolean;
+  
+  if (providedRepoRoot !== undefined && providedIsDirty !== undefined) {
+    // Both provided, use them directly
+    repoRoot = providedRepoRoot;
+    isDirty = providedIsDirty;
+  } else if (providedRepoRoot !== undefined) {
+    // Only repoRoot provided, fetch isDirty
+    repoRoot = providedRepoRoot;
+    isDirty = await isWorkingDirDirty();
+  } else if (providedIsDirty !== undefined) {
+    // Only isDirty provided, fetch repoRoot
+    repoRoot = await getRepoRoot();
+    isDirty = providedIsDirty;
+  } else {
+    // Neither provided, fetch both in parallel
+    [repoRoot, isDirty] = await Promise.all([
+      getRepoRoot(),
+      isWorkingDirDirty(),
+    ]);
+  }
 
   const git: GitInfo = {
     base: changeSet.base,
