@@ -13,7 +13,8 @@ mock.module("execa", () => {
 
 describe("batchGetFileContent", () => {
   beforeEach(() => {
-    (execa as unknown as Mock<typeof execa>).mockClear();
+    // mockReset() clears both call history AND implementation, preventing leaks between tests
+    (execa as unknown as Mock<typeof execa>).mockReset();
   });
 
   afterAll(() => {
