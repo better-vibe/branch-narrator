@@ -1,3 +1,6 @@
+/**
+ * Type definitions for benchmark test cases.
+ */
 export interface BenchmarkDefinition {
   name: string;
   args: string[];

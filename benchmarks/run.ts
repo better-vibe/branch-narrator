@@ -2,13 +2,13 @@
  * Benchmark runner for branch-narrator CLI commands.
  */
 import { execa } from 'execa';
-import type { BenchmarkDefinition } from './types';
-import { pretty } from './cases/pretty';
-import { prBody } from './cases/pr-body';
-import { facts } from './cases/facts';
-import { dumpDiff } from './cases/dump-diff';
-import { riskReport } from './cases/risk-report';
-import { integrate } from './cases/integrate';
+import type { BenchmarkDefinition } from './types.js';
+import { pretty } from './cases/pretty.js';
+import { prBody } from './cases/pr-body.js';
+import { facts } from './cases/facts.js';
+import { dumpDiff } from './cases/dump-diff.js';
+import { riskReport } from './cases/risk-report.js';
+import { integrate } from './cases/integrate.js';
 
 const BENCHMARKS: BenchmarkDefinition[] = [
   pretty,

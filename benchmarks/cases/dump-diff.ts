@@ -1,4 +1,7 @@
-import type { BenchmarkDefinition } from '../types';
+/**
+ * Benchmark test case for the 'dump-diff' command with cleanup teardown.
+ */
+import type { BenchmarkDefinition } from '../types.js';
 import { rm } from 'node:fs/promises';
 
 export const dumpDiff: BenchmarkDefinition = {

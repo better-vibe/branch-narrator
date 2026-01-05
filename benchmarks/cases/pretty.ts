@@ -1,4 +1,7 @@
-import type { BenchmarkDefinition } from '../types';
+/**
+ * Benchmark test case for the 'pretty' command.
+ */
+import type { BenchmarkDefinition } from '../types.js';
 
 export const pretty: BenchmarkDefinition = {
   name: 'pretty',
