@@ -19,6 +19,9 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = resolve(__dirname, '..');
 const CLI_PATH = resolve(PROJECT_ROOT, 'dist', 'cli.js');
 
+// Relative CLI path used in benchmark definitions (will be replaced with absolute path)
+const RELATIVE_CLI_PATH = './dist/cli.js';
+
 const BENCHMARKS: BenchmarkDefinition[] = [
   pretty,
   prBody,
@@ -99,9 +102,9 @@ async function runBenchmark() {
       for (let i = 0; i < iterations; i++) {
         const start = performance.now();
         try {
-          // Replace ./dist/cli.js with absolute path in args
+          // Replace relative CLI path with absolute path for execution in temp repo
           const absoluteArgs = bench.args.map(arg => 
-            arg === './dist/cli.js' ? CLI_PATH : arg
+            arg === RELATIVE_CLI_PATH ? CLI_PATH : arg
           );
           
           // Run benchmark in temp repo directory

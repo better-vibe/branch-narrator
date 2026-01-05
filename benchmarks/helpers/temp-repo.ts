@@ -202,19 +202,35 @@ export async function setupBenchmarkRepo(size: BenchmarkSize = 'medium'): Promis
       baseBranch: 'develop',
       featureBranch: 'feature/benchmark',
       cleanup: async () => {
-        await rm(cwd, { recursive: true, force: true });
+        try {
+          await rm(cwd, { recursive: true, force: true });
+        } catch (error) {
+          // Ignore cleanup errors - directory may already be deleted
+          // or inaccessible, which is acceptable for temp directories
+        }
       },
     };
   } catch (error) {
     // Cleanup on error
-    await rm(cwd, { recursive: true, force: true });
+    try {
+      await rm(cwd, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
     throw error;
   }
 }
 
 /**
  * Cleanup a benchmark repository.
+ * Provides consistent API and error handling for repository cleanup.
  */
 export async function cleanupBenchmarkRepo(repo: BenchmarkRepo): Promise<void> {
-  await repo.cleanup();
+  try {
+    await repo.cleanup();
+  } catch (error) {
+    // Log but don't throw - cleanup failures for temp directories
+    // are not critical and shouldn't fail the benchmark run
+    console.warn('Warning: Failed to cleanup benchmark repository:', error);
+  }
 }
