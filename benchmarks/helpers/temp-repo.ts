@@ -7,8 +7,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execa } from 'execa';
-
-export type BenchmarkSize = 'small' | 'medium' | 'large';
+import type { BenchmarkSize } from '../types.js';
 
 interface SizeConfig {
   committedFiles: number;
