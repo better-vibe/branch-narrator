@@ -1,5 +1,18 @@
 # @better-vibe/branch-narrator
 
+## 0.15.1
+
+### Patch Changes
+
+- 4b7c6e9: Improve dump-diff performance by reducing git calls and batching work
+
+  - Use single git diff call for all tracked files instead of per-file calls
+  - Batch binary detection using git diff --numstat for tracked files
+  - Limit concurrency for untracked file operations (binary checks and diffs)
+  - Add diff splitting utility to parse full diff into per-file chunks
+  - Add concurrency limiting utility for parallel operations
+  - Maintain identical output for all existing modes (full, --name-only, --stat, --patch-for)
+
 ## 0.15.0
 
 ### Minor Changes
