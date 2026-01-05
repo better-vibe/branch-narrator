@@ -5,7 +5,7 @@
 import { describe, expect, it, afterEach } from "bun:test";
 import { execa } from "execa";
 import { access } from "node:fs/promises";
-import { setupBenchmarkRepo, cleanupBenchmarkRepo, type BenchmarkRepo } from "../benchmarks/helpers/temp-repo.ts";
+import { setupBenchmarkRepo, cleanupBenchmarkRepo, type BenchmarkRepo } from "../benchmarks/helpers/temp-repo.js";
 
 // ============================================================================
 // Test Fixtures
