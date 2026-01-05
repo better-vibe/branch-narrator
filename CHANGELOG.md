@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 0.14.0
+
+### Minor Changes
+
+- 400b16d: Add modular benchmarking workflow for performance testing
+
 ## 0.13.0
 
 ### Minor Changes
