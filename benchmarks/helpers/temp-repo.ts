@@ -9,6 +9,10 @@ import { tmpdir } from 'node:os';
 import { execa } from 'execa';
 import type { BenchmarkSize } from '../types.js';
 
+/**
+ * Configuration for a specific benchmark size.
+ * Defines the number of files and settings for generated test repositories.
+ */
 interface SizeConfig {
   committedFiles: number;
   stagedFiles: number;
@@ -211,11 +215,11 @@ export async function setupBenchmarkRepo(size: BenchmarkSize = 'medium'): Promis
       },
     };
   } catch (error) {
-    // Cleanup on error
+    // Cleanup on error and rethrow
     try {
       await rm(cwd, { recursive: true, force: true });
     } catch {
-      // Ignore cleanup errors
+      // Ignore cleanup errors - the original error is more important
     }
     throw error;
   }

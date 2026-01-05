@@ -220,16 +220,8 @@ describe("cleanupBenchmarkRepo", () => {
     // Manually delete the directory first
     await cleanupBenchmarkRepo(repo);
     
-    // Cleanup again should not throw (just return successfully)
-    let error: Error | null = null;
-    try {
-      await cleanupBenchmarkRepo(repo);
-    } catch (e) {
-      error = e as Error;
-    }
-    
-    // Should not have thrown an error
-    expect(error).toBeNull();
+    // Cleanup again should not throw (cleanupBenchmarkRepo swallows errors)
+    await expect(cleanupBenchmarkRepo(repo)).resolves.toBeUndefined();
   });
 });
 

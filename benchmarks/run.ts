@@ -32,7 +32,12 @@ const BENCHMARKS: BenchmarkDefinition[] = [
 ];
 
 /**
- * Parse command-line arguments.
+ * Parse command-line arguments from process.argv.
+ * 
+ * Supports `--size` and `--iterations` flags, exits on invalid input, and
+ * prints a help message when `--help` or `-h` is provided.
+ * 
+ * @returns Parsed benchmark configuration including size and iteration count
  */
 function parseArgs(): { size: BenchmarkSize; iterations: number } {
   const args = process.argv.slice(2);
@@ -65,12 +70,26 @@ function parseArgs(): { size: BenchmarkSize; iterations: number } {
       console.log('  --iterations <number>         Number of iterations per benchmark (default: 5)');
       console.log('  --help, -h                    Show this help message');
       process.exit(0);
+    } else if (args[i].startsWith('-')) {
+      console.error(`Unknown option: ${args[i]}. Use --help to see available options.`);
+      process.exit(1);
     }
   }
 
   return { size, iterations };
 }
 
+/**
+ * Run all configured CLI benchmarks against a temporary git repository.
+ * 
+ * This function:
+ * - Parses command-line options (benchmark size and iteration count)
+ * - Creates a temporary benchmark repository of the requested size
+ * - Executes each benchmark case against the built CLI entrypoint
+ * - Cleans up the temporary repository when finished
+ * 
+ * Errors are propagated to the caller so they can be logged or handled.
+ */
 async function runBenchmark() {
   const { size, iterations } = parseArgs();
 
