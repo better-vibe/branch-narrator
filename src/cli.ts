@@ -387,7 +387,7 @@ program
         },
         skippedFiles: [],
         warnings: [],
-        noTimestamp: options.noTimestamp,
+        noTimestamp: !options.timestamp,
         repoRoot,
         isDirty,
       });
