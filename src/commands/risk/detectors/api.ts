@@ -2,7 +2,7 @@
  * API contract change detectors (OpenAPI, GraphQL, Proto).
  */
 
-import type { RiskFlag, RiskFlagEvidence } from "../../core/types.js";
+import type { RiskFlag, RiskFlagEvidence } from "../../../core/types.js";
 import type { Detector } from "./types.js";
 
 /**

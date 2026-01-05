@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { redactLine, redactLines } from "../src/risk/redaction.js";
+import { redactLine, redactLines } from "../src/commands/risk/redaction.js";
 
 describe("redactLine", () => {
   it("should redact GitHub tokens", () => {

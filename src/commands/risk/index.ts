@@ -1,13 +1,13 @@
 /**
- * Main risk report engine.
+ * Risk report command.
  */
 
-import type { ChangeSet, RiskFlag, RiskReport } from "../core/types.js";
+import type { ChangeSet, RiskFlag, RiskReport } from "../../core/types.js";
 import { ALL_DETECTORS } from "./detectors/index.js";
 import { shouldSkipFile } from "./exclusions.js";
 import { redactLines } from "./redaction.js";
 import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
-import { sortRiskFlagEvidence } from "../core/sorting.js";
+import { sortRiskFlagEvidence } from "../../core/sorting.js";
 
 /**
  * Options for generating risk report.
@@ -86,6 +86,17 @@ export function generateRiskReport(
     skippedFiles,
     { explainScore }
   );
+}
+
+/**
+ * Execute the risk-report command.
+ * This is the standard command handler that follows the execute* naming convention.
+ */
+export function executeRiskReport(
+  changeSet: ChangeSet,
+  options: RiskReportOptions = {}
+): RiskReport {
+  return generateRiskReport(changeSet, options);
 }
 
 export * from "./detectors/index.js";

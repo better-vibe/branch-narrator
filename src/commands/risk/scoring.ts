@@ -8,8 +8,8 @@ import type {
   RiskReport, 
   RiskReportLevel,
   ScoreBreakdown,
-} from "../core/types.js";
-import { sortRiskFlags } from "../core/sorting.js";
+} from "../../core/types.js";
+import { sortRiskFlags } from "../../core/sorting.js";
 
 /**
  * Compute category scores from flags.

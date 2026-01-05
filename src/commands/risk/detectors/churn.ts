@@ -2,7 +2,7 @@
  * Code churn detector.
  */
 
-import type { ChangeSet, RiskFlag, RiskFlagEvidence } from "../../core/types.js";
+import type { ChangeSet, RiskFlag, RiskFlagEvidence } from "../../../core/types.js";
 import type { Detector } from "./types.js";
 
 /**

@@ -14,12 +14,12 @@ import type {
   RiskScore,
   SkippedFile,
   Stats,
-} from "../core/types.js";
-import { redactEvidence } from "../core/evidence.js";
+} from "../../core/types.js";
+import { redactEvidence } from "../../core/evidence.js";
 import { aggregateCategories, buildSummaryByArea } from "./categories.js";
 import { deriveActions } from "./actions.js";
-import { DEFAULT_EXCLUDES } from "../core/filters.js";
-import { sortFindings as sortFindingsDeterministically, sortEvidence } from "../core/sorting.js";
+import { DEFAULT_EXCLUDES } from "../../core/filters.js";
+import { sortFindings as sortFindingsDeterministically, sortEvidence } from "../../core/sorting.js";
 
 /**
  * Build facts output options.

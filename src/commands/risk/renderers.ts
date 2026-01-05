@@ -2,7 +2,7 @@
  * Risk report renderers (JSON, Markdown, Text).
  */
 
-import type { RiskReport, RiskFlag } from "../core/types.js";
+import type { RiskReport, RiskFlag } from "../../core/types.js";
 
 /**
  * Render risk report as JSON.

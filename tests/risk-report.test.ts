@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { generateRiskReport } from "../src/risk/index.js";
+import { generateRiskReport } from "../src/commands/risk/index.js";
 import { createChangeSet } from "./fixtures/index.js";
 
 describe("generateRiskReport", () => {
