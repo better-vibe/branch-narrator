@@ -124,8 +124,8 @@ export interface FilterOptions {
 
 export interface RenderOptions {
   mode: DiffMode;
-  base: string | null;
-  head: string | null;
+  base: string | null | undefined;
+  head: string | null | undefined;
   unified: number;
   excludePatterns: string[];
 }
@@ -581,8 +581,8 @@ export function parseDiffIntoHunks(diff: string): DiffHunk[] {
 
 export interface BuildDumpDiffJsonV2Options {
   mode: DiffMode;
-  base: string;
-  head: string;
+  base?: string;
+  head?: string;
   unified: number;
   include: string[];
   exclude: string[];
@@ -602,8 +602,12 @@ function buildCommandArgs(options: BuildDumpDiffJsonV2Options): string[] {
   args.push("--mode", options.mode);
 
   if (options.mode === "branch") {
-    args.push("--base", options.base);
-    args.push("--head", options.head);
+    if (options.base) {
+      args.push("--base", options.base);
+    }
+    if (options.head) {
+      args.push("--head", options.head);
+    }
   }
 
   args.push("--format", "json");
@@ -657,8 +661,8 @@ export function buildDumpDiffJsonV2(
     },
     git: {
       mode: options.mode,
-      base: options.mode === "branch" ? options.base : null,
-      head: options.mode === "branch" ? options.head : null,
+      base: options.mode === "branch" ? (options.base ?? null) : null,
+      head: options.mode === "branch" ? (options.head ?? null) : null,
       isDirty: options.mode !== "branch",
     },
     options: {
