@@ -233,3 +233,77 @@ for (const finding of facts.findings) {
 }
 ```
 
+---
+
+## Agent Workflows with Zoom
+
+### Interactive Investigation Loop
+
+```bash
+# Step 1: Get all findings
+branch-narrator facts --format json --pretty > facts.json
+
+# Step 2: Review findings and identify one to investigate
+# (Agent or human reviews facts.json)
+
+# Step 3: Zoom into specific finding for detailed context
+branch-narrator zoom --finding "finding.env-var#abc123def456" --format md
+
+# Step 4: Make code changes based on zoomed context
+
+# Step 5: Verify the finding is resolved
+branch-narrator facts --format json | jq '.findings[] | select(.findingId == "finding.env-var#abc123def456")'
+```
+
+### Risk-Driven Investigation
+
+```bash
+# Step 1: Get risk report with flags
+branch-narrator risk-report --format json --pretty > risk.json
+
+# Step 2: Extract high-risk flags
+cat risk.json | jq '.flags[] | select(.effectiveScore > 30)'
+
+# Step 3: Zoom into the highest risk flag
+FLAG_ID=$(cat risk.json | jq -r '.flags | max_by(.effectiveScore) | .flagId')
+branch-narrator zoom --flag "$FLAG_ID" --format md > investigation.md
+
+# Step 4: Review related findings
+cat investigation.md
+```
+
+### Automated Evidence Collection
+
+```bash
+#!/bin/bash
+# Collect evidence for all high-confidence findings
+
+branch-narrator facts --format json | \
+  jq -r '.findings[] | select(.confidence == "high") | .findingId' | \
+  while read -r finding_id; do
+    echo "Investigating: $finding_id"
+    branch-narrator zoom --finding "$finding_id" --format md \
+      --out "evidence/${finding_id}.md"
+  done
+```
+
+### CI Integration with Zoom
+
+```bash
+# In CI pipeline: investigate specific failures
+
+# Get risk report
+branch-narrator risk-report --format json > risk.json
+
+# If there are security flags, investigate each one
+if [ $(jq '.flags[] | select(.category == "security") | length' risk.json) -gt 0 ]; then
+  jq -r '.flags[] | select(.category == "security") | .flagId' risk.json | \
+    while read -r flag_id; do
+      echo "Security flag found: $flag_id"
+      branch-narrator zoom --flag "$flag_id" --format text
+    done
+  exit 1
+fi
+```
+
+

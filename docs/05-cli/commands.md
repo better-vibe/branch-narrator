@@ -1,6 +1,6 @@
 # CLI Commands
 
-branch-narrator provides five commands for different use cases.
+branch-narrator provides six commands for different use cases.
 
 ## pretty
 
@@ -485,6 +485,187 @@ branch-narrator risk-report --no-timestamp
 
 ---
 
+## zoom
+
+Zoom into a specific finding or flag for detailed, targeted context. Designed for interactive AI agent loops.
+
+```bash
+branch-narrator zoom [options]
+```
+
+### Required Selector (exactly one)
+
+Either `--finding <id>` or `--flag <id>` must be provided.
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--finding <id>` | (none) | Finding ID to zoom into |
+| `--flag <id>` | (none) | Flag ID to zoom into |
+| `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
+| `--format <type>` | `md` | Output format: `json`, `md`, or `text` |
+| `--unified <n>` | `3` | Lines of unified context for patch hunks |
+| `--no-patch` | (off) | Do not include patch context, only evidence |
+| `--max-evidence-lines <n>` | `8` | Max evidence excerpt lines to show |
+| `--redact` | `false` | Redact obvious secret values in evidence excerpts |
+| `--out <path>` | (stdout) | Write output to file instead of stdout |
+| `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
+| `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
+
+### Diff Modes
+
+| Mode | Description | Git Command |
+|------|-------------|-------------|
+| `unstaged` | Working tree vs index (uncommitted) - **default** | `git diff` |
+| `branch` | Compare base ref to head ref | `git diff base..head` |
+| `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
+| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+
+### Workflow
+
+The typical workflow for using `zoom` is:
+
+1. Run `facts` or `risk-report` to get all findings or flags
+2. Extract a specific `findingId` or `flagId` from the output
+3. Run `zoom` with that ID to get detailed context for just that item
+
+### Examples
+
+```bash
+# First, get available findings
+branch-narrator facts --format json > facts.json
+
+# Extract a finding ID (e.g., from jq)
+FINDING_ID=$(cat facts.json | jq -r '.findings[0].findingId')
+
+# Zoom into that specific finding (Markdown format)
+branch-narrator zoom --finding "$FINDING_ID" --mode unstaged
+
+# Zoom into a finding with JSON output
+branch-narrator zoom --finding "finding.env-var#abc123def456" --format json --pretty
+
+# Zoom into a finding without patch context (evidence only)
+branch-narrator zoom --finding "finding.dependency-change#xyz789" --no-patch
+
+# Zoom into a finding with redacted secrets
+branch-narrator zoom --finding "finding.env-var#abc123" --redact
+
+# Get a risk flag from risk-report
+branch-narrator risk-report --format json > risk.json
+FLAG_ID=$(cat risk.json | jq -r '.flags[0].flagId')
+
+# Zoom into that specific flag
+branch-narrator zoom --flag "$FLAG_ID" --format md
+
+# Zoom into a flag in a branch comparison
+branch-narrator zoom --flag "flag.security.workflow_permissions_broadened#def789" \
+  --mode branch --base main --head feature/ci
+
+# Write zoom output to file
+branch-narrator zoom --finding "finding.route-change#abc123" --out zoom-output.md
+
+# Deterministic output for testing
+branch-narrator zoom --finding "finding.test-gap#xyz789" --no-timestamp --format json
+
+# Text format for simple terminal output
+branch-narrator zoom --finding "finding.sql-risk#abc456" --format text
+```
+
+### Output Formats
+
+#### JSON Format
+
+```json
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-01-06T12:00:00.000Z",
+  "range": {
+    "base": "main",
+    "head": "HEAD"
+  },
+  "itemType": "finding",
+  "findingId": "finding.env-var#abc123def456",
+  "finding": {
+    "type": "env-var",
+    "kind": "env-var",
+    "category": "config_env",
+    "confidence": "high",
+    "evidence": [...],
+    "name": "API_KEY",
+    "change": "added",
+    "evidenceFiles": ["src/config.ts"]
+  },
+  "evidence": [
+    {
+      "file": "src/config.ts",
+      "excerpt": "const API_KEY = process.env.API_KEY;",
+      "line": 5
+    }
+  ],
+  "patchContext": [
+    {
+      "file": "src/config.ts",
+      "status": "modified",
+      "hunks": [
+        {
+          "oldStart": 1,
+          "oldLines": 3,
+          "newStart": 1,
+          "newLines": 4,
+          "content": "..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### Markdown Format
+
+```markdown
+# Finding: finding.env-var#abc123def456
+
+**Type:** env-var
+**Category:** config_env
+**Confidence:** high
+
+**Range:** main..HEAD
+
+## Details
+
+[JSON representation of the finding]
+
+## Evidence
+
+### src/config.ts
+Line 5
+
+const API_KEY = process.env.API_KEY;
+
+## Patch Context
+
+### src/config.ts (modified)
+
+[diff hunks]
+```
+
+#### Text Format
+
+Plain text output optimized for terminal display, similar to Markdown but without formatting.
+
+### Use Cases
+
+- **AI Agent Iteration**: Agent runs `facts`, sees a concerning finding, zooms in for details
+- **CI/CD Integration**: Investigate specific high-risk flags in automated workflows
+- **Developer Workflow**: Quick drill-down on specific changes without full diff noise
+- **Debugging**: Isolate context for a particular finding or flag
+
+---
+
 ## integrate
 
 Generate provider-specific rules for AI coding assistants (e.g., Cursor, Jules).
@@ -542,6 +723,8 @@ branch-narrator pr-body --help
 branch-narrator facts --help
 branch-narrator dump-diff --help
 branch-narrator risk-report --help
+branch-narrator zoom --help
+branch-narrator integrate --help
 
 # Show version
 branch-narrator --version
