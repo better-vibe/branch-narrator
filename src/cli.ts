@@ -634,7 +634,7 @@ program
       });
 
       // Execute risk report command
-      const report = executeRiskReport(changeSet, {
+      const report = await executeRiskReport(changeSet, {
         only,
         exclude,
         maxEvidenceLines,

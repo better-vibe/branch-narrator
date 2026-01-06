@@ -13,6 +13,13 @@ import {
   vitestAnalyzer,
   testParityAnalyzer,
   impactAnalyzer,
+  analyzeLargeDiff,
+  analyzeLockfiles,
+  analyzeTestGaps,
+  analyzeSQLRisks,
+  analyzeCIWorkflows,
+  analyzeInfra,
+  analyzeAPIContracts,
 } from "../analyzers/index.js";
 
 /**
@@ -30,5 +37,12 @@ export const defaultProfile: Profile = {
     securityFilesAnalyzer,
     testParityAnalyzer,
     impactAnalyzer,
+    analyzeLargeDiff,
+    analyzeLockfiles,
+    analyzeTestGaps,
+    analyzeSQLRisks,
+    analyzeCIWorkflows,
+    analyzeInfra,
+    analyzeAPIContracts,
   ],
 };

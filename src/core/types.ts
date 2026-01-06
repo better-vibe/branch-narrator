@@ -57,6 +57,7 @@ export type Category =
   | "ci"
   | "docs"
   | "infra"
+  | "api"
   | "unknown";
 
 export type Confidence = "high" | "medium" | "low";
@@ -76,6 +77,7 @@ export interface FileSummaryFinding {
   deleted: string[];
   renamed: Array<{ from: string; to: string }>;
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.file-summary#<hash>"
 }
 
 export interface DependencyChangeFinding {
@@ -91,6 +93,7 @@ export interface DependencyChangeFinding {
   impact?: "major" | "minor" | "patch" | "new" | "removed" | "unknown";
   riskCategory?: "auth" | "database" | "native" | "payment";
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.dependency-change#<hash>"
 }
 
 export type RouteType = "page" | "layout" | "endpoint" | "error" | "unknown";
@@ -107,6 +110,7 @@ export interface RouteChangeFinding {
   routeType: RouteType;
   methods?: string[]; // For endpoints: GET, POST, etc.
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.route-change#<hash>"
 }
 
 export type EnvVarChange = "added" | "touched";
@@ -121,6 +125,7 @@ export interface EnvVarFinding {
   change: EnvVarChange;
   evidenceFiles: string[];
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.env-var#<hash>"
 }
 
 export type MigrationRisk = "high" | "medium" | "low";
@@ -136,6 +141,7 @@ export interface DbMigrationFinding {
   risk: MigrationRisk;
   reasons: string[];
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.db-migration#<hash>"
 }
 
 export type CloudflareArea = "wrangler" | "pages" | "workers" | "ci";
@@ -149,6 +155,7 @@ export interface CloudflareChangeFinding {
   area: CloudflareArea;
   files: string[];
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.cloudflare-change#<hash>"
 }
 
 export interface TestChangeFinding {
@@ -160,6 +167,7 @@ export interface TestChangeFinding {
   framework: "vitest";
   files: string[];
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.test-change#<hash>"
 }
 
 export type RiskLevel = "high" | "medium" | "low";
@@ -173,6 +181,7 @@ export interface RiskFlagFinding {
   risk: RiskLevel;
   evidenceText: string; // Legacy field for compatibility
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.risk-flag#<hash>"
 }
 
 export type FileCategory =
@@ -197,6 +206,7 @@ export interface FileCategoryFinding {
     count: number;
   }>;
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.file-category#<hash>"
 }
 
 export type SecurityFileReason =
@@ -216,6 +226,7 @@ export interface SecurityFileFinding {
   files: string[];
   reasons: SecurityFileReason[];
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.security-file#<hash>"
 }
 
 export interface ConventionViolationFinding {
@@ -227,6 +238,7 @@ export interface ConventionViolationFinding {
   message: string;
   files: string[];
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.convention-violation#<hash>"
 }
 
 export interface ImpactAnalysisFinding {
@@ -242,6 +254,108 @@ export interface ImpactAnalysisFinding {
   isTestFile?: boolean;
   blastRadius: "low" | "medium" | "high";
   tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.impact-analysis#<hash>"
+}
+
+export type CIWorkflowRisk =
+  | "permissions_broadened"
+  | "pull_request_target"
+  | "remote_script_download"
+  | "pipeline_changed";
+
+export interface CIWorkflowFinding {
+  type: "ci-workflow";
+  kind: "ci-workflow";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  riskType: CIWorkflowRisk;
+  details: string;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.ci-workflow#<hash>"
+}
+
+export type SQLRisk =
+  | "destructive"
+  | "schema_change"
+  | "unscoped_modification";
+
+export interface SQLRiskFinding {
+  type: "sql-risk";
+  kind: "sql-risk";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  riskType: SQLRisk;
+  details: string;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.sql-risk#<hash>"
+}
+
+export type InfraChangeType =
+  | "dockerfile"
+  | "terraform"
+  | "k8s";
+
+export interface InfraChangeFinding {
+  type: "infra-change";
+  kind: "infra-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  infraType: InfraChangeType;
+  files: string[];
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.infra-change#<hash>"
+}
+
+export interface APIContractChangeFinding {
+  type: "api-contract-change";
+  kind: "api-contract-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  files: string[];
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.api-contract-change#<hash>"
+}
+
+export interface LargeDiffFinding {
+  type: "large-diff";
+  kind: "large-diff";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  filesChanged: number;
+  linesChanged: number;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.large-diff#<hash>"
+}
+
+export interface LockfileFinding {
+  type: "lockfile-mismatch";
+  kind: "lockfile-mismatch";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  manifestChanged: boolean;
+  lockfileChanged: boolean;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.lockfile-mismatch#<hash>"
+}
+
+export interface TestGapFinding {
+  type: "test-gap";
+  kind: "test-gap";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  prodFilesChanged: number;
+  testFilesChanged: number;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.test-gap#<hash>"
 }
 
 export type RiskyPackageCategory =
@@ -262,7 +376,14 @@ export type Finding =
   | FileCategoryFinding
   | SecurityFileFinding
   | ConventionViolationFinding
-  | ImpactAnalysisFinding;
+  | ImpactAnalysisFinding
+  | CIWorkflowFinding
+  | SQLRiskFinding
+  | InfraChangeFinding
+  | APIContractChangeFinding
+  | LargeDiffFinding
+  | LockfileFinding
+  | TestGapFinding;
 
 // ============================================================================
 // Risk Score
@@ -439,7 +560,10 @@ export interface RiskFlagEvidence {
 }
 
 export interface RiskFlag {
-  id: string; // stable identifier, e.g. "db.destructive_sql"
+  id: string; // Legacy field - now duplicated as ruleKey
+  ruleKey?: string; // Stable rule identifier, e.g. "db.destructive_sql"
+  flagId?: string; // Stable instance ID, format: "flag.<ruleKey>#<hash>"
+  relatedFindingIds?: string[]; // Links to findings that triggered this flag
   category: RiskCategory;
   score: number; // 0..100 (base score for this flag)
   confidence: number; // 0..1

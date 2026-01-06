@@ -683,4 +683,94 @@ describe("buildFacts", () => {
     expect(facts.stats.insertions).toBe(2);
     expect(facts.stats.deletions).toBe(1);
   });
+
+  it("should assign findingIds to all findings", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence: [{ file: "a.ts", excerpt: "test" }],
+        name: "DATABASE_URL",
+        change: "added",
+        evidenceFiles: ["a.ts"],
+      },
+      {
+        type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence: [{ file: "b.ts", excerpt: "test" }],
+        routeId: "/api/users",
+        file: "b.ts",
+        change: "added",
+        routeType: "endpoint",
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.findings.length).toBe(2);
+    // All findings should have findingIds
+    expect(facts.findings[0].findingId).toBeDefined();
+    expect(facts.findings[0].findingId).toMatch(/^finding\./);
+    expect(facts.findings[1].findingId).toBeDefined();
+    expect(facts.findings[1].findingId).toMatch(/^finding\./);
+  });
+
+  it("should assign deterministic findingIds", async () => {
+    const changeSet = createMockChangeSet();
+    const finding: Finding = {
+      type: "env-var",
+      kind: "env-var",
+      category: "config_env",
+      confidence: "high",
+      evidence: [{ file: "a.ts", excerpt: "test" }],
+      name: "DATABASE_URL",
+      change: "added",
+      evidenceFiles: ["a.ts"],
+    };
+    const riskScore = createMockRiskScore();
+
+    // Build facts twice with the same input
+    const facts1 = await buildFacts({
+      changeSet,
+      findings: [finding],
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    const facts2 = await buildFacts({
+      changeSet,
+      findings: [finding],
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    // findingIds should be identical
+    expect(facts1.findings[0].findingId).toBe(facts2.findings[0].findingId);
+  });
 });
