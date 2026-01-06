@@ -10,7 +10,7 @@ import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
-import { collectChangeSet } from "./git/collector.js";
+import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
 import { getProfile, resolveProfileName } from "./profiles/index.js";
 import { renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
@@ -50,6 +50,40 @@ async function prompt(question: string): Promise<string> {
       resolve(answer.trim());
     });
   });
+}
+
+/**
+ * Resolve base/head refs for branch mode.
+ * Auto-detects base branch if not provided.
+ */
+async function resolveDiffOptions(options: {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+}): Promise<{ base?: string; head?: string }> {
+  if (options.mode === "branch") {
+    let base = options.base;
+    let head = options.head;
+
+    if (!base) {
+      base = await getDefaultBranch();
+    }
+    if (!head) {
+      head = "HEAD";
+    }
+    return { base, head };
+  }
+
+  // Warn if base/head provided with non-branch mode
+  const baseProvided = options.base !== undefined;
+  const headProvided = options.head !== undefined;
+  if (baseProvided || headProvided) {
+    warn(
+      `Warning: --base and --head are ignored when --mode is "${options.mode}"`
+    );
+  }
+
+  return { base: undefined, head: undefined };
 }
 
 /**
@@ -116,10 +150,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
-  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
+  .option("--base <ref>", "Base branch to compare against (branch mode; auto-detected if omitted)")
+  .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit|react)",
@@ -134,21 +168,16 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       const { findings, resolvedProfile } = await runAnalysisWithMode({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         profile: options.profile as ProfileName,
         showSpinner: true,
       });
@@ -175,10 +204,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
-  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
+  .option("--base <ref>", "Base branch to compare against (branch mode; auto-detected if omitted)")
+  .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option("-u, --uncommitted", "[DEPRECATED] Use --mode unstaged instead", false)
   .option(
     "--profile <name>",
@@ -201,21 +230,16 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       const { findings, resolvedProfile } = await runAnalysisWithMode({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         profile: options.profile as ProfileName,
         showSpinner: false,
       });
@@ -259,10 +283,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base git reference (branch mode only)", "main")
-  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
+  .option("--base <ref>", "Base git reference (branch mode only; auto-detected if omitted)")
+  .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit|react)",
@@ -312,16 +336,11 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       // Validate format
       if (options.format !== "json") {
@@ -339,8 +358,8 @@ program
       // Collect git data using mode-based options
       const changeSet = await collectChangeSet({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         includeUntracked: mode === "all",
       });
 
@@ -425,10 +444,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base git reference (branch mode only)", "main")
-  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
+  .option("--base <ref>", "Base git reference (branch mode only; auto-detected if omitted)")
+  .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option("--no-untracked", "Exclude untracked files (non-branch modes)")
   .option("--out <path>", "Write output to file (creates directories as needed)")
   .option(
@@ -471,6 +490,12 @@ program
         process.exit(1);
       }
 
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
+
       const format = options.format as "text" | "md" | "json";
       if (!["text", "md", "json"].includes(format)) {
         logError(`Invalid format: ${options.format}. Use text, md, or json.`);
@@ -507,8 +532,8 @@ program
 
       await executeDumpDiff({
         mode,
-        base: options.base,
-        head: options.head,
+        base,
+        head,
         out: options.out,
         format,
         unified,
@@ -539,10 +564,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base git reference (branch mode only)", "main")
-  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
+  .option("--base <ref>", "Base git reference (branch mode only; auto-detected if omitted)")
+  .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option("--format <type>", "Output format: json|md|text", "json")
   .option("--out <path>", "Write output to file instead of stdout")
   .option("--fail-on-score <n>", "Exit with code 2 if risk score >= threshold")
@@ -565,16 +590,11 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       // Validate format
       const format = options.format as "json" | "md" | "text";
@@ -608,8 +628,8 @@ program
       // Collect git data using mode-based options
       const changeSet = await collectChangeSet({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         includeUntracked: mode === "all",
       });
 
