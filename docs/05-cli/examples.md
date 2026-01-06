@@ -7,7 +7,7 @@ Practical examples for common use cases.
 ### Generate PR Description
 
 ```bash
-# Compare main to HEAD
+# Analyze unstaged changes (default)
 branch-narrator pr-body
 
 # Output goes to stdout
@@ -30,28 +30,28 @@ branch-narrator facts | jq -r '.riskScore.level'
 ### Before Committing
 
 ```bash
-# Check uncommitted changes
-branch-narrator pr-body -u
+# Check unstaged changes (default)
+branch-narrator pr-body
 
 # See what will be flagged
-branch-narrator facts -u | jq '.riskScore.evidenceBullets'
+branch-narrator facts | jq '.riskScore.evidenceBullets'
 ```
 
 ### Feature Branch
 
 ```bash
 # Compare feature to main
-branch-narrator pr-body --base main --head feature/auth
+branch-narrator pr-body --mode branch --base main --head feature/auth
 ```
 
 ### Comparing Commits
 
 ```bash
 # Last 5 commits
-branch-narrator pr-body --base HEAD~5 --head HEAD
+branch-narrator pr-body --mode branch --base HEAD~5 --head HEAD
 
 # Between tags
-branch-narrator pr-body --base v1.0.0 --head v1.1.0
+branch-narrator pr-body --mode branch --base v1.0.0 --head v1.1.0
 ```
 
 ---
@@ -133,6 +133,7 @@ jobs:
       - name: Generate PR body
         run: |
           npx branch-narrator pr-body \
+            --mode branch \
             --base ${{ github.base_ref }} \
             --head ${{ github.head_ref }} > pr-body.md
 
@@ -156,11 +157,11 @@ jobs:
 #!/bin/bash
 # .git/hooks/pre-commit
 
-RISK=$(npx branch-narrator facts -u | jq -r '.riskScore.level')
+RISK=$(npx branch-narrator facts --mode unstaged | jq -r '.riskScore.level')
 
 if [ "$RISK" = "high" ]; then
   echo "⚠️  High risk changes detected!"
-  npx branch-narrator facts -u | jq -r '.riskScore.evidenceBullets[]'
+  npx branch-narrator facts --mode unstaged | jq -r '.riskScore.evidenceBullets[]'
   echo ""
   read -p "Continue anyway? (y/n) " -n 1 -r
   echo

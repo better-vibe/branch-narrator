@@ -46,24 +46,24 @@ branch-narrator --quiet --debug facts
 ### Preview Changes (for Humans)
 
 ```bash
-# Colorized summary of changes
+# Colorized summary of unstaged changes (default)
 branch-narrator pretty
 
-# Include uncommitted work
-branch-narrator pretty -u
-
 # Compare specific branches
-branch-narrator pretty --base develop --head feature/auth
+branch-narrator pretty --mode branch --base develop --head feature/auth
+
+# Review all uncommitted changes (staged + unstaged + untracked)
+branch-narrator pretty --mode all
 ```
 
 ### Generate PR Description
 
 ```bash
-# Raw markdown for GitHub PRs
+# Analyze unstaged changes (default)
 branch-narrator pr-body
 
-# With custom refs
-branch-narrator pr-body --base develop --head feature/my-feature
+# Compare branches for PR
+branch-narrator pr-body --mode branch --base develop --head feature/my-feature
 
 # Interactive mode (prompts for context)
 branch-narrator pr-body --interactive
@@ -75,17 +75,17 @@ branch-narrator pr-body | pbcopy
 ### Generate JSON Facts (Agent-Grade)
 
 ```bash
-# Machine-readable structured output
+# Analyze unstaged changes (default)
 branch-narrator facts
+
+# Compare branches for PR
+branch-narrator facts --mode branch --base develop --head feature/auth
 
 # Pretty-printed JSON
 branch-narrator facts --pretty
 
 # Redact secrets in evidence excerpts
 branch-narrator facts --redact
-
-# Custom git refs
-branch-narrator facts --base develop --head feature/auth
 
 # Limit output
 branch-narrator facts --max-findings 50
@@ -102,8 +102,11 @@ branch-narrator facts | jq '.actions[] | select(.blocking == true)'
 ### Risk Report (General-Purpose Security & Quality Analysis)
 
 ```bash
-# Generate risk report with JSON output (default)
+# Analyze unstaged changes (default)
 branch-narrator risk-report
+
+# Compare branches for PR
+branch-narrator risk-report --mode branch --base develop --head feature/auth
 
 # Markdown format for human review
 branch-narrator risk-report --format md
@@ -131,9 +134,6 @@ branch-narrator risk-report --max-evidence-lines 3
 
 # Write to file
 branch-narrator risk-report --format md --out .ai/risk-report.md
-
-# Custom git refs
-branch-narrator risk-report --base develop --head feature/auth
 
 # Parse with jq
 branch-narrator risk-report | jq '.riskScore'
@@ -195,14 +195,14 @@ branch-narrator risk-report | jq '.categoryScores.db'
 ### Dump Diff for AI Agents
 
 ```bash
-# Output prompt-ready diff to stdout (branch mode, default)
+# Output unstaged changes (default)
 branch-narrator dump-diff
 
 # Write to file
 branch-narrator dump-diff --out .ai/diff.txt
 
-# Unstaged changes (working tree vs index)
-branch-narrator dump-diff --mode unstaged --out .ai/diff.txt
+# Compare branches for PR
+branch-narrator dump-diff --mode branch --base main --head feature/auth --out .ai/diff.txt
 
 # Staged changes only (index vs HEAD)
 branch-narrator dump-diff --mode staged --format md --out .ai/staged.md
@@ -259,9 +259,9 @@ Display a colorized summary of changes in the terminal.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
-| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 
 ### `pr-body` Command
@@ -270,9 +270,10 @@ Generate a raw Markdown PR description.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
-| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
+| `-u, --uncommitted` | `false` | **[DEPRECATED]** Use `--mode unstaged` instead |
 | `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 | `--interactive` | `false` | Prompt for additional context |
 
@@ -282,9 +283,9 @@ Output JSON findings for programmatic use.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
-| `-u, --uncommitted` | `false` | Include uncommitted changes |
+| `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
 
 ### `dump-diff` Command
@@ -293,8 +294,8 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--mode <type>` | `branch` | Mode: `branch`, `unstaged`, `staged`, or `all` |
-| `--base <ref>` | `main` | Base git reference (branch mode only) |
+| `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--no-untracked` | (off) | Exclude untracked files (non-branch modes) |
 | `--out <path>` | stdout | Write output to file |
@@ -308,8 +309,8 @@ Output prompt-ready git diff with smart exclusions. Designed for AI agents.
 | `--dry-run` | `false` | Preview without writing |
 
 **Modes:**
-- `branch` (default): Compare `--base` to `--head` refs
-- `unstaged`: Working tree vs index (uncommitted changes)
+- `unstaged` (default): Working tree vs index (uncommitted changes)
+- `branch`: Compare `--base` to `--head` refs
 - `staged`: Index vs HEAD (staged changes)
 - `all`: Working tree vs HEAD (all uncommitted changes)
 
@@ -339,8 +340,9 @@ Analyze git diff and emit a risk score (0-100) with evidence-backed flags. Frame
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--base <ref>` | `main` | Base git reference |
-| `--head <ref>` | `HEAD` | Head git reference |
+| `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
+| `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
+| `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--format <type>` | `json` | Output format: `json`, `md`, or `text` |
 | `--out <path>` | stdout | Write output to file |
 | `--fail-on-score <n>` | (none) | Exit with code 2 if risk score >= threshold |

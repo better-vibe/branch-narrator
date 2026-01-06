@@ -14,12 +14,12 @@ branch-narrator dump-diff --mode <type>
 
 | Mode | Description | Git Equivalent |
 |------|-------------|----------------|
-| `branch` | Compare base ref to head ref (default) | `git diff base..head` |
-| `unstaged` | Working tree vs index | `git diff` |
+| `unstaged` | Working tree vs index (default) | `git diff` |
+| `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD | `git diff --staged` |
 | `all` | Working tree vs HEAD (includes untracked) | `git diff HEAD` |
 
-**Default:** `branch`
+**Default:** `unstaged`
 
 **Note:** When using `unstaged`, `staged`, or `all` modes, the `--base` and `--head` options are ignored (a warning is printed to stderr).
 
@@ -30,10 +30,10 @@ branch-narrator dump-diff --mode <type>
 Base git reference to compare against. Only used in `branch` mode.
 
 ```bash
-branch-narrator pretty --base <ref>
-branch-narrator pr-body --base <ref>
-branch-narrator facts --base <ref>
-branch-narrator dump-diff --base <ref>
+branch-narrator pretty --mode branch --base <ref>
+branch-narrator pr-body --mode branch --base <ref>
+branch-narrator facts --mode branch --base <ref>
+branch-narrator dump-diff --mode branch --base <ref>
 ```
 
 ### Values
@@ -47,7 +47,7 @@ branch-narrator dump-diff --base <ref>
 
 ### Default
 
-`main`
+Auto-detected from `refs/remotes/origin/HEAD` (usually `main` or `develop`). Falls back to `main` if detection fails.
 
 ---
 
@@ -69,9 +69,10 @@ Same value types as `--base`.
 
 ## -u, --uncommitted
 
-Include uncommitted and untracked changes. Only available on `pr-body` command.
+**[DEPRECATED]** Use `--mode unstaged` instead. Include uncommitted and untracked changes. Only available on `pr-body` command.
 
 ```bash
+# Deprecated (use --mode unstaged instead)
 branch-narrator pr-body -u
 branch-narrator pr-body --uncommitted
 ```
@@ -87,11 +88,14 @@ When enabled:
 ### Use Cases
 
 ```bash
-# Review changes before committing
+# OLD (deprecated)
 branch-narrator pr-body -u
+
+# NEW (recommended)
+branch-narrator pr-body --mode unstaged
 ```
 
-**Note:** For `pretty` and `facts` commands, use `--mode all` instead.
+**Note:** For `pretty` and `facts` commands, use `--mode unstaged` or `--mode all`.
 
 ---
 
