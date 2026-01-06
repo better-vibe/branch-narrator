@@ -57,6 +57,7 @@ export type Category =
   | "ci"
   | "docs"
   | "infra"
+  | "api"
   | "unknown";
 
 export type Confidence = "high" | "medium" | "low";

@@ -37,7 +37,7 @@ export const analyzeAPIContracts: Analyzer = {
       findings.push({
         type: "api-contract-change",
         kind: "api-contract-change",
-        category: "unknown",
+        category: "api",
         confidence: "high",
         evidence: [],
         files: contractFiles,
