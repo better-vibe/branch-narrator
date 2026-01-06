@@ -25,3 +25,7 @@ coverage/
 # Package tarballs
 *.tgz
 
+# Test data
+.test-data/
+test-delta-manual.js
+

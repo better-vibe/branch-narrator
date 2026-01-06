@@ -97,6 +97,11 @@ branch-narrator facts --exclude "**/test/**" --include "src/**"
 branch-narrator facts | jq '.risk.level'
 branch-narrator facts | jq '.categories[] | select(.id == "database")'
 branch-narrator facts | jq '.actions[] | select(.blocking == true)'
+
+# Delta mode: compare to previous run
+branch-narrator facts --out .ai/baseline.json
+# ... make changes ...
+branch-narrator facts --since .ai/baseline.json --pretty
 ```
 
 ### Risk Report (General-Purpose Security & Quality Analysis)
@@ -139,6 +144,12 @@ branch-narrator risk-report --format md --out .ai/risk-report.md
 branch-narrator risk-report | jq '.riskScore'
 branch-narrator risk-report | jq '.flags[] | select(.category == "security")'
 branch-narrator risk-report | jq '.categoryScores.db'
+
+# Delta mode: track risk improvement
+branch-narrator risk-report --out .ai/baseline-risk.json
+# ... make changes ...
+branch-narrator risk-report --since .ai/baseline-risk.json --pretty
+# Shows: risk score change, added/removed/changed flags
 ```
 
 **Risk Categories:**
