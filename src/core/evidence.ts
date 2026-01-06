@@ -72,14 +72,15 @@ export function redactSecrets(text: string): string {
 
   // Generic secret patterns (only match assignment contexts)
   // Match: password=value, secret: value, token="value", api_key='value'
+  // Skip values that contain ***REDACTED*** to avoid double-redaction
   redacted = redacted.replace(
-    /(password|secret|token|apikey|api_key)(\s*[:=]\s*)(["'])([^"']+)\3/gi,
+    /(password|secret|token|apikey|api_key)(\s*[:=]\s*)(["'])(?!.*\*\*\*REDACTED\*\*\*)([^"']+?)\3/gi,
     "$1$2$3***REDACTED***$3"
   );
   
-  // Also match unquoted values
+  // Also match unquoted values (skip values that contain ***REDACTED***)
   redacted = redacted.replace(
-    /(password|secret|token|apikey|api_key)(\s*[:=]\s*)([^\s"',;)]+)/gi,
+    /(password|secret|token|apikey|api_key)(\s*[:=]\s*)(?!.*\*\*\*REDACTED\*\*\*)([^\s"',;)]+)/gi,
     "$1$2***REDACTED***"
   );
 
