@@ -680,6 +680,126 @@ program
     }
   });
 
+// zoom command - targeted drill-down for findings and flags
+program
+  .command("zoom")
+  .description("Zoom into a specific finding or flag for detailed context")
+  .option("--finding <id>", "Finding ID to zoom into")
+  .option("--flag <id>", "Flag ID to zoom into")
+  .option(
+    "--mode <type>",
+    "Diff mode: branch|unstaged|staged|all",
+    "unstaged"
+  )
+  .option("--base <ref>", "Base git reference (branch mode only; auto-detected if omitted)")
+  .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
+  .option(
+    "--profile <name>",
+    "Profile to use (auto|sveltekit|react)",
+    "auto"
+  )
+  .option("--format <type>", "Output format: json|md|text", "md")
+  .option("--unified <n>", "Lines of unified context for patch hunks", "3")
+  .option("--no-patch", "Do not include patch context, only evidence")
+  .option("--max-evidence-lines <n>", "Max evidence excerpt lines to show", "8")
+  .option("--redact", "Redact obvious secret values in evidence excerpts", false)
+  .option("--out <path>", "Write output to file instead of stdout")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .option("--no-timestamp", "Omit generatedAt for deterministic output")
+  .action(async (options) => {
+    try {
+      // Import zoom command dynamically
+      const { executeZoom } = await import("./commands/zoom/index.js");
+      const { renderZoomJSON, renderZoomMarkdown, renderZoomText } = await import("./commands/zoom/renderers.js");
+
+      // Validate mode
+      const mode = options.mode as DiffMode;
+      if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
+        logError(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
+        process.exit(1);
+      }
+
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
+
+      // Validate format
+      const format = options.format as "json" | "md" | "text";
+      if (!["json", "md", "text"].includes(format)) {
+        logError(`Invalid format: ${options.format}. Use json, md, or text.`);
+        process.exit(1);
+      }
+
+      // Parse unified context
+      const unified = parseInt(options.unified, 10);
+      if (isNaN(unified) || unified < 0) {
+        logError(`Invalid unified context: ${options.unified}. Must be a non-negative integer.`);
+        process.exit(1);
+      }
+
+      // Parse max evidence lines
+      const maxEvidenceLines = parseInt(options.maxEvidenceLines, 10);
+      if (isNaN(maxEvidenceLines) || maxEvidenceLines < 1) {
+        logError(`Invalid max-evidence-lines: ${options.maxEvidenceLines}. Must be a positive integer.`);
+        process.exit(1);
+      }
+
+      // Collect git data using mode-based options
+      const changeSet = await collectChangeSet({
+        mode,
+        base,
+        head,
+        includeUntracked: mode === "all",
+      });
+
+      // Execute zoom command
+      const zoomOutput = await executeZoom(changeSet, {
+        findingId: options.finding,
+        flagId: options.flag,
+        mode,
+        base,
+        head,
+        profile: options.profile as ProfileName,
+        includePatch: options.patch !== false,
+        unified,
+        maxEvidenceLines,
+        redact: options.redact,
+        noTimestamp: options.noTimestamp,
+      });
+
+      // Render output
+      let output: string;
+      switch (format) {
+        case "json":
+          output = renderZoomJSON(zoomOutput, options.pretty);
+          break;
+        case "md":
+          output = renderZoomMarkdown(zoomOutput);
+          break;
+        case "text":
+          output = renderZoomText(zoomOutput);
+          break;
+      }
+
+      // Write to file or stdout
+      if (options.out) {
+        const { writeFile, mkdir } = await import("node:fs/promises");
+        const { dirname } = await import("node:path");
+        await mkdir(dirname(options.out), { recursive: true });
+        await writeFile(options.out, output, "utf-8");
+        info(`Zoom output written to ${options.out}`);
+      } else {
+        console.log(output);
+      }
+
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
 // integrate command - generate provider rules (Cursor, Jules, etc.)
 program
   .command("integrate <target>")
