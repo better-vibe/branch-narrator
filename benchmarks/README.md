@@ -58,6 +58,7 @@ benchmarks/
     ├── facts.ts            # Structured facts extraction
     ├── dump-diff.ts        # Diff export to files
     ├── risk-report.ts      # Risk assessment
+    ├── zoom.ts             # Targeted finding/flag drill-down
     └── integrate.ts        # Tool integration (dry-run)
 ```
 

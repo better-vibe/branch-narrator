@@ -11,6 +11,7 @@ import { facts } from './cases/facts.js';
 import { dumpDiff } from './cases/dump-diff.js';
 import { riskReport } from './cases/risk-report.js';
 import { integrate } from './cases/integrate.js';
+import { zoom } from './cases/zoom.js';
 import { setupBenchmarkRepo, cleanupBenchmarkRepo, type BenchmarkRepo } from './helpers/temp-repo.js';
 
 // Get the project root directory
@@ -28,6 +29,7 @@ const BENCHMARKS: BenchmarkDefinition[] = [
   facts,
   dumpDiff,
   riskReport,
+  zoom,
   integrate,
 ];
 
