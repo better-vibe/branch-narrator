@@ -42,8 +42,8 @@ import {
 
 export interface DumpDiffOptions {
   mode: DiffMode;
-  base: string;
-  head: string;
+  base?: string;
+  head?: string;
   out?: string;
   format: "text" | "md" | "json";
   unified: number;
