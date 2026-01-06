@@ -13,6 +13,13 @@ import {
   securityFilesAnalyzer,
   supabaseAnalyzer,
   vitestAnalyzer,
+  analyzeLargeDiff,
+  analyzeLockfiles,
+  analyzeTestGaps,
+  analyzeSQLRisks,
+  analyzeCIWorkflows,
+  analyzeInfra,
+  analyzeAPIContracts,
 } from "../analyzers/index.js";
 
 /**
@@ -30,5 +37,12 @@ export const sveltekitProfile: Profile = {
     vitestAnalyzer,
     dependencyAnalyzer,
     securityFilesAnalyzer,
+    analyzeLargeDiff,
+    analyzeLockfiles,
+    analyzeTestGaps,
+    analyzeSQLRisks,
+    analyzeCIWorkflows,
+    analyzeInfra,
+    analyzeAPIContracts,
   ],
 };

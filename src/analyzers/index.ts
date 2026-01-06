@@ -14,4 +14,11 @@ export * from "./security-files.js";
 export * from "./reactRouterRoutes.js";
 export * from "./test-parity.js";
 export * from "./impact.js";
+export * from "./large-diff.js";
+export * from "./lockfiles.js";
+export * from "./test-gaps.js";
+export * from "./sql-risks.js";
+export * from "./ci-workflows.js";
+export * from "./infra.js";
+export * from "./api-contracts.js";
 
