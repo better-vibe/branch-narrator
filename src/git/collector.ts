@@ -31,6 +31,33 @@ export async function isGitRepo(cwd: string = process.cwd()): Promise<boolean> {
 }
 
 /**
+ * Detect the default branch of the remote origin.
+ * Falls back to "main" if detection fails.
+ */
+export async function getDefaultBranch(cwd: string = process.cwd()): Promise<string> {
+  try {
+    // Try to get the symbolic ref for origin/HEAD
+    const result = await execa("git", ["symbolic-ref", "refs/remotes/origin/HEAD"], {
+      cwd,
+      reject: false,
+    });
+
+    if (result.exitCode === 0) {
+      // Output is like "refs/remotes/origin/main"
+      // Split by slash and get the last part
+      const parts = result.stdout.trim().split("/");
+      if (parts.length > 0) {
+        return parts[parts.length - 1];
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return "main";
+}
+
+/**
  * Validate that a git reference exists.
  */
 export async function refExists(

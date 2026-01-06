@@ -23,7 +23,7 @@ If you need accurate context, run the commands below BEFORE writing conclusions.
 
 ### 1) Get structured facts (preferred)
 Run:
-- \`branch-narrator facts --base main --head HEAD\`
+- \`branch-narrator facts --mode branch --base main --head HEAD\`
 
 This returns JSON findings. Use it to produce:
 - A concise summary (facts-based)
@@ -34,7 +34,7 @@ Do not guess "why" a change was made. If the user needs intent, ask them.
 
 ### 2) Get a prompt-ready diff (filtered)
 Run:
-- \`branch-narrator dump-diff --base main --head HEAD --out .ai/diff.txt\`
+- \`branch-narrator dump-diff --mode branch --base main --head HEAD --out .ai/diff.txt\`
 
 Then read \`.ai/diff.txt\` for line-level context.
 
@@ -49,8 +49,12 @@ When asked to write a PR description, follow the \`PR Description\` rule and cal
 
 ---
 
+## Default mode
+The CLI defaults to \`unstaged\` mode (local changes) if no flags are provided.
+For PR descriptions, always specify \`--mode branch\`.
+
 ## Default refs
-If the user doesn't specify refs, use:
+If the user doesn't specify refs (and \`branch\` mode is implied/requested):
 - base: \`main\`
 - head: \`HEAD\`
 `;
@@ -63,10 +67,10 @@ intent or outcomes.
 
 ## Required tool calls (do this first)
 1) Get structured facts:
-   - \`branch-narrator facts --base main --head HEAD\`
+   - \`branch-narrator facts --mode branch --base main --head HEAD\`
 
 2) Dump a filtered diff with unified context:
-   - \`branch-narrator dump-diff --base main --head HEAD --unified 3 --out .ai/diff.txt\`
+   - \`branch-narrator dump-diff --mode branch --base main --head HEAD --unified 3 --out .ai/diff.txt\`
 
 Read:
 - the JSON output from \`facts\`

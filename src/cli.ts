@@ -116,10 +116,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
-  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
+  .option("--base <ref>", "Base branch to compare against (branch mode; auto-detected if omitted)")
+  .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit|react)",
@@ -134,10 +134,19 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
+      // Resolve refs if mode is branch
+      if (mode === "branch") {
+        if (!options.base) {
+          const { getDefaultBranch } = await import("./git/collector.js");
+          options.base = await getDefaultBranch();
+        }
+        if (!options.head) {
+          options.head = "HEAD";
+        }
+      } else {
+        // Warn if base/head provided with non-branch mode
+        const baseProvided = options.base !== undefined;
+        const headProvided = options.head !== undefined;
         if (baseProvided || headProvided) {
           warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`
@@ -175,10 +184,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base branch to compare against (branch mode)", "main")
-  .option("--head <ref>", "Head branch (branch mode)", "HEAD")
+  .option("--base <ref>", "Base branch to compare against (branch mode; auto-detected if omitted)")
+  .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option("-u, --uncommitted", "[DEPRECATED] Use --mode unstaged instead", false)
   .option(
     "--profile <name>",
@@ -201,10 +210,19 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
+      // Resolve refs if mode is branch
+      if (mode === "branch") {
+        if (!options.base) {
+          const { getDefaultBranch } = await import("./git/collector.js");
+          options.base = await getDefaultBranch();
+        }
+        if (!options.head) {
+          options.head = "HEAD";
+        }
+      } else {
+        // Warn if base/head provided with non-branch mode
+        const baseProvided = options.base !== undefined;
+        const headProvided = options.head !== undefined;
         if (baseProvided || headProvided) {
           warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`
@@ -259,10 +277,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base git reference (branch mode only)", "main")
-  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
+  .option("--base <ref>", "Base git reference (branch mode only; auto-detected if omitted)")
+  .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit|react)",
@@ -303,7 +321,7 @@ program
     try {
       // Import executeFacts dynamically to avoid circular dependencies
       const { executeFacts } = await import("./commands/facts/index.js");
-      const { getRepoRoot, isWorkingDirDirty } = await import("./git/collector.js");
+      const { getRepoRoot, isWorkingDirDirty, getDefaultBranch } = await import("./git/collector.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -312,10 +330,18 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
+      // Resolve refs if mode is branch
+      if (mode === "branch") {
+        if (!options.base) {
+          options.base = await getDefaultBranch();
+        }
+        if (!options.head) {
+          options.head = "HEAD";
+        }
+      } else {
+        // Warn if base/head provided with non-branch mode
+        const baseProvided = options.base !== undefined;
+        const headProvided = options.head !== undefined;
         if (baseProvided || headProvided) {
           warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`
@@ -425,10 +451,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base git reference (branch mode only)", "main")
-  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
+  .option("--base <ref>", "Base git reference (branch mode only; auto-detected if omitted)")
+  .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option("--no-untracked", "Exclude untracked files (non-branch modes)")
   .option("--out <path>", "Write output to file (creates directories as needed)")
   .option(
@@ -469,6 +495,26 @@ program
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
         logError(`Invalid mode: ${options.mode}. Use branch, unstaged, staged, or all.`);
         process.exit(1);
+      }
+
+      // Resolve refs if mode is branch
+      if (mode === "branch") {
+        if (!options.base) {
+          const { getDefaultBranch } = await import("./git/collector.js");
+          options.base = await getDefaultBranch();
+        }
+        if (!options.head) {
+          options.head = "HEAD";
+        }
+      } else {
+        // Warn if base/head provided with non-branch mode
+        const baseProvided = options.base !== undefined;
+        const headProvided = options.head !== undefined;
+        if (baseProvided || headProvided) {
+          warn(
+            `Warning: --base and --head are ignored when --mode is "${mode}"`
+          );
+        }
       }
 
       const format = options.format as "text" | "md" | "json";
@@ -539,10 +585,10 @@ program
   .option(
     "--mode <type>",
     "Diff mode: branch|unstaged|staged|all",
-    "branch"
+    "unstaged"
   )
-  .option("--base <ref>", "Base git reference (branch mode only)", "main")
-  .option("--head <ref>", "Head git reference (branch mode only)", "HEAD")
+  .option("--base <ref>", "Base git reference (branch mode only; auto-detected if omitted)")
+  .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option("--format <type>", "Output format: json|md|text", "json")
   .option("--out <path>", "Write output to file instead of stdout")
   .option("--fail-on-score <n>", "Exit with code 2 if risk score >= threshold")
@@ -565,10 +611,19 @@ program
         process.exit(1);
       }
 
-      // Warn if base/head provided with non-branch mode
-      if (mode !== "branch") {
-        const baseProvided = options.base !== "main";
-        const headProvided = options.head !== "HEAD";
+      // Resolve refs if mode is branch
+      if (mode === "branch") {
+        if (!options.base) {
+          const { getDefaultBranch } = await import("./git/collector.js");
+          options.base = await getDefaultBranch();
+        }
+        if (!options.head) {
+          options.head = "HEAD";
+        }
+      } else {
+        // Warn if base/head provided with non-branch mode
+        const baseProvided = options.base !== undefined;
+        const headProvided = options.head !== undefined;
         if (baseProvided || headProvided) {
           warn(
             `Warning: --base and --head are ignored when --mode is "${mode}"`

@@ -69,20 +69,20 @@ describe("CLI Mode Support", () => {
   });
 
   describe("Default mode behavior", () => {
-    it("should default to branch mode for facts command", () => {
-      const defaultMode = "branch";
-      expect(defaultMode).toBe("branch");
+    it("should default to unstaged mode for facts command", () => {
+      const defaultMode = "unstaged";
+      expect(defaultMode).toBe("unstaged");
     });
 
-    it("should default to branch mode for risk-report command", () => {
-      const defaultMode = "branch";
-      expect(defaultMode).toBe("branch");
+    it("should default to unstaged mode for risk-report command", () => {
+      const defaultMode = "unstaged";
+      expect(defaultMode).toBe("unstaged");
     });
 
     it("should match dump-diff default mode", () => {
-      const factsDefault = "branch";
-      const riskReportDefault = "branch";
-      const dumpDiffDefault = "branch";
+      const factsDefault = "unstaged";
+      const riskReportDefault = "unstaged";
+      const dumpDiffDefault = "unstaged";
 
       expect(factsDefault).toBe(dumpDiffDefault);
       expect(riskReportDefault).toBe(dumpDiffDefault);
