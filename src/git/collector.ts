@@ -43,11 +43,15 @@ export async function getDefaultBranch(cwd: string = process.cwd()): Promise<str
     });
 
     if (result.exitCode === 0) {
-      // Output is like "refs/remotes/origin/main"
-      // Split by slash and get the last part
-      const parts = result.stdout.trim().split("/");
-      if (parts.length > 0) {
-        return parts[parts.length - 1];
+      // Output should be like "refs/remotes/origin/main"
+      // Validate format and extract branch name
+      const trimmed = result.stdout.trim();
+      if (trimmed && trimmed.startsWith("refs/remotes/origin/")) {
+        const branchName = trimmed.substring("refs/remotes/origin/".length);
+        // Validate that we got a non-empty branch name
+        if (branchName && branchName !== "") {
+          return branchName;
+        }
       }
     }
   } catch {
