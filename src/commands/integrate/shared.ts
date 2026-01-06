@@ -55,7 +55,7 @@ For PR descriptions, always specify \`--mode branch\`.
 
 ## Default refs
 If the user doesn't specify refs (and \`branch\` mode is implied/requested):
-- base: \`main\`
+- base: auto-detected from the repository's remote default branch (usually \`main\` or \`develop\`; falls back to \`main\` if detection fails)
 - head: \`HEAD\`
 `;
 
