@@ -10,7 +10,7 @@ import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
-import { collectChangeSet } from "./git/collector.js";
+import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
 import { getProfile, resolveProfileName } from "./profiles/index.js";
 import { renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
@@ -50,6 +50,40 @@ async function prompt(question: string): Promise<string> {
       resolve(answer.trim());
     });
   });
+}
+
+/**
+ * Resolve base/head refs for branch mode.
+ * Auto-detects base branch if not provided.
+ */
+async function resolveDiffOptions(options: {
+  mode: DiffMode;
+  base?: string;
+  head?: string;
+}): Promise<{ base?: string; head?: string }> {
+  if (options.mode === "branch") {
+    let base = options.base;
+    let head = options.head;
+
+    if (!base) {
+      base = await getDefaultBranch();
+    }
+    if (!head) {
+      head = "HEAD";
+    }
+    return { base, head };
+  }
+
+  // Warn if base/head provided with non-branch mode
+  const baseProvided = options.base !== undefined;
+  const headProvided = options.head !== undefined;
+  if (baseProvided || headProvided) {
+    warn(
+      `Warning: --base and --head are ignored when --mode is "${options.mode}"`
+    );
+  }
+
+  return { base: undefined, head: undefined };
 }
 
 /**
@@ -134,30 +168,16 @@ program
         process.exit(1);
       }
 
-      // Resolve refs if mode is branch
-      if (mode === "branch") {
-        if (!options.base) {
-          const { getDefaultBranch } = await import("./git/collector.js");
-          options.base = await getDefaultBranch();
-        }
-        if (!options.head) {
-          options.head = "HEAD";
-        }
-      } else {
-        // Warn if base/head provided with non-branch mode
-        const baseProvided = options.base !== undefined;
-        const headProvided = options.head !== undefined;
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       const { findings, resolvedProfile } = await runAnalysisWithMode({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         profile: options.profile as ProfileName,
         showSpinner: true,
       });
@@ -210,30 +230,16 @@ program
         process.exit(1);
       }
 
-      // Resolve refs if mode is branch
-      if (mode === "branch") {
-        if (!options.base) {
-          const { getDefaultBranch } = await import("./git/collector.js");
-          options.base = await getDefaultBranch();
-        }
-        if (!options.head) {
-          options.head = "HEAD";
-        }
-      } else {
-        // Warn if base/head provided with non-branch mode
-        const baseProvided = options.base !== undefined;
-        const headProvided = options.head !== undefined;
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       const { findings, resolvedProfile } = await runAnalysisWithMode({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         profile: options.profile as ProfileName,
         showSpinner: false,
       });
@@ -321,7 +327,7 @@ program
     try {
       // Import executeFacts dynamically to avoid circular dependencies
       const { executeFacts } = await import("./commands/facts/index.js");
-      const { getRepoRoot, isWorkingDirDirty, getDefaultBranch } = await import("./git/collector.js");
+      const { getRepoRoot, isWorkingDirDirty } = await import("./git/collector.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -330,24 +336,11 @@ program
         process.exit(1);
       }
 
-      // Resolve refs if mode is branch
-      if (mode === "branch") {
-        if (!options.base) {
-          options.base = await getDefaultBranch();
-        }
-        if (!options.head) {
-          options.head = "HEAD";
-        }
-      } else {
-        // Warn if base/head provided with non-branch mode
-        const baseProvided = options.base !== undefined;
-        const headProvided = options.head !== undefined;
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       // Validate format
       if (options.format !== "json") {
@@ -365,8 +358,8 @@ program
       // Collect git data using mode-based options
       const changeSet = await collectChangeSet({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         includeUntracked: mode === "all",
       });
 
@@ -497,25 +490,11 @@ program
         process.exit(1);
       }
 
-      // Resolve refs if mode is branch
-      if (mode === "branch") {
-        if (!options.base) {
-          const { getDefaultBranch } = await import("./git/collector.js");
-          options.base = await getDefaultBranch();
-        }
-        if (!options.head) {
-          options.head = "HEAD";
-        }
-      } else {
-        // Warn if base/head provided with non-branch mode
-        const baseProvided = options.base !== undefined;
-        const headProvided = options.head !== undefined;
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       const format = options.format as "text" | "md" | "json";
       if (!["text", "md", "json"].includes(format)) {
@@ -553,8 +532,8 @@ program
 
       await executeDumpDiff({
         mode,
-        base: options.base,
-        head: options.head,
+        base,
+        head,
         out: options.out,
         format,
         unified,
@@ -611,25 +590,11 @@ program
         process.exit(1);
       }
 
-      // Resolve refs if mode is branch
-      if (mode === "branch") {
-        if (!options.base) {
-          const { getDefaultBranch } = await import("./git/collector.js");
-          options.base = await getDefaultBranch();
-        }
-        if (!options.head) {
-          options.head = "HEAD";
-        }
-      } else {
-        // Warn if base/head provided with non-branch mode
-        const baseProvided = options.base !== undefined;
-        const headProvided = options.head !== undefined;
-        if (baseProvided || headProvided) {
-          warn(
-            `Warning: --base and --head are ignored when --mode is "${mode}"`
-          );
-        }
-      }
+      const { base, head } = await resolveDiffOptions({
+        mode,
+        base: options.base,
+        head: options.head,
+      });
 
       // Validate format
       const format = options.format as "json" | "md" | "text";
@@ -663,8 +628,8 @@ program
       // Collect git data using mode-based options
       const changeSet = await collectChangeSet({
         mode,
-        base: mode === "branch" ? options.base : undefined,
-        head: mode === "branch" ? options.head : undefined,
+        base,
+        head,
         includeUntracked: mode === "all",
       });
 
