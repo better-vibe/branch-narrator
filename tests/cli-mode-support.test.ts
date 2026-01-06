@@ -68,24 +68,42 @@ describe("CLI Mode Support", () => {
     });
   });
 
-  describe("Default mode behavior", () => {
-    it("should default to unstaged mode for facts command", () => {
-      const defaultMode = "unstaged";
-      expect(defaultMode).toBe("unstaged");
+  describe("Default mode behavior", async () => {
+    const { execa } = await import("execa");
+    const { join } = await import("path");
+
+    // Helper to get help text for a command
+    async function getHelpText(command: string): Promise<string> {
+      const cliPath = join(process.cwd(), "src/cli.ts");
+      const result = await execa("bun", [cliPath, command, "--help"], {
+        reject: false,
+      });
+      return result.stdout;
+    }
+
+    it("should default to unstaged mode for facts command", async () => {
+      const helpText = await getHelpText("facts");
+      // Normalize whitespace to handle wrapping
+      const normalized = helpText.replace(/\s+/g, " ");
+      expect(normalized).toContain('(default: "unstaged")');
     });
 
-    it("should default to unstaged mode for risk-report command", () => {
-      const defaultMode = "unstaged";
-      expect(defaultMode).toBe("unstaged");
+    it("should default to unstaged mode for risk-report command", async () => {
+      const helpText = await getHelpText("risk-report");
+      const normalized = helpText.replace(/\s+/g, " ");
+      expect(normalized).toContain('(default: "unstaged")');
     });
 
-    it("should match dump-diff default mode", () => {
-      const factsDefault = "unstaged";
-      const riskReportDefault = "unstaged";
-      const dumpDiffDefault = "unstaged";
+    it("should default to unstaged mode for dump-diff command", async () => {
+      const helpText = await getHelpText("dump-diff");
+      const normalized = helpText.replace(/\s+/g, " ");
+      expect(normalized).toContain('(default: "unstaged")');
+    });
 
-      expect(factsDefault).toBe(dumpDiffDefault);
-      expect(riskReportDefault).toBe(dumpDiffDefault);
+    it("should default to unstaged mode for pretty command", async () => {
+      const helpText = await getHelpText("pretty");
+      const normalized = helpText.replace(/\s+/g, " ");
+      expect(normalized).toContain('(default: "unstaged")');
     });
   });
 

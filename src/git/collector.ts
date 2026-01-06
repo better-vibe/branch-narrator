@@ -47,10 +47,7 @@ export async function getDefaultBranch(cwd: string = process.cwd()): Promise<str
       // Split by slash and get the last part
       const parts = result.stdout.trim().split("/");
       if (parts.length > 0) {
-        const branch = parts[parts.length - 1];
-        if (branch) {
-          return branch;
-        }
+        return parts[parts.length - 1];
       }
     }
   } catch {
