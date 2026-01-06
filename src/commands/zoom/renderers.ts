@@ -83,8 +83,9 @@ function renderFindingMarkdown(output: ZoomFindingOutput): string {
       lines.push("");
 
       for (const hunk of patch.hunks) {
+        lines.push("```diff");
         lines.push(
-          `\`\`\`diff\n@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`
+          `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`
         );
         lines.push(hunk.content);
         lines.push("```");
@@ -173,8 +174,9 @@ function renderFlagMarkdown(output: ZoomFlagOutput): string {
       lines.push("");
 
       for (const hunk of patch.hunks) {
+        lines.push("```diff");
         lines.push(
-          `\`\`\`diff\n@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`
+          `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`
         );
         lines.push(hunk.content);
         lines.push("```");
