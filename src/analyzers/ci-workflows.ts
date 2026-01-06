@@ -41,8 +41,8 @@ export const analyzeCIWorkflows: Analyzer = {
       for (const hunk of diff.hunks) {
         const addedLines = hunk.additions.join("\n");
 
-        // Check for broadened permissions
-        const writePermissions = /permissions:\s*\n[^\n]*\s+(contents|id-token|actions|packages|deployments|security-events):\s*write/gi;
+        // Check for broadened permissions (supports inline and multi-line YAML)
+        const writePermissions = /permissions:[\s\S]{0,500}?\b(contents|id-token|actions|packages|deployments|security-events)\b\s*:\s*write/gi;
         if (!hasPermissions && writePermissions.test(addedLines)) {
           hasPermissions = true;
           const excerpt = extractRepresentativeExcerpt(hunk.additions, 200);

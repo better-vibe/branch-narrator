@@ -283,9 +283,14 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   
   // API contract changes
   if (apiContractFindings.length > 0) {
-    const finding = apiContractFindings[0];
-    const relatedFindingIds = finding.findingId ? [finding.findingId] : [];
+    // Collect all findingIds from all API contract findings
+    const relatedFindingIds = apiContractFindings
+      .map(f => f.findingId)
+      .filter((id): id is string => !!id);
     const ruleKey = "api.contract_changed";
+    
+    // Collect all changed files across all findings
+    const allFiles = apiContractFindings.flatMap(f => f.files);
     
     flags.push({
       id: ruleKey,
@@ -296,8 +301,8 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
       score: 25,
       confidence: 0.85,
       title: "API contract changed",
-      summary: `${finding.files.length} API ${finding.files.length === 1 ? "file" : "files"} changed`,
-      evidence: finding.files.slice(0, 3).map(file => ({ file, lines: [`File changed`] })),
+      summary: `${allFiles.length} API ${allFiles.length === 1 ? "file" : "files"} changed`,
+      evidence: allFiles.slice(0, 3).map(file => ({ file, lines: [`File changed`] })),
       suggestedChecks: [
         "Verify backwards compatibility",
         "Update API documentation",

@@ -30,11 +30,11 @@ export const analyzeInfra: Analyzer = {
       } else if (
         file.path.includes("kubernetes/") ||
         file.path.includes("k8s/") ||
-        file.path.endsWith(".yaml") && (
+        (file.path.endsWith(".yaml") && (
           file.path.includes("deployment") ||
           file.path.includes("service") ||
           file.path.includes("ingress")
-        )
+        ))
       ) {
         k8sFiles.push(file.path);
       }

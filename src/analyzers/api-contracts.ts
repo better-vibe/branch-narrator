@@ -17,7 +17,7 @@ function isAPIContractFile(path: string): boolean {
     path.includes("openapi") ||
     path.includes("swagger") ||
     path.endsWith(".proto") ||
-    path.includes("/api/") && (path.endsWith(".yaml") || path.endsWith(".yml") || path.endsWith(".json"))
+    (path.includes("/api/") && (path.endsWith(".yaml") || path.endsWith(".yml") || path.endsWith(".json")))
   );
 }
 

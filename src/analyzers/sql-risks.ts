@@ -74,7 +74,7 @@ export const analyzeSQLRisks: Analyzer = {
         }
 
         // Check for unscoped data modification
-        const unscopedPatterns = /(UPDATE|DELETE)\s+(?!.*WHERE)/gi;
+        const unscopedPatterns = /(UPDATE|DELETE)\s+(?![^;\n]*\bWHERE\b)/gi;
         if (unscopedPatterns.test(addedLines)) {
           const excerpt = extractRepresentativeExcerpt(hunk.additions, 200);
           findings.push({

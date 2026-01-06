@@ -31,7 +31,7 @@ export const analyzeLargeDiff: Analyzer = {
       findings.push({
         type: "large-diff",
         kind: "large-diff",
-        category: "unknown",
+        category: "unknown", // No specific category for churn/quality metrics
         confidence: "high",
         evidence: [],
         filesChanged,

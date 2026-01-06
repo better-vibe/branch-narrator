@@ -33,13 +33,23 @@ function isDocFile(path: string): boolean {
  * Check if a file is a config/meta file.
  */
 function isConfigFile(path: string): boolean {
+  const filename = path.split("/").pop() || "";
   return (
-    path.endsWith(".json") ||
-    path.endsWith(".yaml") ||
-    path.endsWith(".yml") ||
-    path.endsWith(".toml") ||
-    path.includes("config") ||
-    path.startsWith(".")
+    // Package manager files
+    filename === "package.json" ||
+    filename === "package-lock.json" ||
+    filename === "yarn.lock" ||
+    filename === "pnpm-lock.yaml" ||
+    filename === "bun.lockb" ||
+    // Config files in root
+    filename.endsWith(".config.js") ||
+    filename.endsWith(".config.ts") ||
+    filename.endsWith(".config.mjs") ||
+    filename.endsWith(".config.cjs") ||
+    // TOML configs
+    filename.endsWith(".toml") ||
+    // Dotfiles in root (but not directories like .github)
+    (path.split("/").length === 1 && filename.startsWith("."))
   );
 }
 
