@@ -1,6 +1,6 @@
 # CLI Commands
 
-branch-narrator provides six commands for different use cases.
+branch-narrator provides seven commands for different use cases.
 
 ## pretty
 

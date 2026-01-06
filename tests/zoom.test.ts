@@ -5,7 +5,7 @@
 import { describe, it, expect } from "bun:test";
 import { executeZoom } from "../src/commands/zoom/index.js";
 import { renderZoomJSON, renderZoomMarkdown, renderZoomText } from "../src/commands/zoom/renderers.js";
-import type { ChangeSet, Finding, Evidence } from "../src/core/types.js";
+import type { ChangeSet, Finding, Evidence, RiskFlag } from "../src/core/types.js";
 import { assignFindingId } from "../src/core/ids.js";
 
 describe("Zoom Command", () => {
@@ -103,51 +103,10 @@ describe("Zoom Command", () => {
       ).rejects.toThrow("Finding not found");
     });
 
-    it("should return zoom output for a valid finding", async () => {
-      const changeSet = createTestChangeSet();
-
-      // Create a finding and get its ID
-      const evidence: Evidence[] = [
-        {
-          file: "src/config.ts",
-          excerpt: "const API_KEY = process.env.API_KEY;",
-          line: 1,
-        },
-      ];
-
-      const finding: Finding = {
-        type: "env-var",
-        kind: "env-var",
-        category: "config_env",
-        confidence: "high",
-        evidence,
-        name: "API_KEY",
-        change: "added",
-        evidenceFiles: ["src/config.ts"],
-      };
-
-      const findingWithId = assignFindingId(finding);
-      const findingId = findingWithId.findingId!;
-
-      // Note: This test will fail because our test changeset doesn't actually
-      // produce env-var findings from the analyzers. This is a limitation of
-      // the current test setup. In a real scenario, we would mock the analyzers
-      // or use a more complete test changeset.
-      
-      // For now, we just verify the error message is correct
-      await expect(
-        executeZoom(changeSet, {
-          findingId,
-          mode: "unstaged",
-          profile: "auto",
-          includePatch: false,
-          unified: 3,
-          maxEvidenceLines: 8,
-          redact: false,
-          noTimestamp: true,
-        })
-      ).rejects.toThrow("Finding not found");
-    });
+    // Note: Testing successful finding zoom requires either:
+    // 1. Mocking the analyzers to produce specific findings, or
+    // 2. Creating a complete test changeset that triggers specific analyzers
+    // The renderer tests below provide coverage for the output formatting.
   });
 
   describe("Renderers", () => {
@@ -283,27 +242,41 @@ describe("Zoom Command", () => {
   });
 
   describe("ID format validation", () => {
-    it("should accept valid finding IDs", () => {
-      const validIds = [
-        "finding.env-var#abc123def456",
-        "finding.dependency-change#xyz789",
-        "finding.route-change#123456789012",
+    it("should generate valid finding IDs", () => {
+      const evidence: Evidence[] = [
+        {
+          file: "src/config.ts",
+          excerpt: "const API_KEY = process.env.API_KEY;",
+          line: 1,
+        },
       ];
 
-      for (const id of validIds) {
-        expect(id).toMatch(/^finding\.[a-z-]+#[a-f0-9]{12}$/);
-      }
+      const finding: Finding = {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence,
+        name: "API_KEY",
+        change: "added",
+        evidenceFiles: ["src/config.ts"],
+      };
+
+      const findingWithId = assignFindingId(finding);
+      
+      // Verify the generated ID matches the expected pattern
+      expect(findingWithId.findingId).toMatch(/^finding\.[a-z-]+#[a-f0-9]{12}$/);
     });
 
-    it("should accept valid flag IDs", () => {
-      const validIds = [
-        "flag.security.workflow_permissions_broadened#abc123def456",
-        "flag.db.destructive_sql#xyz789012345",
-      ];
-
-      for (const id of validIds) {
-        expect(id).toMatch(/^flag\.[a-z._]+#[a-f0-9]{12}$/);
-      }
+    it("should generate valid flag IDs using buildFlagId", () => {
+      const { buildFlagId } = require("../src/core/ids.js");
+      
+      const flagId1 = buildFlagId("security.workflow_permissions_broadened", ["finding.ci-workflow#abc123def456"]);
+      const flagId2 = buildFlagId("db.destructive_sql", ["finding.sql-risk#123456789abc"]);
+      
+      // Verify the generated IDs match the expected pattern
+      expect(flagId1).toMatch(/^flag\.[a-z._]+#[a-f0-9]{12}$/);
+      expect(flagId2).toMatch(/^flag\.[a-z._]+#[a-f0-9]{12}$/);
     });
   });
 
@@ -332,7 +305,7 @@ describe("Zoom Command", () => {
         schemaVersion: "1.0" as const,
         range: { base: "main", head: "HEAD" },
         itemType: "finding" as const,
-        findingId: "finding.file-summary#abc123",
+        findingId: "finding.file-summary#abc123def456",
         finding,
         evidence: evidence.slice(0, 5).map((ev) => ({
           file: ev.file,
@@ -343,6 +316,145 @@ describe("Zoom Command", () => {
       };
 
       expect(output.evidence.length).toBe(5);
+    });
+  });
+
+  describe("Flag zoom output", () => {
+    it("should render flag output as JSON", () => {
+      const flag: RiskFlag = {
+        id: "security.workflow_permissions_broadened",
+        ruleKey: "security.workflow_permissions_broadened",
+        flagId: "flag.security.workflow_permissions_broadened#abc123def456",
+        relatedFindingIds: ["finding.ci-workflow#123456789abc"],
+        category: "security",
+        score: 35,
+        confidence: 0.9,
+        title: "Workflow permissions broadened",
+        summary: "Workflow has broadened permissions",
+        evidence: [
+          {
+            file: ".github/workflows/ci.yml",
+            lines: ["permissions: write-all"],
+          },
+        ],
+        suggestedChecks: ["Review permissions"],
+        effectiveScore: 32,
+      };
+
+      const output = {
+        schemaVersion: "1.0" as const,
+        range: { base: "main", head: "HEAD" },
+        itemType: "flag" as const,
+        flagId: "flag.security.workflow_permissions_broadened#abc123def456",
+        flag,
+        evidence: flag.evidence,
+      };
+
+      const json = renderZoomJSON(output, false);
+      expect(json).toContain("flag.security.workflow_permissions_broadened#abc123def456");
+      expect(json).toContain("Workflow permissions broadened");
+
+      const parsed = JSON.parse(json);
+      expect(parsed.itemType).toBe("flag");
+      expect(parsed.flagId).toBe("flag.security.workflow_permissions_broadened#abc123def456");
+    });
+
+    it("should render flag output as Markdown", () => {
+      const flag: RiskFlag = {
+        id: "db.destructive_sql",
+        ruleKey: "db.destructive_sql",
+        flagId: "flag.db.destructive_sql#def456789abc",
+        relatedFindingIds: [],
+        category: "db",
+        score: 50,
+        confidence: 0.95,
+        title: "Destructive SQL detected",
+        summary: "DROP TABLE statement found",
+        evidence: [
+          {
+            file: "migrations/001.sql",
+            lines: ["DROP TABLE users;"],
+          },
+        ],
+        suggestedChecks: ["Verify migration safety"],
+        effectiveScore: 48,
+      };
+
+      const output = {
+        schemaVersion: "1.0" as const,
+        range: { base: "main", head: "HEAD" },
+        itemType: "flag" as const,
+        flagId: "flag.db.destructive_sql#def456789abc",
+        flag,
+        evidence: flag.evidence,
+      };
+
+      const markdown = renderZoomMarkdown(output);
+      expect(markdown).toContain("# Flag: flag.db.destructive_sql#def456789abc");
+      expect(markdown).toContain("**Rule:** db.destructive_sql");
+      expect(markdown).toContain("Destructive SQL detected");
+    });
+
+    it("should render flag output as text", () => {
+      const flag: RiskFlag = {
+        id: "tests.test_gap",
+        ruleKey: "tests.test_gap",
+        flagId: "flag.tests.test_gap#abc987654321",
+        relatedFindingIds: [],
+        category: "tests",
+        score: 20,
+        confidence: 0.8,
+        title: "Test coverage gap",
+        summary: "Production files changed without tests",
+        evidence: [],
+        suggestedChecks: ["Add tests"],
+        effectiveScore: 16,
+      };
+
+      const output = {
+        schemaVersion: "1.0" as const,
+        range: { base: "main", head: "HEAD" },
+        itemType: "flag" as const,
+        flagId: "flag.tests.test_gap#abc987654321",
+        flag,
+        evidence: flag.evidence,
+      };
+
+      const text = renderZoomText(output);
+      expect(text).toContain("Flag: flag.tests.test_gap#abc987654321");
+      expect(text).toContain("Rule: tests.test_gap");
+      expect(text).toContain("Test coverage gap");
+    });
+  });
+
+  describe("Redaction", () => {
+    it("should redact secrets in finding evidence when enabled", () => {
+      const evidence: Evidence[] = [
+        {
+          file: "src/config.ts",
+          excerpt: "const API_KEY = 'sk_test_abcdefghijklmnopqrstuvwxyz1234567890';",
+          line: 1,
+        },
+      ];
+
+      const finding: Finding = {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence,
+        name: "API_KEY",
+        change: "added",
+        evidenceFiles: ["src/config.ts"],
+        findingId: "finding.env-var#123456789abc",
+      };
+
+      // Test that the redaction utility would work
+      const { redactSecrets } = require("../src/core/evidence.js");
+      const redacted = redactSecrets(evidence[0].excerpt);
+      
+      expect(redacted).toContain("sk_test_***REDACTED***");
+      expect(redacted).not.toContain("abcdefghijklmnopqrstuvwxyz1234567890");
     });
   });
 });

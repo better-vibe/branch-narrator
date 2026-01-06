@@ -296,7 +296,7 @@ branch-narrator facts --format json | \
 branch-narrator risk-report --format json > risk.json
 
 # If there are security flags, investigate each one
-if [ $(jq '.flags[] | select(.category == "security") | length' risk.json) -gt 0 ]; then
+if jq -e '.flags[] | select(.category == "security")' risk.json > /dev/null; then
   jq -r '.flags[] | select(.category == "security") | .flagId' risk.json | \
     while read -r flag_id; do
       echo "Security flag found: $flag_id"

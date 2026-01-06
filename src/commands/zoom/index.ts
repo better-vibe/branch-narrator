@@ -20,6 +20,7 @@ import { BranchNarratorError } from "../../core/errors.js";
 import { getProfile, resolveProfileName } from "../../profiles/index.js";
 import { assignFindingId, assignFlagId } from "../../core/ids.js";
 import { generateRiskReport } from "../risk/index.js";
+import { redactSecrets } from "../../core/evidence.js";
 
 /**
  * Options for the zoom command.
@@ -100,10 +101,10 @@ async function executeZoomFinding(
     );
   }
 
-  // Convert evidence to zoom format
+  // Convert evidence to zoom format with optional redaction
   const evidence: ZoomEvidence[] = finding.evidence.slice(0, options.maxEvidenceLines).map((ev) => ({
     file: ev.file,
-    excerpt: ev.excerpt,
+    excerpt: options.redact ? redactSecrets(ev.excerpt) : ev.excerpt,
     line: ev.line,
     hunk: ev.hunk,
   }));
@@ -111,7 +112,7 @@ async function executeZoomFinding(
   // Optionally fetch patch context
   let patchContext: PatchContext[] | undefined;
   if (options.includePatch) {
-    patchContext = await fetchPatchContext(changeSet, finding, options.unified);
+    patchContext = await fetchPatchContext(changeSet, finding, options.unified, options.redact);
   }
 
   const output: ZoomFindingOutput = {
@@ -140,7 +141,20 @@ async function executeZoomFlag(
 ): Promise<ZoomFlagOutput> {
   const flagId = options.flagId!;
 
-  // Generate full risk report to get flags
+  // Run analysis once to get both findings and flags
+  const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
+  const profile = getProfile(profileName);
+
+  const rawFindings: Finding[] = [];
+  for (const analyzer of profile.analyzers) {
+    const analyzerFindings = await analyzer.analyze(changeSet);
+    rawFindings.push(...analyzerFindings);
+  }
+
+  // Assign findingIds to all findings
+  const allFindings = rawFindings.map(assignFindingId);
+
+  // Generate risk report to get flags (passing findings avoids re-running analysis)
   const report = await generateRiskReport(changeSet, {
     profile: options.profile,
     redact: options.redact,
@@ -161,20 +175,9 @@ async function executeZoomFlag(
     );
   }
 
-  // Get related findings if we have relatedFindingIds
+  // Get related findings if we have relatedFindingIds (using already computed findings)
   let relatedFindings: Finding[] | undefined;
   if (flag.relatedFindingIds && flag.relatedFindingIds.length > 0) {
-    // Re-run analysis to get findings with IDs
-    const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
-    const profile = getProfile(profileName);
-
-    const rawFindings: Finding[] = [];
-    for (const analyzer of profile.analyzers) {
-      const analyzerFindings = await analyzer.analyze(changeSet);
-      rawFindings.push(...analyzerFindings);
-    }
-
-    const allFindings = rawFindings.map(assignFindingId);
     relatedFindings = allFindings.filter((f) =>
       flag.relatedFindingIds!.includes(f.findingId!)
     );
@@ -186,7 +189,8 @@ async function executeZoomFlag(
     patchContext = await fetchPatchContextFromFiles(
       changeSet,
       flag.evidence.map((ev) => ev.file),
-      options.unified
+      options.unified,
+      options.redact
     );
   }
 
@@ -214,7 +218,8 @@ async function executeZoomFlag(
 async function fetchPatchContext(
   changeSet: ChangeSet,
   finding: Finding,
-  unified: number
+  unified: number,
+  redact: boolean
 ): Promise<PatchContext[]> {
   // Extract unique files from evidence
   const files = new Set<string>();
@@ -222,7 +227,7 @@ async function fetchPatchContext(
     files.add(ev.file);
   }
 
-  return fetchPatchContextFromFiles(changeSet, Array.from(files), unified);
+  return fetchPatchContextFromFiles(changeSet, Array.from(files), unified, redact);
 }
 
 /**
@@ -233,7 +238,8 @@ async function fetchPatchContext(
 async function fetchPatchContextFromFiles(
   changeSet: ChangeSet,
   files: string[],
-  _unified: number
+  _unified: number,
+  redact: boolean
 ): Promise<PatchContext[]> {
   const patchContext: PatchContext[] = [];
 
@@ -252,7 +258,7 @@ async function fetchPatchContextFromFiles(
         oldLines: hunk.oldLines,
         newStart: hunk.newStart,
         newLines: hunk.newLines,
-        content: hunk.content,
+        content: redact ? redactSecrets(hunk.content) : hunk.content,
       })),
     });
   }
