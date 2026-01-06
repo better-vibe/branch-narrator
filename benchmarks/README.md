@@ -61,6 +61,11 @@ benchmarks/
     └── integrate.ts        # Tool integration (dry-run)
 ```
 
+> **Note**: The `zoom` command benchmark is currently not included because it requires
+> passing the benchmark repository context to the setup function to obtain valid finding IDs.
+> This will be added in a future update when the benchmark infrastructure supports
+> context passing to setup/teardown functions.
+
 ## Adding New Benchmarks
 
 1. Create a new file in `cases/`:

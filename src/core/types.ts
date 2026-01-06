@@ -593,3 +593,56 @@ export interface RiskReport {
   scoreBreakdown?: ScoreBreakdown;
 }
 
+// ============================================================================
+// Zoom Output Schema (for zoom command)
+// ============================================================================
+
+export interface ZoomEvidence {
+  file: string;
+  excerpt: string;
+  line?: number;
+  hunk?: {
+    oldStart: number;
+    oldLines: number;
+    newStart: number;
+    newLines: number;
+  };
+}
+
+export interface PatchContext {
+  file: string;
+  status: FileStatus;
+  hunks: Array<{
+    oldStart: number;
+    oldLines: number;
+    newStart: number;
+    newLines: number;
+    content: string;
+  }>;
+}
+
+export interface ZoomFindingOutput {
+  schemaVersion: "1.0";
+  generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
+  range: { base: string; head: string };
+  itemType: "finding";
+  findingId: string;
+  finding: Finding;
+  evidence: ZoomEvidence[];
+  patchContext?: PatchContext[];
+}
+
+export interface ZoomFlagOutput {
+  schemaVersion: "1.0";
+  generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
+  range: { base: string; head: string };
+  itemType: "flag";
+  flagId: string;
+  flag: RiskFlag;
+  evidence: RiskFlagEvidence[];
+  relatedFindings?: Finding[];
+  patchContext?: PatchContext[];
+}
+
+export type ZoomOutput = ZoomFindingOutput | ZoomFlagOutput;
+
