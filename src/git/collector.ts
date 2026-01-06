@@ -49,7 +49,7 @@ export async function getDefaultBranch(cwd: string = process.cwd()): Promise<str
       if (trimmed && trimmed.startsWith("refs/remotes/origin/")) {
         const branchName = trimmed.substring("refs/remotes/origin/".length);
         // Validate that we got a non-empty branch name
-        if (branchName && branchName !== "") {
+        if (branchName !== "") {
           return branchName;
         }
       }
