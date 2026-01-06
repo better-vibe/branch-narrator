@@ -1,5 +1,20 @@
 # @better-vibe/branch-narrator
 
+## 1.0.0
+
+### Major Changes
+
+- e1039f1: BREAKING: Add stable IDs to findings and risk flags for deterministic references
+
+  - All findings now include an optional `findingId` field (format: "finding.<type>#<hash>")
+  - Risk flags now include `flagId`, `ruleKey`, and `relatedFindingIds` fields
+  - New finding types added to support risk detection patterns
+  - Facts builder automatically assigns findingIds to all findings
+
+### Minor Changes
+
+- c9e6d1e: feat: change default mode to unstaged and add branch auto-detection
+
 ## 0.15.2
 
 ### Patch Changes
