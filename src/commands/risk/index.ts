@@ -122,3 +122,4 @@ export * from "./redaction.js";
 export * from "./scoring.js";
 export * from "./renderers.js";
 export * from "./findings-to-flags.js";
+export { computeRiskReportDelta, type ComputeRiskReportDeltaOptions } from "./delta.js";
