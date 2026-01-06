@@ -20,6 +20,7 @@ import { deriveActions } from "./actions.js";
 import { DEFAULT_EXCLUDES } from "../../core/filters.js";
 import { sortFindings as sortFindingsDeterministically, sortEvidence } from "../../core/sorting.js";
 import { getRepoRoot, isWorkingDirDirty } from "../../git/collector.js";
+import { assignFindingId } from "../../core/ids.js";
 
 /**
  * Build facts output options.
@@ -133,6 +134,9 @@ export async function buildFacts(
 
   // Sort findings deterministically first (without touching evidence yet)
   let findings = sortFindingsDeterministically(rawFindings);
+
+  // Assign stable findingIds to all findings
+  findings = findings.map(assignFindingId);
 
   // Apply max findings limit early to avoid processing evidence for discarded findings
   if (userFilters?.maxFindings && findings.length > userFilters.maxFindings) {
