@@ -2,12 +2,14 @@
  * Risk report command.
  */
 
-import type { ChangeSet, RiskFlag, RiskReport } from "../../core/types.js";
-import { ALL_DETECTORS } from "./detectors/index.js";
+import type { ChangeSet, Finding, ProfileName, RiskFlag, RiskReport } from "../../core/types.js";
 import { shouldSkipFile } from "./exclusions.js";
 import { redactLines } from "./redaction.js";
 import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
 import { sortRiskFlagEvidence } from "../../core/sorting.js";
+import { getProfile, resolveProfileName } from "../../profiles/index.js";
+import { assignFindingId } from "../../core/ids.js";
+import { findingsToFlags } from "./findings-to-flags.js";
 
 /**
  * Options for generating risk report.
@@ -19,15 +21,17 @@ export interface RiskReportOptions {
   redact?: boolean;
   explainScore?: boolean;
   noTimestamp?: boolean;
+  profile?: ProfileName;
+  cwd?: string;
 }
 
 /**
  * Generate risk report from change set.
  */
-export function generateRiskReport(
+export async function generateRiskReport(
   changeSet: ChangeSet,
   options: RiskReportOptions = {}
-): RiskReport {
+): Promise<RiskReport> {
   const {
     only,
     exclude,
@@ -35,6 +39,8 @@ export function generateRiskReport(
     redact = false,
     explainScore = false,
     noTimestamp = false,
+    profile: requestedProfile = "auto",
+    cwd = process.cwd(),
   } = options;
 
   // Track skipped files
@@ -51,12 +57,21 @@ export function generateRiskReport(
     }
   }
 
-  // Run all detectors
-  let allFlags: RiskFlag[] = [];
-  for (const detector of ALL_DETECTORS) {
-    const flags = detector(changeSet);
-    allFlags.push(...flags);
+  // Run analysis pipeline to get findings
+  const profileName = resolveProfileName(requestedProfile, changeSet, cwd);
+  const profile = getProfile(profileName);
+  
+  const rawFindings: Finding[] = [];
+  for (const analyzer of profile.analyzers) {
+    const analyzerFindings = await analyzer.analyze(changeSet);
+    rawFindings.push(...analyzerFindings);
   }
+  
+  // Assign findingIds to all findings
+  const findings = rawFindings.map(assignFindingId);
+  
+  // Convert findings to risk flags
+  let allFlags: RiskFlag[] = findingsToFlags(findings);
 
   // Filter by category if requested
   allFlags = filterFlagsByCategory(allFlags, only, exclude);
@@ -94,11 +109,11 @@ export function generateRiskReport(
  * Execute the risk-report command.
  * This is the standard command handler that follows the execute* naming convention.
  */
-export function executeRiskReport(
+export async function executeRiskReport(
   changeSet: ChangeSet,
   options: RiskReportOptions = {}
-): RiskReport {
-  return generateRiskReport(changeSet, options);
+): Promise<RiskReport> {
+  return await generateRiskReport(changeSet, options);
 }
 
 export * from "./detectors/index.js";
@@ -106,3 +121,4 @@ export * from "./exclusions.js";
 export * from "./redaction.js";
 export * from "./scoring.js";
 export * from "./renderers.js";
+export * from "./findings-to-flags.js";

@@ -7,7 +7,7 @@ import { generateRiskReport } from "../src/commands/risk/index.js";
 import { createChangeSet } from "./fixtures/index.js";
 
 describe("generateRiskReport", () => {
-  it("should generate empty report for no changes", () => {
+  it("should generate empty report for no changes", async () => {
     const changeSet = createChangeSet({
       base: "main",
       head: "HEAD",
@@ -15,7 +15,7 @@ describe("generateRiskReport", () => {
       diffs: [],
     });
 
-    const report = generateRiskReport(changeSet);
+    const report = await generateRiskReport(changeSet);
 
     expect(report.schemaVersion).toBe("1.0");
     expect(report.riskScore).toBe(0);
@@ -23,7 +23,7 @@ describe("generateRiskReport", () => {
     expect(report.flags).toEqual([]);
   });
 
-  it("should compute risk scores correctly", () => {
+  it("should compute risk scores correctly", async () => {
     const changeSet = createChangeSet({
       base: "main",
       head: "HEAD",
@@ -53,7 +53,7 @@ describe("generateRiskReport", () => {
       ],
     });
 
-    const report = generateRiskReport(changeSet);
+    const report = await generateRiskReport(changeSet);
 
     expect(report.flags.length).toBeGreaterThan(0);
     expect(report.riskScore).toBeGreaterThan(0);
@@ -65,7 +65,7 @@ describe("generateRiskReport", () => {
     expect(securityFlag?.confidence).toBe(0.9);
   });
 
-  it("should filter by category with --only", () => {
+  it("should filter by category with --only", async () => {
     const changeSet = createChangeSet({
       base: "main",
       head: "HEAD",
@@ -97,13 +97,13 @@ describe("generateRiskReport", () => {
       ],
     });
 
-    const report = generateRiskReport(changeSet, { only: ["security"] });
+    const report = await generateRiskReport(changeSet, { only: ["security"] });
 
     expect(report.flags.every(f => f.category === "security")).toBe(true);
     expect(report.flags.find(f => f.category === "db")).toBeUndefined();
   });
 
-  it("should exclude categories with --exclude", () => {
+  it("should exclude categories with --exclude", async () => {
     const changeSet = createChangeSet({
       base: "main",
       head: "HEAD",
@@ -125,12 +125,12 @@ describe("generateRiskReport", () => {
       ],
     });
 
-    const report = generateRiskReport(changeSet, { exclude: ["ci"] });
+    const report = await generateRiskReport(changeSet, { exclude: ["ci"] });
 
     expect(report.flags.find(f => f.category === "ci")).toBeUndefined();
   });
 
-  it("should track skipped files", () => {
+  it("should track skipped files", async () => {
     const changeSet = createChangeSet({
       base: "main",
       head: "HEAD",
@@ -141,7 +141,7 @@ describe("generateRiskReport", () => {
       diffs: [],
     });
 
-    const report = generateRiskReport(changeSet);
+    const report = await generateRiskReport(changeSet);
 
     expect(report.skippedFiles.length).toBeGreaterThan(0);
     const lockfileSkip = report.skippedFiles.find(s => s.file === "package-lock.json");
@@ -149,7 +149,7 @@ describe("generateRiskReport", () => {
     expect(lockfileSkip?.reason).toBe("lockfile");
   });
 
-  it("should include score breakdown when explainScore is true", () => {
+  it("should include score breakdown when explainScore is true", async () => {
     const changeSet = createChangeSet({
       base: "main",
       head: "HEAD",
@@ -175,7 +175,7 @@ describe("generateRiskReport", () => {
       ],
     });
 
-    const report = generateRiskReport(changeSet, { explainScore: true });
+    const report = await generateRiskReport(changeSet, { explainScore: true });
 
     expect(report.scoreBreakdown).toBeDefined();
     expect(report.scoreBreakdown?.formula).toContain("riskScore");
@@ -184,7 +184,7 @@ describe("generateRiskReport", () => {
 });
 
 describe("risk level thresholds", () => {
-  it("should classify risk levels correctly", () => {
+  it("should classify risk levels correctly", async () => {
     // This would require creating fixtures that produce specific scores
     // For now, we test the basic logic
     const changeSet = createChangeSet({
@@ -194,7 +194,7 @@ describe("risk level thresholds", () => {
       diffs: [],
     });
 
-    const report = generateRiskReport(changeSet);
+    const report = await generateRiskReport(changeSet);
     
     // Score of 0 should be "low"
     expect(report.riskLevel).toBe("low");
