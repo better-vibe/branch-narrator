@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.1.0
+
+### Minor Changes
+
+- 0f01789: Add zoom command for targeted drill-down by findingId or flagId
+
 ## 1.0.0
 
 ### Major Changes
