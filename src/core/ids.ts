@@ -132,6 +132,52 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "ci-workflow": {
+      // Fingerprint: type + file + riskType
+      const file = normalizePath(finding.file);
+      fingerprint = `ci-workflow:${file}:${finding.riskType}`;
+      break;
+    }
+
+    case "sql-risk": {
+      // Fingerprint: type + file + riskType
+      const file = normalizePath(finding.file);
+      fingerprint = `sql-risk:${file}:${finding.riskType}`;
+      break;
+    }
+
+    case "infra-change": {
+      // Fingerprint: type + infraType + sorted(files)
+      const files = sortForHash(finding.files.map(normalizePath));
+      fingerprint = `infra-change:${finding.infraType}:${files.join(",")}`;
+      break;
+    }
+
+    case "api-contract-change": {
+      // Fingerprint: type + sorted(files)
+      const files = sortForHash(finding.files.map(normalizePath));
+      fingerprint = `api-contract-change:${files.join(",")}`;
+      break;
+    }
+
+    case "large-diff": {
+      // Fingerprint: type + filesChanged + linesChanged
+      fingerprint = `large-diff:${finding.filesChanged}:${finding.linesChanged}`;
+      break;
+    }
+
+    case "lockfile-mismatch": {
+      // Fingerprint: type + manifestChanged + lockfileChanged
+      fingerprint = `lockfile-mismatch:${finding.manifestChanged}:${finding.lockfileChanged}`;
+      break;
+    }
+
+    case "test-gap": {
+      // Fingerprint: type + prodFilesChanged + testFilesChanged
+      fingerprint = `test-gap:${finding.prodFilesChanged}:${finding.testFilesChanged}`;
+      break;
+    }
+
     case "risk-flag": {
       // Fingerprint: type + risk + evidenceText (legacy)
       // Note: risk-flag findings are being phased out in favor of derived flags

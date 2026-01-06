@@ -256,6 +256,107 @@ export interface ImpactAnalysisFinding {
   findingId?: string; // Stable ID, format: "finding.impact-analysis#<hash>"
 }
 
+export type CIWorkflowRisk =
+  | "permissions_broadened"
+  | "pull_request_target"
+  | "remote_script_download"
+  | "pipeline_changed";
+
+export interface CIWorkflowFinding {
+  type: "ci-workflow";
+  kind: "ci-workflow";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  riskType: CIWorkflowRisk;
+  details: string;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.ci-workflow#<hash>"
+}
+
+export type SQLRisk =
+  | "destructive"
+  | "schema_change"
+  | "unscoped_modification";
+
+export interface SQLRiskFinding {
+  type: "sql-risk";
+  kind: "sql-risk";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  riskType: SQLRisk;
+  details: string;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.sql-risk#<hash>"
+}
+
+export type InfraChangeType =
+  | "dockerfile"
+  | "terraform"
+  | "k8s";
+
+export interface InfraChangeFinding {
+  type: "infra-change";
+  kind: "infra-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  infraType: InfraChangeType;
+  files: string[];
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.infra-change#<hash>"
+}
+
+export interface APIContractChangeFinding {
+  type: "api-contract-change";
+  kind: "api-contract-change";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  files: string[];
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.api-contract-change#<hash>"
+}
+
+export interface LargeDiffFinding {
+  type: "large-diff";
+  kind: "large-diff";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  filesChanged: number;
+  linesChanged: number;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.large-diff#<hash>"
+}
+
+export interface LockfileFinding {
+  type: "lockfile-mismatch";
+  kind: "lockfile-mismatch";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  manifestChanged: boolean;
+  lockfileChanged: boolean;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.lockfile-mismatch#<hash>"
+}
+
+export interface TestGapFinding {
+  type: "test-gap";
+  kind: "test-gap";
+  category: Category;
+  confidence: Confidence;
+  evidence: Evidence[];
+  prodFilesChanged: number;
+  testFilesChanged: number;
+  tags?: string[];
+  findingId?: string; // Stable ID, format: "finding.test-gap#<hash>"
+}
+
 export type RiskyPackageCategory =
   | "auth"
   | "database"
@@ -274,7 +375,14 @@ export type Finding =
   | FileCategoryFinding
   | SecurityFileFinding
   | ConventionViolationFinding
-  | ImpactAnalysisFinding;
+  | ImpactAnalysisFinding
+  | CIWorkflowFinding
+  | SQLRiskFinding
+  | InfraChangeFinding
+  | APIContractChangeFinding
+  | LargeDiffFinding
+  | LockfileFinding
+  | TestGapFinding;
 
 // ============================================================================
 // Risk Score
