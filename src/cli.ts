@@ -55,8 +55,9 @@ async function prompt(question: string): Promise<string> {
 /**
  * Resolve base/head refs for branch mode.
  * Auto-detects base branch if not provided.
+ * Exported for testing purposes.
  */
-async function resolveDiffOptions(options: {
+export async function resolveDiffOptions(options: {
   mode: DiffMode;
   base?: string;
   head?: string;
