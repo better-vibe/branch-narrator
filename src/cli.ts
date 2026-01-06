@@ -8,6 +8,7 @@ import { createInterface } from "readline";
 import ora from "ora";
 import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
+import { getVersion } from "./core/version.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
@@ -18,12 +19,15 @@ import { configureLogger, error as logError, warn, info } from "./core/logger.js
 
 const program = new Command();
 
+// Load version from package.json
+const version = await getVersion();
+
 program
   .name("branch-narrator")
   .description(
     "A local-first CLI that reads git diff and generates structured PR descriptions"
   )
-  .version("0.1.0")
+  .version(version)
   .option("--quiet", "Suppress all non-fatal diagnostic output (warnings, info)")
   .option("--debug", "Show debug diagnostics on stderr")
   .hook("preAction", (thisCommand) => {

@@ -15,6 +15,7 @@ import {
   compareScopeMetadata,
   extractRiskReportScope,
 } from "../../core/delta.js";
+import { getVersion } from "../../core/version.js";
 import { BranchNarratorError } from "../../core/errors.js";
 
 /**
@@ -68,13 +69,14 @@ export async function computeRiskReportDelta(
   }
 
   // Extract version metadata
+  const toolVersion = await getVersion();
   const previousVersion = {
-    toolVersion: "1.1.0", // TODO: Extract from package.json or build info
+    toolVersion: toolVersion,
     schemaVersion: previousReport.schemaVersion,
   };
 
   const currentVersion = {
-    toolVersion: "1.1.0", // TODO: Extract from package.json or build info
+    toolVersion: toolVersion,
     schemaVersion: currentReport.schemaVersion,
   };
 

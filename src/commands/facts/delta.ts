@@ -15,6 +15,7 @@ import {
   compareScopeMetadata,
   extractFactsScope,
 } from "../../core/delta.js";
+import { getVersion } from "../../core/version.js";
 import { BranchNarratorError } from "../../core/errors.js";
 
 /**
@@ -70,13 +71,14 @@ export async function computeFactsDelta(
   }
 
   // Extract version metadata
+  const toolVersion = await getVersion();
   const previousVersion = {
-    toolVersion: "1.1.0", // TODO: Extract from package.json or build info
+    toolVersion: toolVersion,
     schemaVersion: previousFacts.schemaVersion,
   };
 
   const currentVersion = {
-    toolVersion: "1.1.0", // TODO: Extract from package.json or build info
+    toolVersion: toolVersion,
     schemaVersion: currentFacts.schemaVersion,
   };
 
