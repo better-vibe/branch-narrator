@@ -179,6 +179,41 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "stencil-component-change": {
+      // Fingerprint: type + tag + change + file
+      const file = normalizePathForHash(finding.file);
+      fingerprint = `stencil-component-change:${finding.tag}:${finding.change}:${file}:${finding.fromTag || ""}:${finding.toTag || ""}`;
+      break;
+    }
+
+    case "stencil-prop-change": {
+      // Fingerprint: type + tag + propName + change + file
+      const file = normalizePathForHash(finding.file);
+      fingerprint = `stencil-prop-change:${finding.tag}:${finding.propName}:${finding.change}:${file}`;
+      break;
+    }
+
+    case "stencil-event-change": {
+      // Fingerprint: type + tag + eventName + change + file
+      const file = normalizePathForHash(finding.file);
+      fingerprint = `stencil-event-change:${finding.tag}:${finding.eventName}:${finding.change}:${file}`;
+      break;
+    }
+
+    case "stencil-method-change": {
+      // Fingerprint: type + tag + methodName + change + file
+      const file = normalizePathForHash(finding.file);
+      fingerprint = `stencil-method-change:${finding.tag}:${finding.methodName}:${finding.change}:${file}`;
+      break;
+    }
+
+    case "stencil-slot-change": {
+      // Fingerprint: type + tag + slotName + change + file
+      const file = normalizePathForHash(finding.file);
+      fingerprint = `stencil-slot-change:${finding.tag}:${finding.slotName}:${finding.change}:${file}`;
+      break;
+    }
+
     case "risk-flag": {
       // Fingerprint: type + risk + evidenceText (legacy)
       // Note: risk-flag findings are being phased out in favor of derived flags

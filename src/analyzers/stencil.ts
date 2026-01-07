@@ -52,11 +52,6 @@ interface StencilMethod {
   line: number;
 }
 
-interface StencilSlot {
-  name: string; // "default" or named
-  line: number;
-}
-
 interface StencilComponent {
   tag: string;
   shadow: boolean;
@@ -335,7 +330,7 @@ export const stencilAnalyzer: Analyzer = {
             kind: "stencil-component-change",
             category: "api",
             confidence: "high",
-            evidence: [createEvidence(file.path, `@Component({ tag: "${tag}" })`, baseComp.line)],
+            evidence: [createEvidence(file.path, `@Component({ tag: "${tag}" })`, { line: baseComp.line })],
             tag,
             change: "removed",
             file: file.path,
@@ -347,7 +342,7 @@ export const stencilAnalyzer: Analyzer = {
             kind: "stencil-component-change",
             category: "api",
             confidence: "high",
-            evidence: [createEvidence(file.path, `@Component({ tag: "${tag}" })`, headComp.line)],
+            evidence: [createEvidence(file.path, `@Component({ tag: "${tag}" })`, { line: headComp.line })],
             tag,
             change: "added",
             file: file.path,
@@ -362,7 +357,7 @@ export const stencilAnalyzer: Analyzer = {
               kind: "stencil-component-change",
               category: "api",
               confidence: "high",
-              evidence: [createEvidence(file.path, `@Component({ tag: "${tag}", shadow: ${headComp.shadow} })`, headComp.line)],
+              evidence: [createEvidence(file.path, `@Component({ tag: "${tag}", shadow: ${headComp.shadow} })`, { line: headComp.line })],
               tag,
               change: "shadow-changed",
               file: file.path,
@@ -383,7 +378,7 @@ export const stencilAnalyzer: Analyzer = {
                 kind: "stencil-prop-change",
                 category: "api",
                 confidence: "high",
-                evidence: [createEvidence(file.path, `@Prop() ${propName}`, baseProp.line)],
+                evidence: [createEvidence(file.path, `@Prop() ${propName}`, { line: baseProp.line })],
                 tag,
                 propName,
                 change: "removed",
@@ -395,7 +390,7 @@ export const stencilAnalyzer: Analyzer = {
                 kind: "stencil-prop-change",
                 category: "api",
                 confidence: "high",
-                evidence: [createEvidence(file.path, `@Prop() ${propName}`, headProp.line)],
+                evidence: [createEvidence(file.path, `@Prop() ${propName}`, { line: headProp.line })],
                 tag,
                 propName,
                 change: "added",
@@ -418,7 +413,7 @@ export const stencilAnalyzer: Analyzer = {
                     kind: "stencil-prop-change",
                     category: "api",
                     confidence: "high",
-                    evidence: [createEvidence(file.path, `@Prop() ${propName}`, headProp.line)],
+                    evidence: [createEvidence(file.path, `@Prop() ${propName}`, { line: headProp.line })],
                     tag,
                     propName,
                     change: "changed",
@@ -445,7 +440,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-event-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `@Event() ${baseEvent.memberName}`, baseEvent.line)],
+                      evidence: [createEvidence(file.path, `@Event() ${baseEvent.memberName}`, { line: baseEvent.line })],
                       tag,
                       eventName,
                       change: "removed",
@@ -457,7 +452,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-event-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `@Event() ${headEvent.memberName}`, headEvent.line)],
+                      evidence: [createEvidence(file.path, `@Event() ${headEvent.memberName}`, { line: headEvent.line })],
                       tag,
                       eventName,
                       change: "added",
@@ -480,7 +475,7 @@ export const stencilAnalyzer: Analyzer = {
                           kind: "stencil-event-change",
                           category: "api",
                           confidence: "high",
-                          evidence: [createEvidence(file.path, `@Event() ${headEvent.memberName}`, headEvent.line)],
+                          evidence: [createEvidence(file.path, `@Event() ${headEvent.memberName}`, { line: headEvent.line })],
                           tag,
                           eventName,
                           change: "changed",
@@ -507,7 +502,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-method-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `@Method() ${methodName}`, baseMethod.line)],
+                      evidence: [createEvidence(file.path, `@Method() ${methodName}`, { line: baseMethod.line })],
                       tag,
                       methodName,
                       change: "removed",
@@ -519,7 +514,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-method-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `@Method() ${methodName}`, headMethod.line)],
+                      evidence: [createEvidence(file.path, `@Method() ${methodName}`, { line: headMethod.line })],
                       tag,
                       methodName,
                       change: "added",
@@ -541,7 +536,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-slot-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, headComp.line)], // Approximate line
+                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, { line: headComp.line })], // Approximate line
                       tag,
                       slotName,
                       change: "removed",
@@ -553,7 +548,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-slot-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, headComp.line)],
+                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, { line: headComp.line })],
                       tag,
                       slotName,
                       change: "added",

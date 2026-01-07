@@ -11,7 +11,7 @@ export * from "./cloudflare.js";
 export * from "./vitest.js";
 export * from "./dependencies.js";
 export * from "./security-files.js";
-export * from "./reactRouterRoutes.js";
+export { reactRouterRoutesAnalyzer } from "./reactRouterRoutes.js";
 export * from "./test-parity.js";
 export * from "./impact.js";
 export * from "./large-diff.js";
@@ -21,5 +21,5 @@ export * from "./sql-risks.js";
 export * from "./ci-workflows.js";
 export * from "./infra.js";
 export * from "./api-contracts.js";
-export * from "./stencil.js";
+export { stencilAnalyzer } from "./stencil.js";
 
