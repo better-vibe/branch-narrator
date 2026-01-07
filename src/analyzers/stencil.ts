@@ -141,9 +141,10 @@ export function extractStencilComponents(
             // @Prop
             const propDec = memberDecorators.find(
               (d) =>
-                t.isCallExpression(d.expression) &&
-                t.isIdentifier(d.expression.callee) &&
-                d.expression.callee.name === "Prop"
+                (t.isCallExpression(d.expression) &&
+                  t.isIdentifier(d.expression.callee) &&
+                  d.expression.callee.name === "Prop") ||
+                (t.isIdentifier(d.expression) && d.expression.name === "Prop")
             );
 
             if (propDec && t.isIdentifier(bodyNode.key)) {
@@ -179,9 +180,10 @@ export function extractStencilComponents(
             // @Event
             const eventDec = memberDecorators.find(
               (d) =>
-                t.isCallExpression(d.expression) &&
-                t.isIdentifier(d.expression.callee) &&
-                d.expression.callee.name === "Event"
+                (t.isCallExpression(d.expression) &&
+                  t.isIdentifier(d.expression.callee) &&
+                  d.expression.callee.name === "Event") ||
+                (t.isIdentifier(d.expression) && d.expression.name === "Event")
             );
 
             if (eventDec && t.isIdentifier(bodyNode.key)) {
@@ -213,9 +215,10 @@ export function extractStencilComponents(
             // @Method
             const methodDec = memberDecorators.find(
               (d) =>
-                t.isCallExpression(d.expression) &&
-                t.isIdentifier(d.expression.callee) &&
-                d.expression.callee.name === "Method"
+                (t.isCallExpression(d.expression) &&
+                  t.isIdentifier(d.expression.callee) &&
+                  d.expression.callee.name === "Method") ||
+                (t.isIdentifier(d.expression) && d.expression.name === "Method")
             );
 
             if (methodDec && t.isIdentifier(bodyNode.key)) {
@@ -238,8 +241,12 @@ export function extractStencilComponents(
                      if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === "name") {
                        if (t.isStringLiteral(attr.value)) {
                          slotName = attr.value.value;
+                       } else if (attr.value === null) {
+                         // Boolean "name" attribute: <slot name />
+                         slotName = "boolean";
                        } else {
-                         slotName = "dynamic"; // Dynamic slot name
+                         // Dynamic or non-literal slot name, e.g. <slot name={expr} />
+                         slotName = "dynamic";
                        }
                      }
                    }
@@ -536,7 +543,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-slot-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, { line: headComp.line })], // Approximate line
+                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, { line: baseComp.line })], // Approximate line
                       tag,
                       slotName,
                       change: "removed",

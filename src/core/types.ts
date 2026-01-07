@@ -366,7 +366,7 @@ export interface StencilComponentChangeFinding {
   confidence: Confidence;
   evidence: Evidence[];
   tag: string;
-  change: "added" | "removed" | "modified" | "tag-changed" | "shadow-changed";
+  change: "added" | "removed" | "tag-changed" | "shadow-changed";
   file: string;
   fromTag?: string; // for tag-changed
   toTag?: string; // for tag-changed
@@ -438,7 +438,7 @@ export interface StencilSlotChangeFinding {
   evidence: Evidence[];
   tag: string;
   slotName: string; // "default" or named
-  change: "added" | "removed" | "changed";
+  change: "added" | "removed";
   file: string;
   tags?: string[];
   findingId?: string;
