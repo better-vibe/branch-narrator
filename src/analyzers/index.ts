@@ -21,4 +21,5 @@ export * from "./sql-risks.js";
 export * from "./ci-workflows.js";
 export * from "./infra.js";
 export * from "./api-contracts.js";
+export * from "./stencil.js";
 

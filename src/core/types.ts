@@ -359,6 +359,91 @@ export interface TestGapFinding {
   findingId?: string; // Stable ID, format: "finding.test-gap#<hash>"
 }
 
+export interface StencilComponentChangeFinding {
+  type: "stencil-component-change";
+  kind: "stencil-component-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  tag: string;
+  change: "added" | "removed" | "modified" | "tag-changed" | "shadow-changed";
+  file: string;
+  fromTag?: string; // for tag-changed
+  toTag?: string; // for tag-changed
+  fromShadow?: boolean; // for shadow-changed
+  toShadow?: boolean; // for shadow-changed
+  tags?: string[];
+  findingId?: string;
+}
+
+export interface StencilPropChangeFinding {
+  type: "stencil-prop-change";
+  kind: "stencil-prop-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  tag: string;
+  propName: string;
+  change: "added" | "removed" | "changed";
+  file: string;
+  details?: {
+    typeText?: string;
+    attribute?: string;
+    reflect?: boolean;
+    mutable?: boolean;
+  };
+  tags?: string[];
+  findingId?: string;
+}
+
+export interface StencilEventChangeFinding {
+  type: "stencil-event-change";
+  kind: "stencil-event-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  tag: string;
+  eventName: string;
+  change: "added" | "removed" | "changed";
+  file: string;
+  details?: {
+    bubbles?: boolean;
+    composed?: boolean;
+    cancelable?: boolean;
+  };
+  tags?: string[];
+  findingId?: string;
+}
+
+export interface StencilMethodChangeFinding {
+  type: "stencil-method-change";
+  kind: "stencil-method-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  tag: string;
+  methodName: string;
+  change: "added" | "removed" | "changed";
+  file: string;
+  signature?: string;
+  tags?: string[];
+  findingId?: string;
+}
+
+export interface StencilSlotChangeFinding {
+  type: "stencil-slot-change";
+  kind: "stencil-slot-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  tag: string;
+  slotName: string; // "default" or named
+  change: "added" | "removed" | "changed";
+  file: string;
+  tags?: string[];
+  findingId?: string;
+}
+
 export type RiskyPackageCategory =
   | "auth"
   | "database"
@@ -384,7 +469,12 @@ export type Finding =
   | APIContractChangeFinding
   | LargeDiffFinding
   | LockfileFinding
-  | TestGapFinding;
+  | TestGapFinding
+  | StencilComponentChangeFinding
+  | StencilPropChangeFinding
+  | StencilEventChangeFinding
+  | StencilMethodChangeFinding
+  | StencilSlotChangeFinding;
 
 // ============================================================================
 // Risk Score
@@ -437,7 +527,7 @@ export interface Analyzer {
 // Profile
 // ============================================================================
 
-export type ProfileName = "auto" | "sveltekit" | "react";
+export type ProfileName = "auto" | "sveltekit" | "react" | "stencil";
 
 export interface Profile {
   name: ProfileName;
