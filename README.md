@@ -384,7 +384,7 @@ Generate provider-specific rules for AI coding assistants.
 
 **Supported targets:**
 - `cursor`: Generates `.cursor/rules/branch-narrator.md` and `.cursor/rules/pr-description.md`
-- `jules`: Generates rules compatible with Jules
+- `jules`: Generates `AGENTS.md` in the repository root with Branch Narrator rules for Jules
 
 **Behavior:**
 - Creates rules directory if it doesn't exist
