@@ -1,6 +1,6 @@
 /**
  * Version information for the CLI.
- * 
+ *
  * This is read from package.json at runtime to ensure consistency.
  */
 
@@ -28,9 +28,10 @@ export async function getVersion(): Promise<string> {
     const packagePath = join(__dirname, "..", "..", "package.json");
     const packageContent = await readFile(packagePath, "utf-8");
     const packageJson = JSON.parse(packageContent);
-    
-    cachedVersion = packageJson.version || "unknown";
-    return cachedVersion;
+
+    const version: string = packageJson.version || "unknown";
+    cachedVersion = version;
+    return version;
   } catch (error) {
     // Fallback if we can't read package.json
     return "unknown";

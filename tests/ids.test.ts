@@ -4,7 +4,6 @@
 
 import { describe, expect, it } from "bun:test";
 import {
-  normalizePath,
   stableHash,
   buildFindingId,
   buildFlagId,
@@ -13,19 +12,7 @@ import {
 } from "../src/core/ids.js";
 import type { EnvVarFinding, DependencyChangeFinding, RouteChangeFinding } from "../src/core/types.js";
 
-describe("normalizePath", () => {
-  it("should convert backslashes to forward slashes", () => {
-    expect(normalizePath("src\\routes\\page.ts")).toBe("src/routes/page.ts");
-  });
-
-  it("should preserve forward slashes", () => {
-    expect(normalizePath("src/routes/page.ts")).toBe("src/routes/page.ts");
-  });
-
-  it("should handle mixed slashes", () => {
-    expect(normalizePath("src\\routes/api\\+server.ts")).toBe("src/routes/api/+server.ts");
-  });
-});
+// Note: normalizePathForHash is now internal to ids.ts and tested indirectly via buildFindingId
 
 describe("stableHash", () => {
   it("should produce a 12-character hex hash", () => {
@@ -63,7 +50,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding);
       const id2 = buildFindingId(finding);
-      
+
       expect(id1).toBe(id2);
       expect(id1).toMatch(/^finding\.env-var#[0-9a-f]{12}$/);
     });
@@ -87,7 +74,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding1);
       const id2 = buildFindingId(finding2);
-      
+
       expect(id1).toBe(id2);
     });
 
@@ -110,7 +97,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding1);
       const id2 = buildFindingId(finding2);
-      
+
       expect(id1).not.toBe(id2);
     });
 
@@ -133,7 +120,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding1);
       const id2 = buildFindingId(finding2);
-      
+
       expect(id1).toBe(id2);
     });
   });
@@ -155,7 +142,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding);
       const id2 = buildFindingId(finding);
-      
+
       expect(id1).toBe(id2);
       expect(id1).toMatch(/^finding\.dependency-change#[0-9a-f]{12}$/);
     });
@@ -182,7 +169,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding1);
       const id2 = buildFindingId(finding2);
-      
+
       expect(id1).not.toBe(id2);
     });
 
@@ -219,7 +206,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding);
       const id2 = buildFindingId(finding);
-      
+
       expect(id1).toBe(id2);
       expect(id1).toMatch(/^finding\.route-change#[0-9a-f]{12}$/);
     });
@@ -244,7 +231,7 @@ describe("buildFindingId", () => {
 
       const id1 = buildFindingId(finding1);
       const id2 = buildFindingId(finding2);
-      
+
       expect(id1).toBe(id2);
     });
   });
@@ -257,7 +244,7 @@ describe("buildFlagId", () => {
 
     const id1 = buildFlagId(ruleKey, relatedFindingIds);
     const id2 = buildFlagId(ruleKey, relatedFindingIds);
-    
+
     expect(id1).toBe(id2);
     expect(id1).toMatch(/^flag\.security\.workflow_permissions_broadened#[0-9a-f]{12}$/);
   });
@@ -269,32 +256,32 @@ describe("buildFlagId", () => {
 
     const id1 = buildFlagId(ruleKey, ids1);
     const id2 = buildFlagId(ruleKey, ids2);
-    
+
     expect(id1).toBe(id2);
   });
 
   it("should produce different IDs for different rule keys", () => {
     const relatedFindingIds = ["finding.env-var#abc123"];
-    
+
     const id1 = buildFlagId("security.rule1", relatedFindingIds);
     const id2 = buildFlagId("security.rule2", relatedFindingIds);
-    
+
     expect(id1).not.toBe(id2);
   });
 
   it("should produce different IDs for different finding sets", () => {
     const ruleKey = "security.workflow_permissions_broadened";
-    
+
     const id1 = buildFlagId(ruleKey, ["finding.env-var#abc123"]);
     const id2 = buildFlagId(ruleKey, ["finding.env-var#def456"]);
-    
+
     expect(id1).not.toBe(id2);
   });
 
   it("should handle empty relatedFindingIds", () => {
     const ruleKey = "security.workflow_permissions_broadened";
     const id = buildFlagId(ruleKey, []);
-    
+
     expect(id).toMatch(/^flag\.security\.workflow_permissions_broadened#[0-9a-f]{12}$/);
   });
 });
@@ -313,7 +300,7 @@ describe("assignFindingId", () => {
     };
 
     const withId = assignFindingId(finding);
-    
+
     expect(withId.findingId).toBeDefined();
     expect(withId.findingId).toMatch(/^finding\.env-var#[0-9a-f]{12}$/);
   });
@@ -331,7 +318,7 @@ describe("assignFindingId", () => {
     };
 
     const withId = assignFindingId(finding);
-    
+
     expect((finding as any).findingId).toBeUndefined();
     expect(withId.findingId).toBeDefined();
   });
@@ -353,7 +340,7 @@ describe("assignFlagId", () => {
     };
 
     const withId = assignFlagId(flag);
-    
+
     expect(withId.flagId).toBeDefined();
     expect(withId.flagId).toMatch(/^flag\.security\.workflow_permissions_broadened#[0-9a-f]{12}$/);
     expect(withId.ruleKey).toBe("security.workflow_permissions_broadened");
@@ -373,7 +360,7 @@ describe("assignFlagId", () => {
     };
 
     const withId = assignFlagId(flag);
-    
+
     expect(withId.flagId).toBeDefined();
     expect(withId.ruleKey).toBe("security.workflow_permissions_broadened");
   });
