@@ -2,7 +2,7 @@
  * Risk report command.
  */
 
-import type { ChangeSet, Finding, ProfileName, RiskFlag, RiskReport } from "../../core/types.js";
+import type { ChangeSet, DiffMode, Finding, ProfileName, RiskFlag, RiskReport } from "../../core/types.js";
 import { shouldSkipFile } from "./exclusions.js";
 import { redactLines } from "./redaction.js";
 import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
@@ -23,6 +23,8 @@ export interface RiskReportOptions {
   noTimestamp?: boolean;
   profile?: ProfileName;
   cwd?: string;
+  /** Original CLI mode used to generate this output */
+  mode?: DiffMode;
 }
 
 /**
@@ -41,6 +43,7 @@ export async function generateRiskReport(
     noTimestamp = false,
     profile: requestedProfile = "auto",
     cwd = process.cwd(),
+    mode,
   } = options;
 
   // Track skipped files
@@ -60,16 +63,16 @@ export async function generateRiskReport(
   // Run analysis pipeline to get findings
   const profileName = resolveProfileName(requestedProfile, changeSet, cwd);
   const profile = getProfile(profileName);
-  
+
   const rawFindings: Finding[] = [];
   for (const analyzer of profile.analyzers) {
     const analyzerFindings = await analyzer.analyze(changeSet);
     rawFindings.push(...analyzerFindings);
   }
-  
+
   // Assign findingIds to all findings
   const findings = rawFindings.map(assignFindingId);
-  
+
   // Convert findings to risk flags
   let allFlags: RiskFlag[] = findingsToFlags(findings);
 
@@ -101,7 +104,7 @@ export async function generateRiskReport(
     changeSet.head,
     allFlags,
     skippedFiles,
-    { explainScore, noTimestamp }
+    { explainScore, noTimestamp, mode, only, exclude }
   );
 }
 

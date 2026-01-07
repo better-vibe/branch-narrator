@@ -3,6 +3,7 @@
  */
 
 import type {
+  DiffMode,
   RiskCategory,
   RiskFlag,
   RiskReport,
@@ -136,6 +137,9 @@ export function computeRiskReport(
   options?: {
     explainScore?: boolean;
     noTimestamp?: boolean;
+    mode?: DiffMode;
+    only?: string[];
+    exclude?: string[];
   }
 ): RiskReport {
   const categoryScores = computeCategoryScores(flags);
@@ -144,7 +148,7 @@ export function computeRiskReport(
 
   const report: RiskReport = {
     schemaVersion: "1.0",
-    range: { base, head },
+    range: { base, head, mode: options?.mode },
     riskScore,
     riskLevel,
     categoryScores,
@@ -159,6 +163,14 @@ export function computeRiskReport(
 
   if (options?.explainScore) {
     report.scoreBreakdown = buildScoreBreakdown(categoryScores);
+  }
+
+  // Store filters if provided
+  if (options?.only || options?.exclude) {
+    report.filters = {
+      only: options.only,
+      exclude: options.exclude,
+    };
   }
 
   return report;

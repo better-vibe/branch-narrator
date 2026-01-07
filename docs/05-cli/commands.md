@@ -199,11 +199,9 @@ When `--since <path>` is provided, the output is a **delta** instead of the full
   },
   "since": {
     "path": ".ai/prev-facts.json",
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "current": {
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "scope": {
@@ -601,18 +599,17 @@ When `--since <path>` is provided, the output is a **delta** instead of the full
   },
   "since": {
     "path": ".ai/prev-risk.json",
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "current": {
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "scope": {
     "mode": "unstaged",
     "base": null,
     "head": null,
-    "only": null
+    "only": null,
+    "exclude": null
   },
   "delta": {
     "riskScore": {
@@ -761,7 +758,8 @@ branch-narrator zoom --finding "finding.sql-risk#abc456" --format text
   "generatedAt": "2026-01-06T12:00:00.000Z",
   "range": {
     "base": "main",
-    "head": "HEAD"
+    "head": "HEAD",
+    "mode": "branch"
   },
   "itemType": "finding",
   "findingId": "finding.env-var#abc123def456",

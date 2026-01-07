@@ -4,6 +4,7 @@
 
 import type {
   ChangeSet,
+  DiffMode,
   FactsOutput,
   Finding,
   Filters,
@@ -48,6 +49,8 @@ export interface BuildFactsOptions {
   repoRoot?: string;
   /** Pre-computed working directory dirty status (avoids git call if provided) */
   isDirty?: boolean;
+  /** Original CLI mode used to generate this output */
+  mode?: DiffMode;
 }
 
 /**
@@ -130,6 +133,7 @@ export async function buildFacts(
     noTimestamp,
     repoRoot: providedRepoRoot,
     isDirty: providedIsDirty,
+    mode,
   } = options;
 
   // Sort findings deterministically first (without touching evidence yet)
@@ -160,7 +164,7 @@ export async function buildFacts(
   // Get git info - use provided values if available, otherwise fetch in parallel
   let repoRoot: string;
   let isDirty: boolean;
-  
+
   if (providedRepoRoot !== undefined && providedIsDirty !== undefined) {
     // Both provided, use them directly
     repoRoot = providedRepoRoot;
@@ -187,6 +191,7 @@ export async function buildFacts(
     range: `${changeSet.base}..${changeSet.head}`,
     repoRoot,
     isDirty,
+    mode,
   };
 
   const profile: ProfileInfo = {

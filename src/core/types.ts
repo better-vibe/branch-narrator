@@ -474,6 +474,7 @@ export interface GitInfo {
   range: string;
   repoRoot: string;
   isDirty: boolean;
+  mode?: DiffMode; // Original CLI mode used to generate this output
 }
 
 export interface ProfileInfo {
@@ -581,16 +582,22 @@ export interface ScoreBreakdown {
   formula: string;
 }
 
+export interface RiskReportFilters {
+  only?: string[];
+  exclude?: string[];
+}
+
 export interface RiskReport {
   schemaVersion: "1.0";
   generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
-  range: { base: string; head: string };
+  range: { base: string; head: string; mode?: DiffMode };
   riskScore: number; // 0..100
   riskLevel: RiskReportLevel;
   categoryScores: Record<RiskCategory, number>; // 0..100 per category
   flags: RiskFlag[];
   skippedFiles: Array<{ file: string; reason: string }>;
   scoreBreakdown?: ScoreBreakdown;
+  filters?: RiskReportFilters; // Category filters used to generate this output
 }
 
 // ============================================================================
@@ -655,11 +662,6 @@ export interface CommandMetadata {
   args: string[];
 }
 
-export interface VersionMetadata {
-  toolVersion: string;
-  schemaVersion: string;
-}
-
 export interface ScopeMetadata {
   mode: string;
   base: string | null;
@@ -687,10 +689,11 @@ export interface FactsDelta {
   command: CommandMetadata;
   since: {
     path: string;
-    toolVersion: string;
     schemaVersion: string;
   };
-  current: VersionMetadata;
+  current: {
+    schemaVersion: string;
+  };
   scope: ScopeMetadata;
   warnings: ScopeWarning[];
   delta: {
@@ -717,10 +720,11 @@ export interface RiskReportDelta {
   command: CommandMetadata;
   since: {
     path: string;
-    toolVersion: string;
     schemaVersion: string;
   };
-  current: VersionMetadata;
+  current: {
+    schemaVersion: string;
+  };
   scope: ScopeMetadata;
   delta: {
     riskScore: {

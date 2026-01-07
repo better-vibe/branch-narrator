@@ -15,7 +15,6 @@ import {
   compareScopeMetadata,
   extractRiskReportScope,
 } from "../../core/delta.js";
-import { getVersion } from "../../core/version.js";
 import { BranchNarratorError } from "../../core/errors.js";
 
 /**
@@ -68,22 +67,6 @@ export async function computeRiskReportDelta(
       1
     );
   }
-
-  // Extract version metadata
-  const currentToolVersion = await getVersion();
-  
-  // Note: RiskReport doesn't store toolVersion, so we can't determine
-  // which version of branch-narrator generated the previous output.
-  // We mark it as "unknown" for now.
-  const previousVersion = {
-    toolVersion: "unknown",
-    schemaVersion: previousReport.schemaVersion,
-  };
-
-  const currentVersion = {
-    toolVersion: currentToolVersion,
-    schemaVersion: currentReport.schemaVersion,
-  };
 
   // Build scope metadata for current run
   const currentScope: ScopeMetadata = {
@@ -145,10 +128,11 @@ export async function computeRiskReportDelta(
     },
     since: {
       path: sincePath,
-      toolVersion: previousVersion.toolVersion,
-      schemaVersion: previousVersion.schemaVersion,
+      schemaVersion: previousReport.schemaVersion,
     },
-    current: currentVersion,
+    current: {
+      schemaVersion: currentReport.schemaVersion,
+    },
     scope: currentScope,
     delta: {
       riskScore: riskScoreDelta,
