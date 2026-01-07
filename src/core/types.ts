@@ -189,6 +189,7 @@ export type FileCategory =
   | "tests"
   | "ci"
   | "infra"
+  | "database"
   | "docs"
   | "dependencies"
   | "config"

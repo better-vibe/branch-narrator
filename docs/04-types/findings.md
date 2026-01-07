@@ -67,6 +67,7 @@ type FileCategory =
   | "tests"
   | "ci"
   | "infra"
+  | "database"
   | "docs"
   | "dependencies"
   | "config"
@@ -81,6 +82,18 @@ interface FileCategoryFinding {
   }>;
 }
 ```
+
+### Database Category Patterns
+
+Files matching these patterns are categorized as `database`:
+- `supabase/migrations/*` - Supabase migrations
+- `supabase/seed*` - Supabase seed files
+- `prisma/migrations/*` - Prisma migrations
+- `prisma/schema.prisma` - Prisma schema
+- `drizzle/migrations/*` - Drizzle migrations
+- `drizzle.config*` - Drizzle config
+- `migrations/` or `*/migrations/` - Generic migration directories
+- `*.sql` - SQL files
 
 ---
 

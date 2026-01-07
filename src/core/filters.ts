@@ -23,6 +23,10 @@ export const DEFAULT_EXCLUDES = [
   "**/yarn.lock",
   "**/pnpm-lock.yaml",
   "**/bun.lock",
+  // Archive files
+  "**/*.tgz",
+  "**/*.tar.gz",
+  "**/*.zip",
 ];
 
 // Patterns for files that should be excluded from analysis

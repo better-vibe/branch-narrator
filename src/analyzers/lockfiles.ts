@@ -24,7 +24,8 @@ function isLockfile(path: string): boolean {
     path === "package-lock.json" ||
     path === "yarn.lock" ||
     path === "pnpm-lock.yaml" ||
-    path === "bun.lockb"
+    path === "bun.lockb" ||
+    path === "bun.lock"
   );
 }
 

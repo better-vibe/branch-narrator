@@ -21,6 +21,8 @@ const CATEGORY_RULES: Array<{
     patterns: [
       /^tests?\//i,
       /^__tests__\//i,
+      /\/tests?\//i, // matches src/tests/, lib/tests/, etc.
+      /\/__tests__\//i,
       /\.test\.[jt]sx?$/i,
       /\.spec\.[jt]sx?$/i,
       /\.e2e\.[jt]sx?$/i,
@@ -60,6 +62,21 @@ const CATEGORY_RULES: Array<{
       /^pulumi\//i,
       /^ansible\//i,
       /^Vagrantfile$/,
+    ],
+  },
+  // Database (migrations, schemas, seeds)
+  {
+    category: "database",
+    patterns: [
+      /^supabase\/migrations\//,
+      /^supabase\/seed/,
+      /^prisma\/migrations\//,
+      /^prisma\/schema\.prisma$/,
+      /^drizzle\/migrations\//,
+      /^drizzle\.config/,
+      /^migrations?\//i,
+      /\/migrations?\//i, // matches db/migrations/, database/migrations/, etc.
+      /\.sql$/i,
     ],
   },
   // Documentation
@@ -159,6 +176,7 @@ export function getCategoryLabel(category: FileCategory): string {
     tests: "Tests",
     ci: "CI/CD",
     infra: "Infrastructure",
+    database: "Database",
     docs: "Documentation",
     dependencies: "Dependencies",
     config: "Configuration",
@@ -176,6 +194,7 @@ export const fileCategoryAnalyzer: Analyzer = {
       tests: [],
       ci: [],
       infra: [],
+      database: [],
       docs: [],
       dependencies: [],
       config: [],

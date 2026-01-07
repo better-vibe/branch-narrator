@@ -12,9 +12,10 @@ Categorizes files into meaningful groups for better PR organization.
 | Category | Description | Example Paths |
 |----------|-------------|---------------|
 | `product` | Application code | `src/`, `lib/`, `app/` |
-| `tests` | Test files | `tests/`, `*.test.ts`, `*.spec.ts` |
+| `tests` | Test files | `tests/`, `src/tests/`, `*.test.ts`, `*.spec.ts` |
 | `ci` | CI/CD configuration | `.github/workflows/`, `Jenkinsfile` |
 | `infra` | Infrastructure | `Dockerfile`, `helm/`, `terraform/` |
+| `database` | Database files | `supabase/migrations/`, `prisma/`, `*.sql` |
 | `docs` | Documentation | `docs/`, `*.md`, `README` |
 | `dependencies` | Package manifests | `package.json`, lockfiles |
 | `config` | Configuration | `*.config.*`, `.env*`, `tsconfig` |
@@ -28,6 +29,7 @@ type FileCategory =
   | "tests"
   | "ci"
   | "infra"
+  | "database"
   | "docs"
   | "dependencies"
   | "config"
@@ -45,13 +47,14 @@ interface FileCategoryFinding {
 
 ## Detection Rules (Priority Order)
 
-1. **tests** - `tests/`, `__tests__/`, `*.test.*`, `*.spec.*`, `vitest.config.*`
+1. **tests** - `tests/`, `src/tests/`, `__tests__/`, `*.test.*`, `*.spec.*`, `vitest.config.*`
 2. **ci** - `.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile`
 3. **infra** - `Dockerfile`, `docker-compose*`, `helm/`, `terraform/`, `k8s/`
-4. **docs** - `docs/`, `*.md`, `README*`, `CHANGELOG*`
-5. **dependencies** - `package.json`, `*lock*`, `Cargo.toml`, `requirements.txt`
-6. **config** - `.*rc`, `*.config.*`, `.env*`, `tsconfig*`
-7. **product** - `src/`, `lib/`, `app/`, `*.ts`, `*.svelte`
+4. **database** - `supabase/migrations/`, `prisma/migrations/`, `drizzle/`, `migrations/`, `*.sql`
+5. **docs** - `docs/`, `*.md`, `README*`, `CHANGELOG*`
+6. **dependencies** - `package.json`, `*lock*`, `Cargo.toml`, `requirements.txt`
+7. **config** - `.*rc`, `*.config.*`, `.env*`, `tsconfig*`
+8. **product** - `src/`, `lib/`, `app/`, `*.ts`, `*.svelte`
 
 ## Example Output
 
@@ -63,6 +66,7 @@ interface FileCategoryFinding {
     "tests": ["tests/auth.test.ts"],
     "ci": [],
     "infra": [],
+    "database": ["supabase/migrations/001_init.sql"],
     "docs": ["README.md"],
     "dependencies": ["package.json"],
     "config": ["tsconfig.json"],
@@ -70,6 +74,7 @@ interface FileCategoryFinding {
   },
   "summary": [
     { "category": "product", "count": 2 },
+    { "category": "database", "count": 1 },
     { "category": "tests", "count": 1 },
     { "category": "docs", "count": 1 },
     { "category": "dependencies", "count": 1 },

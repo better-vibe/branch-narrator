@@ -4,9 +4,67 @@
 
 import type {
   Action,
+  FileCategoryFinding,
+  FileSummaryFinding,
   Finding,
   ProfileName,
 } from "../../core/types.js";
+
+/**
+ * Detected package manager type.
+ */
+type PackageManager = "bun" | "pnpm" | "yarn" | "npm";
+
+/**
+ * Detect package manager from findings by looking at lockfiles.
+ * Priority: bun > pnpm > yarn > npm
+ */
+function detectPackageManager(findings: Finding[]): PackageManager {
+  // Get all file paths from findings
+  const allFiles: string[] = [];
+
+  for (const finding of findings) {
+    if (finding.type === "file-summary") {
+      const f = finding as FileSummaryFinding;
+      allFiles.push(...f.added, ...f.modified, ...f.deleted);
+      allFiles.push(...f.renamed.map(r => r.to));
+    }
+    if (finding.type === "file-category") {
+      const f = finding as FileCategoryFinding;
+      allFiles.push(...f.categories.dependencies);
+    }
+  }
+
+  // Check for lockfiles in priority order
+  if (allFiles.some(f => f === "bun.lock" || f === "bun.lockb")) {
+    return "bun";
+  }
+  if (allFiles.some(f => f === "pnpm-lock.yaml")) {
+    return "pnpm";
+  }
+  if (allFiles.some(f => f === "yarn.lock")) {
+    return "yarn";
+  }
+
+  // Default to npm
+  return "npm";
+}
+
+/**
+ * Get run command prefix for package manager.
+ */
+function getRunCmd(pm: PackageManager): string {
+  switch (pm) {
+    case "bun":
+      return "bun run";
+    case "pnpm":
+      return "pnpm";
+    case "yarn":
+      return "yarn";
+    case "npm":
+      return "npm run";
+  }
+}
 
 /**
  * Derive actionable recommendations from findings and risk.
@@ -16,6 +74,8 @@ export function deriveActions(
   profile: ProfileName
 ): Action[] {
   const actions: Action[] = [];
+  const pm = detectPackageManager(findings);
+  const runCmd = getRunCmd(pm);
 
   // SvelteKit check
   if (profile === "sveltekit" || profile === "auto") {
@@ -27,7 +87,7 @@ export function deriveActions(
         blocking: true,
         reason: "Run SvelteKit type checker to verify no type errors",
         commands: [
-          { cmd: "pnpm check", when: "local-or-ci" },
+          { cmd: `${runCmd} check`, when: "local-or-ci" },
         ],
       });
     }
@@ -41,7 +101,7 @@ export function deriveActions(
       blocking: true,
       reason: "Run tests to verify functionality",
       commands: [
-        { cmd: "pnpm test", when: "local-or-ci" },
+        { cmd: `${runCmd} test`, when: "local-or-ci" },
       ],
     });
   }
@@ -52,7 +112,7 @@ export function deriveActions(
     const hasDangerousSQL = dbMigrations.some(
       m => m.risk === "high"
     );
-    
+
     actions.push({
       id: "apply-migrations",
       blocking: hasDangerousSQL,

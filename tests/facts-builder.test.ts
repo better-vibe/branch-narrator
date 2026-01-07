@@ -64,12 +64,12 @@ describe("aggregateCategories", () => {
     const categories = aggregateCategories(findings, riskFactors);
 
     expect(categories.length).toBe(2);
-    
+
     // Should be sorted by riskWeight desc
     expect(categories[0].id).toBe("database");
     expect(categories[0].count).toBe(1);
     expect(categories[0].riskWeight).toBe(15);
-    
+
     expect(categories[1].id).toBe("routes");
     expect(categories[1].count).toBe(2);
     expect(categories[1].riskWeight).toBe(5);
@@ -223,6 +223,17 @@ describe("deriveActions", () => {
         change: "modified",
         routeType: "page",
       },
+      {
+        type: "file-summary",
+        kind: "file-summary",
+        category: "unknown",
+        confidence: "high",
+        evidence: [],
+        added: [],
+        modified: ["pnpm-lock.yaml"],
+        deleted: [],
+        renamed: [],
+      },
     ];
 
     const actions = deriveActions(findings, "sveltekit");
@@ -231,6 +242,29 @@ describe("deriveActions", () => {
     const checkAction = actions.find(a => a.id === "sveltekit-check");
     expect(checkAction?.blocking).toBe(true);
     expect(checkAction?.commands[0].cmd).toBe("pnpm check");
+  });
+
+  it("should detect bun package manager from lockfile", () => {
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        kind: "file-summary",
+        category: "unknown",
+        confidence: "high",
+        evidence: [],
+        added: [],
+        modified: ["bun.lock", "package.json"],
+        deleted: [],
+        renamed: [],
+      },
+    ];
+
+    const actions = deriveActions(findings, "sveltekit");
+
+    const checkAction = actions.find(a => a.id === "sveltekit-check");
+    expect(checkAction?.commands[0].cmd).toBe("bun run check");
+    const testAction = actions.find(a => a.id === "run-tests");
+    expect(testAction?.commands[0].cmd).toBe("bun run test");
   });
 
   it("should generate test action when test changes detected", () => {
@@ -293,7 +327,7 @@ describe("deriveActions", () => {
     const migrateAction = actions.find(a => a.id === "apply-migrations");
     expect(migrateAction?.blocking).toBe(true);
     expect(migrateAction?.reason).toContain("DANGEROUS SQL");
-    
+
     // Should also have backup action
     expect(actions.some(a => a.id === "backup-db")).toBe(true);
   });
@@ -347,7 +381,7 @@ describe("deriveActions", () => {
     // Blocking actions should come first
     const firstAction = actions[0];
     expect(firstAction.blocking).toBe(true);
-    
+
     // Non-blocking should come after
     const lastAction = actions[actions.length - 1];
     expect(lastAction.blocking).toBe(false);
@@ -487,7 +521,7 @@ describe("buildFacts", () => {
 
   it("should sort evidence only for findings that remain after maxFindings", async () => {
     const changeSet = createMockChangeSet();
-    
+
     // Create findings with unsorted evidence
     // VAR1 has evidence starting with 'z.ts' and VAR2 starts with 'y.ts',
     // so VAR2 will sort before VAR1 when findings are ordered by first evidence file.
@@ -547,7 +581,7 @@ describe("buildFacts", () => {
 
   it("should redact evidence only for findings kept after maxFindings", async () => {
     const changeSet = createMockChangeSet();
-    
+
     const findings: Finding[] = [
       {
         type: "env-var",
@@ -600,7 +634,7 @@ describe("buildFacts", () => {
 
   it("should maintain deterministic sorting with maxFindings", async () => {
     const changeSet = createMockChangeSet();
-    
+
     // Create findings that will sort deterministically
     // Sorting is by type first, then by first evidence file
     const findings: Finding[] = [

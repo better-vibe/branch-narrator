@@ -5,7 +5,7 @@
 ### Completed Features ✅
 
 - [x] File summary analyzer
-- [x] File category classifier
+- [x] File category classifier (with database category)
 - [x] SvelteKit route detection
 - [x] Supabase migration scanner
 - [x] Environment variable detection
@@ -22,6 +22,9 @@
 - [x] React profile (React Router support)
 - [x] Test parity analyzer
 - [x] Impact/blast radius analyzer
+- [x] Package manager detection for actions (bun/pnpm/yarn/npm)
+- [x] `bun.lock` lockfile detection
+- [x] Improved test file detection (src/tests/ paths)
 
 ---
 
