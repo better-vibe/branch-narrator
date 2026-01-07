@@ -132,6 +132,8 @@ branch-narrator facts [options]
 | `--max-findings <n>` | (none) | Maximum number of findings to include |
 | `--out <path>` | (stdout) | Write output to file instead of stdout |
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
+| `--since <path>` | (none) | Compare current output to a previous JSON file |
+| `--since-strict` | `false` | Exit with code 1 on scope/tool/schema mismatch |
 
 ### Diff Modes
 
@@ -171,6 +173,89 @@ branch-narrator facts --pretty
 
 # Deterministic output (omit timestamp)
 branch-narrator facts --no-timestamp
+
+# Compare to previous run (delta mode)
+branch-narrator facts --out .ai/prev-facts.json
+# ... make code changes ...
+branch-narrator facts --since .ai/prev-facts.json
+
+# Strict delta mode (fail on scope mismatch)
+branch-narrator facts --since .ai/prev-facts.json --since-strict
+```
+
+### Delta Mode (`--since`)
+
+When `--since <path>` is provided, the output is a **delta** instead of the full facts output. This is useful for iteration loops where you want to see what changed since your last run.
+
+#### Delta Output Schema
+
+```json
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-01-06T12:00:00.000Z",
+  "command": {
+    "name": "facts",
+    "args": ["--mode", "unstaged", "--since", ".ai/prev-facts.json"]
+  },
+  "since": {
+    "path": ".ai/prev-facts.json",
+    "toolVersion": "1.1.0",
+    "schemaVersion": "1.0"
+  },
+  "current": {
+    "toolVersion": "1.1.0",
+    "schemaVersion": "1.0"
+  },
+  "scope": {
+    "mode": "unstaged",
+    "base": null,
+    "head": null,
+    "profile": "auto",
+    "include": [],
+    "exclude": []
+  },
+  "warnings": [
+    {
+      "code": "scope-mismatch",
+      "message": "Previous run used profile=sveltekit, current is profile=auto"
+    }
+  ],
+  "delta": {
+    "added": ["finding.env-var#abc123", "finding.route-change#def456"],
+    "removed": ["finding.db-migration#789xyz"],
+    "changed": [
+      {
+        "findingId": "finding.dependency-change#c0ffee",
+        "before": { "...": "previous finding object..." },
+        "after": { "...": "current finding object..." }
+      }
+    ]
+  },
+  "summary": {
+    "addedCount": 2,
+    "removedCount": 1,
+    "changedCount": 1
+  }
+}
+```
+
+#### Scope Mismatch Warnings
+
+Delta mode compares scope metadata (mode, base, head, profile, filters) between runs. If they differ, warnings are included in the output. Use `--since-strict` to exit with code 1 on mismatch instead of continuing with warnings.
+
+#### Example Workflow
+
+```bash
+# 1. Save baseline
+branch-narrator facts --out .ai/baseline.json
+
+# 2. Make code changes...
+# (edit files)
+
+# 3. Compare to baseline
+branch-narrator facts --since .ai/baseline.json --pretty
+
+# Output shows only added/removed/changed findings
 ```
 
 ---
@@ -427,6 +512,8 @@ branch-narrator risk-report [options]
 | `--explain-score` | `false` | Include score breakdown in output |
 | `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
+| `--since <path>` | (none) | Compare current output to a previous JSON file |
+| `--since-strict` | `false` | Exit with code 1 on scope/tool/schema mismatch |
 
 ### Diff Modes
 
@@ -481,6 +568,95 @@ branch-narrator risk-report --pretty
 
 # Deterministic output (omit timestamp)
 branch-narrator risk-report --no-timestamp
+
+# Compare to previous run (delta mode)
+branch-narrator risk-report --out .ai/prev-risk.json
+# ... make code changes ...
+branch-narrator risk-report --since .ai/prev-risk.json
+
+# Strict delta mode (fail on scope mismatch)
+branch-narrator risk-report --since .ai/prev-risk.json --since-strict
+```
+
+### Delta Mode (`--since`)
+
+When `--since <path>` is provided, the output is a **delta** instead of the full risk report. The delta shows:
+
+- Risk score change (from → to)
+- Added flags (by ID)
+- Removed flags (by ID)
+- Changed flags (before/after objects)
+
+**Note:** In v1, `--since` only supports JSON format. Using `--format md` or `--format text` with `--since` will result in an error.
+
+#### Delta Output Schema
+
+```json
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-01-06T12:00:00.000Z",
+  "command": {
+    "name": "risk-report",
+    "args": ["--mode", "unstaged", "--since", ".ai/prev-risk.json"]
+  },
+  "since": {
+    "path": ".ai/prev-risk.json",
+    "toolVersion": "1.1.0",
+    "schemaVersion": "1.0"
+  },
+  "current": {
+    "toolVersion": "1.1.0",
+    "schemaVersion": "1.0"
+  },
+  "scope": {
+    "mode": "unstaged",
+    "base": null,
+    "head": null,
+    "only": null
+  },
+  "delta": {
+    "riskScore": {
+      "from": 62,
+      "to": 40,
+      "delta": -22
+    },
+    "flags": {
+      "added": ["flag.ci.workflow_permissions_widened#abc123"],
+      "removed": ["flag.db.destructive_migration#def456"],
+      "changed": [
+        {
+          "flagId": "flag.deps.major_bump#789xyz",
+          "before": { "...": "previous flag object..." },
+          "after": { "...": "current flag object..." }
+        }
+      ]
+    }
+  },
+  "summary": {
+    "flagAddedCount": 1,
+    "flagRemovedCount": 1,
+    "flagChangedCount": 1
+  }
+}
+```
+
+#### Example Workflow
+
+```bash
+# 1. Save baseline
+branch-narrator risk-report --out .ai/baseline-risk.json
+
+# 2. Make code changes to address risks...
+# (edit files)
+
+# 3. Compare to baseline
+branch-narrator risk-report --since .ai/baseline-risk.json --pretty
+
+# Output shows:
+# - Risk score change (hopefully lower!)
+# - Which flags were resolved (removed)
+# - Which new flags appeared (added)
+# - Which flags changed
 ```
 
 ---

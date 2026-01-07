@@ -8,6 +8,7 @@ import { createInterface } from "readline";
 import ora from "ora";
 import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
+import { getVersion } from "./core/version.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
@@ -18,12 +19,15 @@ import { configureLogger, error as logError, warn, info } from "./core/logger.js
 
 const program = new Command();
 
+// Load version from package.json
+const version = await getVersion();
+
 program
   .name("branch-narrator")
   .description(
     "A local-first CLI that reads git diff and generates structured PR descriptions"
   )
-  .version("0.1.0")
+  .version(version)
   .option("--quiet", "Suppress all non-fatal diagnostic output (warnings, info)")
   .option("--debug", "Show debug diagnostics on stderr")
   .hook("preAction", (thisCommand) => {
@@ -323,11 +327,14 @@ program
   )
   .option("--out <path>", "Write output to file instead of stdout")
   .option("--no-timestamp", "Omit generatedAt for deterministic output")
+  .option("--since <path>", "Compare current output to a previous JSON file")
+  .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
   .action(async (options) => {
     try {
       // Import executeFacts dynamically to avoid circular dependencies
       const { executeFacts } = await import("./commands/facts/index.js");
       const { getRepoRoot, isWorkingDirDirty } = await import("./git/collector.js");
+      const { computeFactsDelta } = await import("./commands/facts/delta.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -411,10 +418,29 @@ program
         isDirty,
       });
 
+      // If --since is provided, compute delta instead
+      let output: any;
+      if (options.since) {
+        const delta = await computeFactsDelta({
+          sincePath: options.since,
+          currentFacts: facts,
+          mode,
+          base: base || null,
+          head: head || null,
+          profile: resolvedProfile,
+          include: options.include,
+          exclude: options.exclude,
+          sinceStrict: options.sinceStrict,
+        });
+        output = delta;
+      } else {
+        output = facts;
+      }
+
       // Output JSON
       const json = options.pretty
-        ? JSON.stringify(facts, null, 2)
-        : JSON.stringify(facts);
+        ? JSON.stringify(output, null, 2)
+        : JSON.stringify(output);
 
       // Write to file or stdout
       if (options.out) {
@@ -578,10 +604,13 @@ program
   .option("--explain-score", "Include score breakdown in output", false)
   .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
   .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
+  .option("--since <path>", "Compare current output to a previous JSON file")
+  .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
   .action(async (options) => {
     try {
       // Import risk report command dynamically
       const { executeRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./commands/risk/index.js");
+      const { computeRiskReportDelta } = await import("./commands/risk/delta.js");
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -643,18 +672,42 @@ program
         noTimestamp: options.noTimestamp,
       });
 
-      // Render output
+      // If --since is provided, compute delta and force JSON format
       let output: string;
-      switch (format) {
-        case "json":
-          output = renderRiskReportJSON(report, options.pretty);
-          break;
-        case "md":
-          output = renderRiskReportMarkdown(report);
-          break;
-        case "text":
-          output = renderRiskReportText(report);
-          break;
+      if (options.since) {
+        // Validate format - --since only supports JSON for v1
+        if (format !== "json") {
+          logError(`--since requires --format json (other formats not supported in v1)`);
+          process.exit(1);
+        }
+
+        const delta = await computeRiskReportDelta({
+          sincePath: options.since,
+          currentReport: report,
+          mode,
+          base: base || null,
+          head: head || null,
+          only: only || null,
+          exclude: exclude || null,
+          sinceStrict: options.sinceStrict,
+        });
+
+        output = options.pretty
+          ? JSON.stringify(delta, null, 2)
+          : JSON.stringify(delta);
+      } else {
+        // Normal rendering without delta
+        switch (format) {
+          case "json":
+            output = renderRiskReportJSON(report, options.pretty);
+            break;
+          case "md":
+            output = renderRiskReportMarkdown(report);
+            break;
+          case "text":
+            output = renderRiskReportText(report);
+            break;
+        }
       }
 
       // Write to file or stdout
@@ -668,7 +721,7 @@ program
         console.log(output);
       }
 
-      // Check fail-on-score threshold
+      // Check fail-on-score threshold (use current score regardless of delta mode)
       if (failOnScore !== undefined && report.riskScore >= failOnScore) {
         logError(`Risk score ${report.riskScore} >= threshold ${failOnScore}`);
         process.exit(2);

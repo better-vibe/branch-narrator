@@ -646,3 +646,98 @@ export interface ZoomFlagOutput {
 
 export type ZoomOutput = ZoomFindingOutput | ZoomFlagOutput;
 
+// ============================================================================
+// Delta Output Schema (for --since comparison)
+// ============================================================================
+
+export interface CommandMetadata {
+  name: string;
+  args: string[];
+}
+
+export interface VersionMetadata {
+  toolVersion: string;
+  schemaVersion: string;
+}
+
+export interface ScopeMetadata {
+  mode: string;
+  base: string | null;
+  head: string | null;
+  profile?: string;
+  include?: string[];
+  exclude?: string[];
+  only?: string[] | null;
+}
+
+export interface ScopeWarning {
+  code: string;
+  message: string;
+}
+
+export interface FindingChange {
+  findingId: string;
+  before: Finding;
+  after: Finding;
+}
+
+export interface FactsDelta {
+  schemaVersion: "1.0";
+  generatedAt: string;
+  command: CommandMetadata;
+  since: {
+    path: string;
+    toolVersion: string;
+    schemaVersion: string;
+  };
+  current: VersionMetadata;
+  scope: ScopeMetadata;
+  warnings: ScopeWarning[];
+  delta: {
+    added: string[];
+    removed: string[];
+    changed: FindingChange[];
+  };
+  summary: {
+    addedCount: number;
+    removedCount: number;
+    changedCount: number;
+  };
+}
+
+export interface FlagChange {
+  flagId: string;
+  before: RiskFlag;
+  after: RiskFlag;
+}
+
+export interface RiskReportDelta {
+  schemaVersion: "1.0";
+  generatedAt: string;
+  command: CommandMetadata;
+  since: {
+    path: string;
+    toolVersion: string;
+    schemaVersion: string;
+  };
+  current: VersionMetadata;
+  scope: ScopeMetadata;
+  delta: {
+    riskScore: {
+      from: number;
+      to: number;
+      delta: number;
+    };
+    flags: {
+      added: string[];
+      removed: string[];
+      changed: FlagChange[];
+    };
+  };
+  summary: {
+    flagAddedCount: number;
+    flagRemovedCount: number;
+    flagChangedCount: number;
+  };
+}
+
