@@ -78,6 +78,9 @@ describe("CLI Mode Support", () => {
       const result = await execa("bun", [cliPath, command, "--help"], {
         reject: false,
       });
+      if (result.failed) {
+        throw new Error(`Failed to get help text for ${command}: ${result.stderr}`);
+      }
       return result.stdout;
     }
 
