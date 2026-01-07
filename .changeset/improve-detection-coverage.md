@@ -1,5 +1,5 @@
 ---
-"branch-narrator": minor
+"@better-vibe/branch-narrator": minor
 ---
 
 Improve detection coverage and package manager support:
