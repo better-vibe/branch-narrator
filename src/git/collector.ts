@@ -504,7 +504,7 @@ async function collectChangeSetByMode(
   options: CollectChangeSetOptionsV2
 ): Promise<ChangeSet> {
   const cwd = options.cwd ?? process.cwd();
-  const includeUntracked = options.includeUntracked ?? (options.mode === "all");
+  const includeUntracked = options.includeUntracked ?? (options.mode === "all" || options.mode === "unstaged");
 
   // Validate git repo
   if (!(await isGitRepo(cwd))) {

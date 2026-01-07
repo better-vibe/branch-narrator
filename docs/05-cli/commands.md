@@ -23,10 +23,10 @@ branch-narrator pretty [options]
 
 | Mode | Description | Git Command |
 |------|-------------|-------------|
-| `unstaged` | Working tree vs index (uncommitted) - **default** | `git diff` |
+| `unstaged` | Working tree vs index + untracked files - **default** | `git diff` + `git ls-files --others` |
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
-| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+| `all` | All changes vs HEAD (staged + unstaged + untracked) | `git diff HEAD` + `git ls-files --others` |
 
 ### Features
 
@@ -77,10 +77,10 @@ branch-narrator pr-body [options]
 
 | Mode | Description | Git Command |
 |------|-------------|-------------|
-| `unstaged` | Working tree vs index (uncommitted) - **default** | `git diff` |
+| `unstaged` | Working tree vs index + untracked files - **default** | `git diff` + `git ls-files --others` |
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
-| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+| `all` | All changes vs HEAD (staged + unstaged + untracked) | `git diff HEAD` + `git ls-files --others` |
 
 ### Examples
 
@@ -139,10 +139,10 @@ branch-narrator facts [options]
 
 | Mode | Description | Git Command |
 |------|-------------|-------------|
-| `unstaged` | Working tree vs index (uncommitted) - **default** | `git diff` |
+| `unstaged` | Working tree vs index + untracked files - **default** | `git diff` + `git ls-files --others` |
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
-| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+| `all` | All changes vs HEAD (staged + unstaged + untracked) | `git diff HEAD` + `git ls-files --others` |
 
 ### Examples
 
@@ -295,7 +295,7 @@ branch-narrator dump-diff [options]
 
 | Mode | Description | Git Command |
 |------|-------------|-------------|
-| `unstaged` | Working tree vs index (uncommitted) - **default** | `git diff` |
+| `unstaged` | Working tree vs index + untracked files - **default** | `git diff` + `git ls-files --others` |
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
 | `all` | Working tree vs HEAD (all uncommitted) | `git diff HEAD` |
@@ -517,10 +517,10 @@ branch-narrator risk-report [options]
 
 | Mode | Description | Git Command |
 |------|-------------|-------------|
-| `unstaged` | Working tree vs index (uncommitted) - **default** | `git diff` |
+| `unstaged` | Working tree vs index + untracked files - **default** | `git diff` + `git ls-files --others` |
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
-| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+| `all` | All changes vs HEAD (staged + unstaged + untracked) | `git diff HEAD` + `git ls-files --others` |
 
 ### Examples
 
@@ -693,10 +693,10 @@ Either `--finding <id>` or `--flag <id>` must be provided.
 
 | Mode | Description | Git Command |
 |------|-------------|-------------|
-| `unstaged` | Working tree vs index (uncommitted) - **default** | `git diff` |
+| `unstaged` | Working tree vs index + untracked files - **default** | `git diff` + `git ls-files --others` |
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
-| `all` | Working tree vs HEAD (all uncommitted + untracked) | `git diff HEAD` |
+| `all` | All changes vs HEAD (staged + unstaged + untracked) | `git diff HEAD` + `git ls-files --others` |
 
 ### Workflow
 

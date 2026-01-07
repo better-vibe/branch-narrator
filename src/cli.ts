@@ -112,7 +112,7 @@ async function runAnalysisWithMode(options: {
     mode: options.mode,
     base: options.base,
     head: options.head,
-    includeUntracked: options.mode === "all",
+    includeUntracked: options.mode === "all" || options.mode === "unstaged",
   });
 
   if (spinner) {
@@ -367,7 +367,7 @@ program
         mode,
         base,
         head,
-        includeUntracked: mode === "all",
+        includeUntracked: mode === "all" || mode === "unstaged",
       });
 
       // Compute git metadata once (parallel for efficiency)
@@ -660,7 +660,7 @@ program
         mode,
         base,
         head,
-        includeUntracked: mode === "all",
+        includeUntracked: mode === "all" || mode === "unstaged",
       });
 
       // Execute risk report command
@@ -806,7 +806,7 @@ program
         mode,
         base,
         head,
-        includeUntracked: mode === "all",
+        includeUntracked: mode === "all" || mode === "unstaged",
       });
 
       // Execute zoom command

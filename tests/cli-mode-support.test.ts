@@ -136,6 +136,15 @@ describe("CLI Mode Support", () => {
       expect(allModeConfig.includeUntracked).toBe(true);
     });
 
+    it("should set includeUntracked to true for unstaged mode (default)", () => {
+      const unstagedModeConfig = {
+        mode: "unstaged" as const,
+        includeUntracked: true,
+      };
+
+      expect(unstagedModeConfig.includeUntracked).toBe(true);
+    });
+
     it("should not set includeUntracked for branch mode", () => {
       const branchModeConfig = {
         mode: "branch" as const,
@@ -143,6 +152,15 @@ describe("CLI Mode Support", () => {
       };
 
       expect(branchModeConfig.includeUntracked).toBe(false);
+    });
+
+    it("should not set includeUntracked for staged mode", () => {
+      const stagedModeConfig = {
+        mode: "staged" as const,
+        includeUntracked: false,
+      };
+
+      expect(stagedModeConfig.includeUntracked).toBe(false);
     });
   });
 });
