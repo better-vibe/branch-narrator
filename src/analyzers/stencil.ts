@@ -72,6 +72,21 @@ function isCandidateFile(path: string): boolean {
 }
 
 /**
+ * Format slot evidence string based on slot name type.
+ */
+function formatSlotEvidence(slotName: string): string {
+  if (slotName === "default") {
+    return "<slot />";
+  } else if (slotName === "boolean") {
+    return "<slot name />";
+  } else if (slotName === "dynamic") {
+    return "<slot name={...} />";
+  } else {
+    return `<slot name="${slotName}" />`;
+  }
+}
+
+/**
  * Extract Stencil component information from file content.
  */
 export function extractStencilComponents(
@@ -543,7 +558,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-slot-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, { line: baseComp.line })], // Approximate line
+                      evidence: [createEvidence(file.path, formatSlotEvidence(slotName), { line: baseComp.line })], // Approximate line
                       tag,
                       slotName,
                       change: "removed",
@@ -555,7 +570,7 @@ export const stencilAnalyzer: Analyzer = {
                       kind: "stencil-slot-change",
                       category: "api",
                       confidence: "high",
-                      evidence: [createEvidence(file.path, `<slot name="${slotName}" />`, { line: headComp.line })],
+                      evidence: [createEvidence(file.path, formatSlotEvidence(slotName), { line: headComp.line })],
                       tag,
                       slotName,
                       change: "added",
