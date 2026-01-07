@@ -24,6 +24,23 @@ bun add -D branch-narrator
 npm install -D branch-narrator
 ```
 
+## Common Use Cases
+
+### For AI Agents
+Agents need grounded, hallucination-free context to work effectively. `branch-narrator` provides the "ground truth" of what actually changed in the codebase.
+- **Context Gathering**: Use `facts` to get a structured JSON summary of changes (routes, dependencies, risks) to understand the "what" before generating code.
+- **Diff Understanding**: Use `dump-diff` to get a clean, token-optimized git diff that handles exclusions smartly (ignoring lockfiles, minified files, etc.).
+- **Self-Verification**: Use `zoom` to verify specific findings or check if a requested change (e.g., "add a route") was actually implemented correctly.
+
+### For Developers
+Streamline your daily workflow without context switching.
+- **Fast Code Review**: Run `branch-narrator pretty` to see a high-level summary of your uncommitted changes in the terminal.
+- **PR Descriptions**: Generate a consistent, comprehensive PR description with `branch-narrator pr-body` and pipe it directly to `gh pr create` or your clipboard.
+
+### For CI/CD Pipelines
+Automate quality and security checks.
+- **Risk Gating**: Use `branch-narrator risk-report --fail-on-score 60` in your CI pipeline to automatically block merges that introduce high-risk changes (like destructive migrations or dangerous permissions) until they are reviewed.
+
 ## Usage
 
 ### Global Flags
@@ -234,13 +251,40 @@ branch-narrator dump-diff --format json --out .ai/diff.json
 branch-narrator dump-diff --include "src/**" --include "tests/**"
 ```
 
+### Zoom Command
+
+Drill down into a specific finding or risk flag to get detailed, isolated context. Useful for AI agents to verify specific issues or changes without processing the entire diff.
+
+```bash
+# Zoom into a specific finding by ID (from 'facts' output)
+branch-narrator zoom --finding finding-123
+
+# Zoom into a risk flag by ID (from 'risk-report' output)
+branch-narrator zoom --flag flag-456
+
+# Output as Markdown (default is markdown, can be json or text)
+branch-narrator zoom --finding finding-123 --format md
+
+# Get JSON output for machine parsing
+branch-narrator zoom --flag flag-456 --format json --pretty
+
+# Exclude patch context (show only evidence metadata)
+branch-narrator zoom --finding finding-123 --no-patch
+
+# Adjust context lines
+branch-narrator zoom --finding finding-123 --unified 5
+```
+
 ### AI Agent Integration
 
-Generate provider-specific rules for AI coding assistants (Cursor, Claude Code, etc.).
+Generate provider-specific rules for AI coding assistants (Cursor, Jules, etc.).
 
 ```bash
 # Generate Cursor rules
 branch-narrator integrate cursor
+
+# Generate Jules rules
+branch-narrator integrate jules
 
 # Preview what would be created without writing files
 branch-narrator integrate cursor --dry-run
@@ -250,11 +294,12 @@ branch-narrator integrate cursor --force
 ```
 
 **What it does:**
-- Creates `.cursor/rules/branch-narrator.md` - Instructs Cursor on when and how to use `branch-narrator facts` and `dump-diff` commands
-- Creates `.cursor/rules/pr-description.md` - Provides a complete workflow for writing PR descriptions using branch-narrator
+- Creates provider-specific rule files (e.g., `.cursor/rules/branch-narrator.md`)
+- Instructs the AI on when and how to use `branch-narrator` commands
+- Provides consistent workflows for PR descriptions and analysis
 
 **Why use this:**
-- Cursor (and other AI assistants) will automatically read these rules when working in your repository
+- AI assistants will automatically read these rules when working in your repository
 - Ensures the AI uses branch-narrator to ground PR descriptions in actual git diffs instead of guessing
 - Provides consistent PR description templates across your team
 
@@ -333,15 +378,16 @@ Generate provider-specific rules for AI coding assistants.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `<target>` | (required) | Integration target: `cursor` |
+| `<target>` | (required) | Integration target: `cursor`, `jules` |
 | `--dry-run` | `false` | Preview what would be written without creating files |
 | `--force` | `false` | Overwrite existing files |
 
 **Supported targets:**
 - `cursor`: Generates `.cursor/rules/branch-narrator.md` and `.cursor/rules/pr-description.md`
+- `jules`: Generates rules compatible with Jules
 
 **Behavior:**
-- Creates `.cursor/rules/` directory if it doesn't exist
+- Creates rules directory if it doesn't exist
 - Fails with exit code 1 if files already exist (use `--force` to overwrite)
 - Outputs exact file paths and contents in `--dry-run` mode
 
@@ -377,8 +423,23 @@ Analyze git diff and emit a risk score (0-100) with evidence-backed flags. Frame
 | Code | Description |
 |------|-------------|
 | `0` | Success |
-| `1` | Expected errors (not a git repo, bad ref) |
+| `1` | Expected errors (not a git repo, invalid refs, etc.) |
 | `2` | Risk score >= `--fail-on-score` threshold |
+
+### `zoom` Command
+
+Zoom into a specific finding or flag for detailed context.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--finding <id>` | (optional) | Finding ID to zoom into (mutually exclusive with `--flag`) |
+| `--flag <id>` | (optional) | Flag ID to zoom into (mutually exclusive with `--finding`) |
+| `--format <type>` | `md` | Output format: `json`, `md`, `text` |
+| `--no-patch` | `false` | Exclude patch context, only show evidence |
+| `--unified <n>` | `3` | Lines of unified context for patch hunks |
+| `--max-evidence-lines <n>` | `8` | Max evidence excerpt lines to show |
+| `--redact` | `false` | Redact obvious secret values |
+| `--out <path>` | stdout | Write output to file |
 
 ## Sample Output
 
@@ -588,4 +649,3 @@ bun src/cli.ts facts -u | jq '.riskScore'
 ## License
 
 MIT
-
