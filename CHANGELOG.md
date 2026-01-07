@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.3.1
+
+### Patch Changes
+
+- 51dfc4a: fix --version flag
+
 ## 1.3.0
 
 ### Minor Changes
