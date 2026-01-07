@@ -56,8 +56,9 @@ export async function computeFactsDelta(
   try {
     previousFacts = await loadJson(sincePath);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     throw new BranchNarratorError(
-      `Failed to load previous facts from ${sincePath}: ${error}`,
+      `Failed to load previous facts from ${sincePath}: ${errorMessage}`,
       1
     );
   }
@@ -71,14 +72,18 @@ export async function computeFactsDelta(
   }
 
   // Extract version metadata
-  const toolVersion = await getVersion();
+  const currentToolVersion = await getVersion();
+  
+  // Note: FactsOutput doesn't store toolVersion, so we can't determine
+  // which version of branch-narrator generated the previous output.
+  // We mark it as "unknown" for now.
   const previousVersion = {
-    toolVersion: toolVersion,
+    toolVersion: "unknown",
     schemaVersion: previousFacts.schemaVersion,
   };
 
   const currentVersion = {
-    toolVersion: toolVersion,
+    toolVersion: currentToolVersion,
     schemaVersion: currentFacts.schemaVersion,
   };
 

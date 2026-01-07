@@ -35,9 +35,25 @@ export function normalizeForComparison<T extends Record<string, any>>(obj: T): T
 
 /**
  * Compare two normalized objects for deep equality.
+ * Sorts object keys to avoid false positives from property order differences.
  */
 function deepEqual(a: any, b: any): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  // Sort keys recursively to ensure consistent ordering
+  const sortKeys = (obj: any): any => {
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(sortKeys);
+    }
+    const sorted: any = {};
+    Object.keys(obj).sort().forEach(key => {
+      sorted[key] = sortKeys(obj[key]);
+    });
+    return sorted;
+  };
+  
+  return JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
 }
 
 /**
@@ -181,10 +197,25 @@ export function compareScopeMetadata(
 
 /**
  * Extract scope metadata from FactsOutput for comparison.
+ * 
+ * NOTE: FactsOutput currently does not persist the original CLI "mode"
+ * (e.g. "unstaged", "staged", "all", "branch"). As a result, we can only
+ * infer the mode heuristically from the available git range information:
+ *
+ * - If `facts.git.base` is set, we treat this as `mode = "branch"`.
+ * - If `facts.git.base` is null/undefined, we treat this as `mode = "unstaged"`.
+ *
+ * This is a best-effort guess and may misclassify some cases. In particular,
+ * runs that originally used "staged" or "all" modes will currently be
+ * reported here as `mode = "unstaged"`. Consumers of ScopeMetadata should
+ * treat the `mode` field as approximate when derived from FactsOutput and not
+ * rely on it for exact reconstruction of the original CLI invocation.
  */
 export function extractFactsScope(facts: FactsOutput): ScopeMetadata {
   return {
-    mode: facts.git.base ? "branch" : "unstaged", // Best guess
+    // Heuristic: presence of a base ref implies a branch comparison.
+    // See function documentation for limitations of this inference.
+    mode: facts.git.base ? "branch" : "unstaged",
     base: facts.git.base || null,
     head: facts.git.head || null,
     profile: facts.profile.detected,
@@ -195,10 +226,21 @@ export function extractFactsScope(facts: FactsOutput): ScopeMetadata {
 
 /**
  * Extract scope metadata from RiskReport for comparison.
+ * 
+ * NOTE: Similar to extractFactsScope, RiskReport does not persist the original
+ * CLI "mode". We infer it heuristically from the range information:
+ *
+ * - If `report.range.base` is set, we treat this as `mode = "branch"`.
+ * - If `report.range.base` is null/empty, we treat this as `mode = "unstaged"`.
+ *
+ * This may misclassify "staged" or "all" modes as "unstaged". Treat the `mode`
+ * field as approximate.
  */
 export function extractRiskReportScope(report: RiskReport): ScopeMetadata {
   return {
-    mode: report.range.base ? "branch" : "unstaged", // Best guess
+    // Heuristic: presence of a base ref implies a branch comparison.
+    // See function documentation for limitations of this inference.
+    mode: report.range.base ? "branch" : "unstaged",
     base: report.range.base || null,
     head: report.range.head || null,
     // Risk report doesn't store only/exclude, so we can't compare

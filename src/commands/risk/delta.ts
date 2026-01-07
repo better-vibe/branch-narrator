@@ -54,8 +54,9 @@ export async function computeRiskReportDelta(
   try {
     previousReport = await loadJson(sincePath);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     throw new BranchNarratorError(
-      `Failed to load previous risk report from ${sincePath}: ${error}`,
+      `Failed to load previous risk report from ${sincePath}: ${errorMessage}`,
       1
     );
   }
@@ -69,14 +70,18 @@ export async function computeRiskReportDelta(
   }
 
   // Extract version metadata
-  const toolVersion = await getVersion();
+  const currentToolVersion = await getVersion();
+  
+  // Note: RiskReport doesn't store toolVersion, so we can't determine
+  // which version of branch-narrator generated the previous output.
+  // We mark it as "unknown" for now.
   const previousVersion = {
-    toolVersion: toolVersion,
+    toolVersion: "unknown",
     schemaVersion: previousReport.schemaVersion,
   };
 
   const currentVersion = {
-    toolVersion: toolVersion,
+    toolVersion: currentToolVersion,
     schemaVersion: currentReport.schemaVersion,
   };
 
