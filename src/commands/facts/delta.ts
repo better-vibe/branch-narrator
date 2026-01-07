@@ -15,7 +15,6 @@ import {
   compareScopeMetadata,
   extractFactsScope,
 } from "../../core/delta.js";
-import { getVersion } from "../../core/version.js";
 import { BranchNarratorError } from "../../core/errors.js";
 
 /**
@@ -71,22 +70,6 @@ export async function computeFactsDelta(
     );
   }
 
-  // Extract version metadata
-  const currentToolVersion = await getVersion();
-  
-  // Note: FactsOutput doesn't store toolVersion, so we can't determine
-  // which version of branch-narrator generated the previous output.
-  // We mark it as "unknown" for now.
-  const previousVersion = {
-    toolVersion: "unknown",
-    schemaVersion: previousFacts.schemaVersion,
-  };
-
-  const currentVersion = {
-    toolVersion: currentToolVersion,
-    schemaVersion: currentFacts.schemaVersion,
-  };
-
   // Build scope metadata for current run
   const currentScope: ScopeMetadata = {
     mode,
@@ -140,10 +123,11 @@ export async function computeFactsDelta(
     },
     since: {
       path: sincePath,
-      toolVersion: previousVersion.toolVersion,
-      schemaVersion: previousVersion.schemaVersion,
+      schemaVersion: previousFacts.schemaVersion,
     },
-    current: currentVersion,
+    current: {
+      schemaVersion: currentFacts.schemaVersion,
+    },
     scope: currentScope,
     warnings,
     delta: {

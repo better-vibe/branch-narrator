@@ -416,6 +416,7 @@ program
         noTimestamp: options.noTimestamp,
         repoRoot,
         isDirty,
+        mode,
       });
 
       // If --since is provided, compute delta instead
@@ -670,6 +671,7 @@ program
         redact: options.redact,
         explainScore: options.explainScore,
         noTimestamp: options.noTimestamp,
+        mode,
       });
 
       // If --since is provided, compute delta and force JSON format

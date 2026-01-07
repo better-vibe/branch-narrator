@@ -27,7 +27,7 @@ Delta mode provides this answer by computing a structured diff keyed by stable I
 
 The output shows:
 - **Added** findings/flags (by ID)
-- **Removed** findings/flags (by ID)  
+- **Removed** findings/flags (by ID)
 - **Changed** findings/flags (with before/after objects)
 
 ## Stable IDs
@@ -97,11 +97,9 @@ Both work correctly with `--since`.
   },
   "since": {
     "path": ".ai/prev-facts.json",
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "current": {
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "scope": {
@@ -144,18 +142,17 @@ Both work correctly with `--since`.
   },
   "since": {
     "path": ".ai/prev-risk.json",
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "current": {
-    "toolVersion": "1.1.0",
     "schemaVersion": "1.0"
   },
   "scope": {
     "mode": "unstaged",
     "base": null,
     "head": null,
-    "only": null
+    "only": null,
+    "exclude": null
   },
   "delta": {
     "riskScore": {
