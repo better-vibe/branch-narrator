@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.4.1
+
+### Patch Changes
+
+- 55d20d2: Add 'artifacts' file category for build outputs like .tgz, .tar.gz, .zip, .wasm, .exe, and other binary/archive files. These are now categorized as "Build Artifacts" instead of "other".
+
 ## 1.4.0
 
 ### Minor Changes
