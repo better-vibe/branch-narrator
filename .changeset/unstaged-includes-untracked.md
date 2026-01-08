@@ -1,5 +1,5 @@
 ---
-"branch-narrator": minor
+"@better-vibe/branch-narrator": minor
 ---
 
 Change default behavior: `unstaged` mode now includes untracked files
