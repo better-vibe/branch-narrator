@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.5.1
+
+### Patch Changes
+
+- 4fb6570: fix --no-timestamp flag
+
 ## 1.5.0
 
 ### Minor Changes
