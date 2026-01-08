@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.4.3
+
+### Patch Changes
+
+- 8ecb5d0: refactor actions array
+
 ## 1.4.2
 
 ### Patch Changes
