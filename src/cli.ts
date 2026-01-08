@@ -12,7 +12,7 @@ import { getVersion } from "./core/version.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
-import { getProfile, resolveProfileName } from "./profiles/index.js";
+import { getProfile, resolveProfileName, detectProfileWithReasons } from "./profiles/index.js";
 import { renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
 import { configureLogger, error as logError, warn, info } from "./core/logger.js";
@@ -376,13 +376,25 @@ program
         isWorkingDirDirty(),
       ]);
 
-      // Resolve profile
-      const resolvedProfile = resolveProfileName(
-        options.profile as ProfileName,
-        changeSet,
-        process.cwd()
-      );
-      const profile = getProfile(resolvedProfile);
+      // Resolve profile with detection reasons
+      const requestedProfile = options.profile as ProfileName;
+      let detectedProfile: ProfileName;
+      let profileConfidence: "high" | "medium" | "low";
+      let profileReasons: string[];
+
+      if (requestedProfile === "auto") {
+        const detection = detectProfileWithReasons(changeSet, process.cwd());
+        detectedProfile = detection.profile;
+        profileConfidence = detection.confidence;
+        profileReasons = detection.reasons;
+      } else {
+        // User explicitly requested a profile
+        detectedProfile = requestedProfile;
+        profileConfidence = "high";
+        profileReasons = [`Profile explicitly set to ${requestedProfile}`];
+      }
+
+      const profile = getProfile(detectedProfile);
 
       // Run analyzers
       const findings: Finding[] = [];
@@ -399,10 +411,10 @@ program
         changeSet,
         findings,
         riskScore,
-        requestedProfile: options.profile as ProfileName,
-        detectedProfile: resolvedProfile,
-        profileConfidence: "high",
-        profileReasons: [`Detected ${resolvedProfile} project`],
+        requestedProfile,
+        detectedProfile,
+        profileConfidence,
+        profileReasons,
         filters: {
           excludes: options.exclude,
           includes: options.include,
@@ -428,7 +440,7 @@ program
           mode,
           base: base || null,
           head: head || null,
-          profile: resolvedProfile,
+          profile: detectedProfile,
           include: options.include,
           exclude: options.exclude,
           sinceStrict: options.sinceStrict,

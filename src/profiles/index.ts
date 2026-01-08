@@ -11,6 +11,15 @@ import { reactProfile } from "./react.js";
 import { stencilProfile } from "./stencil.js";
 
 /**
+ * Result of profile detection with reasons.
+ */
+export interface ProfileDetectionResult {
+  profile: ProfileName;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+}
+
+/**
  * Check if a project is a SvelteKit project.
  */
 export function isSvelteKitProject(cwd: string = process.cwd()): boolean {
@@ -120,37 +129,83 @@ export function hasStencilConfig(cwd: string = process.cwd()): boolean {
 }
 
 /**
+ * Detect the appropriate profile for a project with reasons.
+ */
+export function detectProfileWithReasons(
+  changeSet: ChangeSet,
+  cwd: string = process.cwd()
+): ProfileDetectionResult {
+  const reasons: string[] = [];
+
+  // Check for SvelteKit
+  const hasSvelteRoutes = isSvelteKitProject(cwd);
+  const hasSvelteDep = hasSvelteKitDependency(changeSet.headPackageJson);
+
+  if (hasSvelteRoutes || hasSvelteDep) {
+    if (hasSvelteRoutes) {
+      reasons.push("Found src/routes/ directory (SvelteKit file-based routing)");
+    }
+    if (hasSvelteDep) {
+      reasons.push("Found @sveltejs/kit in package.json dependencies");
+    }
+    return {
+      profile: "sveltekit",
+      confidence: hasSvelteRoutes && hasSvelteDep ? "high" : "high",
+      reasons,
+    };
+  }
+
+  // Check for Stencil
+  const hasStencilDep = hasStencilDependency(changeSet.headPackageJson);
+  const hasStencilConf = hasStencilConfig(cwd);
+
+  if (hasStencilDep || hasStencilConf) {
+    if (hasStencilDep) {
+      reasons.push("Found @stencil/core in package.json dependencies");
+    }
+    if (hasStencilConf) {
+      reasons.push("Found stencil.config.ts or stencil.config.js");
+    }
+    return {
+      profile: "stencil",
+      confidence: hasStencilDep && hasStencilConf ? "high" : "high",
+      reasons,
+    };
+  }
+
+  // Check for React with React Router
+  const hasReact = hasReactDependency(changeSet.headPackageJson);
+  const hasRouter = hasReactRouterDependency(changeSet.headPackageJson);
+  const hasNext = hasNextDependency(changeSet.headPackageJson);
+
+  if (hasReact && hasRouter && !hasNext) {
+    reasons.push("Found react and react-dom in package.json dependencies");
+    reasons.push("Found react-router or react-router-dom in package.json dependencies");
+    return {
+      profile: "react",
+      confidence: "high",
+      reasons,
+    };
+  }
+
+  // Default profile
+  reasons.push("No framework-specific markers detected, using default analyzers");
+  return {
+    profile: "auto",
+    confidence: "medium",
+    reasons,
+  };
+}
+
+/**
  * Detect the appropriate profile for a project.
+ * @deprecated Use detectProfileWithReasons for more detailed information.
  */
 export function detectProfile(
   changeSet: ChangeSet,
   cwd: string = process.cwd()
 ): ProfileName {
-  // Check for SvelteKit first
-  if (
-    isSvelteKitProject(cwd) ||
-    hasSvelteKitDependency(changeSet.headPackageJson)
-  ) {
-    return "sveltekit";
-  }
-
-  // Check for Stencil
-  if (hasStencilDependency(changeSet.headPackageJson) || hasStencilConfig(cwd)) {
-    return "stencil";
-  }
-
-  // Check for React with React Router
-  // Only use React profile if React Router is present and Next.js is not
-  if (
-    hasReactDependency(changeSet.headPackageJson) &&
-    hasReactRouterDependency(changeSet.headPackageJson) &&
-    !hasNextDependency(changeSet.headPackageJson)
-  ) {
-    return "react";
-  }
-
-  // Default to auto (generic profile)
-  return "auto";
+  return detectProfileWithReasons(changeSet, cwd).profile;
 }
 
 /**

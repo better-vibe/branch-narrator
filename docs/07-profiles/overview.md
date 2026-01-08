@@ -98,6 +98,18 @@ graph LR
 ## API
 
 ```typescript
+// Detect profile with detailed reasons
+interface ProfileDetectionResult {
+  profile: ProfileName;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+}
+
+function detectProfileWithReasons(
+  changeSet: ChangeSet,
+  cwd: string
+): ProfileDetectionResult;
+
 // Resolve profile name (auto-detect if needed)
 function resolveProfileName(
   requested: ProfileName,
@@ -110,6 +122,32 @@ function getProfile(name: ProfileName): Profile;
 
 // Check for SvelteKit
 function isSvelteKitProject(changeSet: ChangeSet, cwd: string): boolean;
+```
+
+## Detection Reasons
+
+When a profile is auto-detected, the `facts` command includes detailed reasons explaining **why** the profile was chosen:
+
+| Profile | Example Reasons |
+|---------|-----------------|
+| `sveltekit` | "Found src/routes/ directory (SvelteKit file-based routing)", "Found @sveltejs/kit in package.json dependencies" |
+| `stencil` | "Found @stencil/core in package.json dependencies", "Found stencil.config.ts or stencil.config.js" |
+| `react` | "Found react and react-dom in package.json dependencies", "Found react-router or react-router-dom in package.json dependencies" |
+| `auto` | "No framework-specific markers detected, using default analyzers" |
+
+Example output:
+```json
+{
+  "profile": {
+    "requested": "auto",
+    "detected": "sveltekit",
+    "confidence": "high",
+    "reasons": [
+      "Found src/routes/ directory (SvelteKit file-based routing)",
+      "Found @sveltejs/kit in package.json dependencies"
+    ]
+  }
+}
 ```
 
 ## Usage

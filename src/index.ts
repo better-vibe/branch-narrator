@@ -41,12 +41,14 @@ export * from "./analyzers/index.js";
 // Profiles
 export {
   detectProfile,
+  detectProfileWithReasons,
   getProfile,
   hasSvelteKitDependency,
   isSvelteKitProject,
   resolveProfileName,
   sveltekitProfile,
 } from "./profiles/index.js";
+export type { ProfileDetectionResult } from "./profiles/index.js";
 
 // Renderers
 export { renderMarkdown } from "./render/markdown.js";
