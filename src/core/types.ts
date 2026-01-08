@@ -193,6 +193,7 @@ export type FileCategory =
   | "docs"
   | "dependencies"
   | "config"
+  | "artifacts"
   | "other";
 
 export interface FileCategoryFinding {

@@ -19,6 +19,7 @@ Categorizes files into meaningful groups for better PR organization.
 | `docs` | Documentation | `docs/`, `*.md`, `README` |
 | `dependencies` | Package manifests | `package.json`, lockfiles |
 | `config` | Configuration | `*.config.*`, `.env*`, `tsconfig` |
+| `artifacts` | Build outputs | `*.tgz`, `*.tar.gz`, `*.zip`, `*.wasm`, `*.exe` |
 | `other` | Uncategorized | Everything else |
 
 ## Finding Type
@@ -33,6 +34,7 @@ type FileCategory =
   | "docs"
   | "dependencies"
   | "config"
+  | "artifacts"
   | "other";
 
 interface FileCategoryFinding {
@@ -54,7 +56,8 @@ interface FileCategoryFinding {
 5. **docs** - `docs/`, `*.md`, `README*`, `CHANGELOG*`
 6. **dependencies** - `package.json`, `*lock*`, `Cargo.toml`, `requirements.txt`
 7. **config** - `.*rc`, `*.config.*`, `.env*`, `tsconfig*`
-8. **product** - `src/`, `lib/`, `app/`, `*.ts`, `*.svelte`
+8. **artifacts** - `*.tgz`, `*.tar.gz`, `*.zip`, `*.whl`, `*.jar`, `*.wasm`, `*.exe`, `*.dll`, `*.so`, `*.dylib`
+9. **product** - `src/`, `lib/`, `app/`, `*.ts`, `*.svelte`
 
 ## Example Output
 
@@ -70,6 +73,7 @@ interface FileCategoryFinding {
     "docs": ["README.md"],
     "dependencies": ["package.json"],
     "config": ["tsconfig.json"],
+    "artifacts": ["my-package-1.0.0.tgz"],
     "other": []
   },
   "summary": [
@@ -78,7 +82,8 @@ interface FileCategoryFinding {
     { "category": "tests", "count": 1 },
     { "category": "docs", "count": 1 },
     { "category": "dependencies", "count": 1 },
-    { "category": "config", "count": 1 }
+    { "category": "config", "count": 1 },
+    { "category": "artifacts", "count": 1 }
   ]
 }
 ```

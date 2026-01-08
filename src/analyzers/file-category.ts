@@ -132,6 +132,30 @@ const CATEGORY_RULES: Array<{
       /^\.node-version$/,
     ],
   },
+  // Artifacts (build outputs, packages, binaries)
+  {
+    category: "artifacts",
+    patterns: [
+      /\.tgz$/i, // npm/bun pack tarballs
+      /\.tar\.gz$/i, // compressed archives
+      /\.zip$/i, // zip archives
+      /\.whl$/i, // Python wheels
+      /\.jar$/i, // Java archives
+      /\.war$/i, // Java web archives
+      /\.gem$/i, // Ruby gems
+      /\.nupkg$/i, // NuGet packages
+      /\.deb$/i, // Debian packages
+      /\.rpm$/i, // RPM packages
+      /\.dmg$/i, // macOS disk images
+      /\.exe$/i, // Windows executables
+      /\.dll$/i, // Windows libraries
+      /\.so$/i, // Linux shared objects
+      /\.dylib$/i, // macOS dynamic libraries
+      /\.a$/i, // Static libraries
+      /\.o$/i, // Object files
+      /\.wasm$/i, // WebAssembly binaries
+    ],
+  },
   // Product code (src, lib, app - excluding already matched patterns)
   {
     category: "product",
@@ -180,6 +204,7 @@ export function getCategoryLabel(category: FileCategory): string {
     docs: "Documentation",
     dependencies: "Dependencies",
     config: "Configuration",
+    artifacts: "Build Artifacts",
     other: "Other",
   };
   return labels[category];
@@ -198,6 +223,7 @@ export const fileCategoryAnalyzer: Analyzer = {
       docs: [],
       dependencies: [],
       config: [],
+      artifacts: [],
       other: [],
     };
 

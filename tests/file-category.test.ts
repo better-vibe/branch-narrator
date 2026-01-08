@@ -68,6 +68,16 @@ describe("categorizeFile", () => {
     expect(categorizeFile("wrangler.toml")).toBe("config");
   });
 
+  it("should categorize artifact files", () => {
+    expect(categorizeFile("my-package-1.0.0.tgz")).toBe("artifacts");
+    expect(categorizeFile("bundle.tar.gz")).toBe("artifacts");
+    expect(categorizeFile("release.zip")).toBe("artifacts");
+    expect(categorizeFile("module.wasm")).toBe("artifacts");
+    expect(categorizeFile("dist/app.exe")).toBe("artifacts");
+    expect(categorizeFile("lib/native.so")).toBe("artifacts");
+    expect(categorizeFile("my-wheel-1.0.0.whl")).toBe("artifacts");
+  });
+
   it("should categorize unknown files as other", () => {
     expect(categorizeFile("random-file.xyz")).toBe("other");
     expect(categorizeFile("data.csv")).toBe("other");
@@ -83,6 +93,7 @@ describe("getCategoryLabel", () => {
     expect(getCategoryLabel("docs")).toBe("Documentation");
     expect(getCategoryLabel("dependencies")).toBe("Dependencies");
     expect(getCategoryLabel("config")).toBe("Configuration");
+    expect(getCategoryLabel("artifacts")).toBe("Build Artifacts");
     expect(getCategoryLabel("other")).toBe("Other");
   });
 });

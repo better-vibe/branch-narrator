@@ -71,6 +71,7 @@ type FileCategory =
   | "docs"
   | "dependencies"
   | "config"
+  | "artifacts"
   | "other";
 
 interface FileCategoryFinding {
