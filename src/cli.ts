@@ -425,7 +425,7 @@ program
         },
         skippedFiles: [],
         warnings: [],
-        noTimestamp: options.noTimestamp,
+        noTimestamp: options.timestamp === false,
         repoRoot,
         isDirty,
         mode,
@@ -587,7 +587,7 @@ program
         stat,
         patchFor: options.patchFor,
         pretty: options.pretty,
-        noTimestamp: options.noTimestamp,
+        noTimestamp: options.timestamp === false,
       });
 
       process.exit(0);
@@ -682,7 +682,7 @@ program
         maxEvidenceLines,
         redact: options.redact,
         explainScore: options.explainScore,
-        noTimestamp: options.noTimestamp,
+        noTimestamp: options.timestamp === false,
         mode,
       });
 
@@ -833,7 +833,7 @@ program
         unified,
         maxEvidenceLines,
         redact: options.redact,
-        noTimestamp: options.noTimestamp,
+        noTimestamp: options.timestamp === false,
       });
 
       // Render output

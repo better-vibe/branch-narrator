@@ -139,6 +139,7 @@ export const DEFAULT_EXCLUDES = [
   "**/pnpm-lock.yaml",
   "**/package-lock.json",
   "**/yarn.lock",
+  "**/bun.lock",
   "**/bun.lockb",
   // Type declarations
   "**/*.d.ts",

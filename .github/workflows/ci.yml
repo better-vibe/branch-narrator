@@ -25,8 +25,11 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Test
+      - name: Unit Tests
         run: bun run test
+
+      - name: End-to-End Tests
+        run: bun run test:e2e
 
       - name: Build
         run: bun run build

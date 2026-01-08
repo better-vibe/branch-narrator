@@ -1,77 +1,10 @@
 /**
- * Tests for untracked files detection.
+ * Tests for untracked files integration with analyzers.
+ *
+ * Note: parseNameStatus tests are in dump-diff.test.ts to avoid duplication.
  */
 
 import { describe, expect, it } from "bun:test";
-import { parseNameStatus } from "../src/core/change-set.js";
-
-describe("parseNameStatus", () => {
-  it("should parse added files", () => {
-    const output = "A\tsrc/new-file.ts\nA\tsrc/another.ts";
-    const changes = parseNameStatus(output);
-
-    expect(changes).toHaveLength(2);
-    expect(changes[0]).toEqual({ path: "src/new-file.ts", status: "added" });
-    expect(changes[1]).toEqual({ path: "src/another.ts", status: "added" });
-  });
-
-  it("should parse modified files", () => {
-    const output = "M\tsrc/existing.ts";
-    const changes = parseNameStatus(output);
-
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toEqual({ path: "src/existing.ts", status: "modified" });
-  });
-
-  it("should parse deleted files", () => {
-    const output = "D\tsrc/removed.ts";
-    const changes = parseNameStatus(output);
-
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toEqual({ path: "src/removed.ts", status: "deleted" });
-  });
-
-  it("should parse renamed files", () => {
-    const output = "R100\tsrc/old-name.ts\tsrc/new-name.ts";
-    const changes = parseNameStatus(output);
-
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toEqual({
-      path: "src/new-name.ts",
-      status: "renamed",
-      oldPath: "src/old-name.ts",
-    });
-  });
-
-  it("should parse mixed status output", () => {
-    const output = `A\tsrc/new.ts
-M\tsrc/modified.ts
-D\tsrc/deleted.ts
-R100\tsrc/old.ts\tsrc/renamed.ts`;
-
-    const changes = parseNameStatus(output);
-
-    expect(changes).toHaveLength(4);
-    expect(changes.map((c) => c.status)).toEqual([
-      "added",
-      "modified",
-      "deleted",
-      "renamed",
-    ]);
-  });
-
-  it("should handle empty output", () => {
-    const changes = parseNameStatus("");
-    expect(changes).toHaveLength(0);
-  });
-
-  it("should handle output with blank lines", () => {
-    const output = "A\tsrc/file.ts\n\n";
-    const changes = parseNameStatus(output);
-
-    expect(changes).toHaveLength(1);
-  });
-});
 
 describe("untracked files integration", () => {
   it("should include untracked files in file-summary when uncommitted", async () => {
