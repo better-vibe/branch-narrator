@@ -138,6 +138,71 @@ interface RenderContext {
 
 ---
 
+## ChangesetInfo
+
+Organizational data about the changeset. This structure contains data that describes the changeset as a whole, rather than domain-specific findings.
+
+```typescript
+interface ChangesetInfo {
+  /** Files grouped by change status */
+  files: {
+    added: string[];
+    modified: string[];
+    deleted: string[];
+    renamed: Array<{ from: string; to: string }>;
+  };
+  /** Files grouped by category */
+  byCategory: Record<FileCategory, string[]>;
+  /** Category summary sorted by count */
+  categorySummary: Array<{ category: FileCategory; count: number }>;
+  /** Warnings about changeset characteristics */
+  warnings: ChangesetWarning[];
+}
+
+type ChangesetWarning = LargeDiffWarning | LockfileMismatchWarning;
+
+interface LargeDiffWarning {
+  type: "large-diff";
+  filesChanged: number;
+  linesChanged: number;
+}
+
+interface LockfileMismatchWarning {
+  type: "lockfile-mismatch";
+  manifestChanged: boolean;
+  lockfileChanged: boolean;
+}
+```
+
+**Note:** In schema version 2.0, meta-findings (`file-summary`, `file-category`, `large-diff`, `lockfile-mismatch`) are no longer included in the `findings` array. Their data is now in the `changeset` structure.
+
+---
+
+## FactsOutput
+
+The complete output of the `facts` command.
+
+```typescript
+interface FactsOutput {
+  schemaVersion: string;        // "2.0"
+  generatedAt?: string;         // ISO timestamp
+  git: GitInfo;
+  profile: ProfileInfo;
+  stats: Stats;
+  filters: Filters;
+  summary: Summary;
+  categories: CategoryAggregate[];
+  changeset: ChangesetInfo;     // NEW in 2.0: organizational data
+  risk: RiskScore;
+  findings: Finding[];          // Domain-specific findings only
+  actions: Action[];
+  skippedFiles: SkippedFile[];
+  warnings: string[];
+}
+```
+
+---
+
 ## Error Types
 
 ```typescript

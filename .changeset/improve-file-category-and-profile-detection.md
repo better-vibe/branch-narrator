@@ -2,8 +2,50 @@
 "@better-vibe/branch-narrator": patch
 ---
 
-Add 'artifacts' file category for build outputs like .tgz, .tar.gz, .zip, .wasm, .exe, and other binary/archive files. These are now categorized as "Build Artifacts" instead of "other".
+## Breaking Changes
 
-Improve profile detection reasons to explain WHY a profile was detected, rather than the circular "Detected X project" message. For example, SvelteKit detection now shows reasons like:
-- "Found src/routes/ directory (SvelteKit file-based routing)"
-- "Found @sveltejs/kit in package.json dependencies"
+### Schema Version 2.0: Restructured `facts` output
+
+Meta-findings are no longer in the `findings` array. They now appear in a new `changeset` structure:
+
+**Before (schema 1.0):**
+```json
+{
+  "findings": [
+    { "type": "file-summary", "added": [...], "modified": [...] },
+    { "type": "file-category", "categories": {...} },
+    { "type": "large-diff", "filesChanged": 50, "linesChanged": 5000 },
+    { "type": "route-change", ... }
+  ]
+}
+```
+
+**After (schema 2.0):**
+```json
+{
+  "changeset": {
+    "files": { "added": [...], "modified": [...], "deleted": [...], "renamed": [...] },
+    "byCategory": { "product": [...], "tests": [...], ... },
+    "categorySummary": [{ "category": "product", "count": 5 }, ...],
+    "warnings": [
+      { "type": "large-diff", "filesChanged": 50, "linesChanged": 5000 }
+    ]
+  },
+  "findings": [
+    { "type": "route-change", ... }
+  ]
+}
+```
+
+**Migration:**
+- `file-summary` → `changeset.files`
+- `file-category` → `changeset.byCategory` + `changeset.categorySummary`
+- `large-diff` → `changeset.warnings`
+- `lockfile-mismatch` → `changeset.warnings`
+
+The `findings` array now only contains domain-specific findings with meaningful `category` values.
+
+## Other Changes
+
+- Add 'artifacts' file category for build outputs (.tgz, .tar.gz, .zip, .wasm, .exe, etc.)
+- Improve profile detection reasons to explain WHY a profile was detected

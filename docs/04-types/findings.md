@@ -2,12 +2,22 @@
 
 All findings use a discriminated union pattern with `type` as the discriminator.
 
-## Finding Union
+## Schema Version 2.0 Changes
+
+In schema version 2.0, findings are split into two categories:
+
+1. **Domain Findings** - Appear in the `findings` array. These represent specific changes in a domain area (routes, database, tests, etc.)
+
+2. **Meta Findings** - Appear in the `changeset` structure. These describe the changeset as a whole, not domain-specific changes:
+   - `file-summary` → `changeset.files`
+   - `file-category` → `changeset.byCategory` and `changeset.categorySummary`
+   - `large-diff` → `changeset.warnings`
+   - `lockfile-mismatch` → `changeset.warnings`
+
+## Finding Union (Domain Findings)
 
 ```typescript
 type Finding =
-  | FileSummaryFinding
-  | FileCategoryFinding
   | DependencyChangeFinding
   | RouteChangeFinding
   | EnvVarFinding
@@ -17,15 +27,18 @@ type Finding =
   | RiskFlagFinding
   | SecurityFileFinding
   | ConventionViolationFinding
-  | ImpactAnalysisFinding;
+  | ImpactAnalysisFinding
+  | SQLRiskFinding
+  | CIWorkflowFinding
+  | InfraChangeFinding
+  | APIContractChangeFinding
+  | TestGapFinding;
 ```
 
 ## Class Diagram
 
 ```mermaid
 classDiagram
-    Finding <|-- FileSummaryFinding
-    Finding <|-- FileCategoryFinding
     Finding <|-- DependencyChangeFinding
     Finding <|-- RouteChangeFinding
     Finding <|-- EnvVarFinding
@@ -34,16 +47,90 @@ classDiagram
     Finding <|-- TestChangeFinding
     Finding <|-- RiskFlagFinding
     Finding <|-- SecurityFileFinding
-    Finding <|-- ConventionViolationFinding
     Finding <|-- ImpactAnalysisFinding
 
     class Finding {
         <<discriminated union>>
         type: string
+        category: Category
     }
 ```
 
 ---
+
+## Meta Findings (in changeset structure)
+
+These findings are no longer in the `findings` array. Their data is in `changeset`:
+
+### FileSummaryFinding → `changeset.files`
+
+```typescript
+// Old (in findings array):
+interface FileSummaryFinding {
+  type: "file-summary";
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  renamed: Array<{ from: string; to: string }>;
+}
+
+// New (in changeset):
+changeset.files = {
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  renamed: Array<{ from: string; to: string }>;
+}
+```
+
+### FileCategoryFinding → `changeset.byCategory`
+
+```typescript
+// Old (in findings array):
+interface FileCategoryFinding {
+  type: "file-category";
+  categories: Record<FileCategory, string[]>;
+  summary: Array<{ category: FileCategory; count: number }>;
+}
+
+// New (in changeset):
+changeset.byCategory = Record<FileCategory, string[]>;
+changeset.categorySummary = Array<{ category: FileCategory; count: number }>;
+```
+
+### LargeDiffFinding → `changeset.warnings`
+
+```typescript
+// Old (in findings array):
+interface LargeDiffFinding {
+  type: "large-diff";
+  filesChanged: number;
+  linesChanged: number;
+}
+
+// New (in changeset.warnings):
+{ type: "large-diff", filesChanged: number, linesChanged: number }
+```
+
+### LockfileFinding → `changeset.warnings`
+
+```typescript
+// Old (in findings array):
+interface LockfileFinding {
+  type: "lockfile-mismatch";
+  manifestChanged: boolean;
+  lockfileChanged: boolean;
+}
+
+// New (in changeset.warnings):
+{ type: "lockfile-mismatch", manifestChanged: boolean, lockfileChanged: boolean }
+```
+
+---
+
+## Domain Findings
+
+These findings appear in the `findings` array and have meaningful `category` values.
 
 ## FileSummaryFinding
 

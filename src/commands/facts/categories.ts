@@ -52,14 +52,14 @@ export function aggregateCategories(
     evidence: Evidence[];
   }>();
 
-  // Process findings (excluding file-summary)
+  // Process findings (excluding meta-findings that don't belong to a specific domain)
   for (const finding of findings) {
-    if (finding.kind === "file-summary") {
-      continue; // Skip file-summary
+    if (finding.kind === "file-summary" || finding.kind === "file-category") {
+      continue; // Skip meta-findings
     }
 
     const category = finding.category;
-    
+
     if (!categoryMap.has(category)) {
       categoryMap.set(category, {
         count: 0,
@@ -82,7 +82,7 @@ export function aggregateCategories(
   for (const factor of riskFactors) {
     // Determine category from factor kind or evidence
     let category: Category = "unknown";
-    
+
     // First, check if there's a matching finding with this evidence
     for (const finding of findings) {
       if (finding.evidence.length > 0 && factor.evidence.length > 0) {
@@ -97,7 +97,7 @@ export function aggregateCategories(
         }
       }
     }
-    
+
     // Fallback to kind-based mapping
     if (category === "unknown") {
       category = riskFactorKindToCategory(factor.kind);

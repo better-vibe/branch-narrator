@@ -413,8 +413,8 @@ describe("buildFacts", () => {
 
   // Helper to create a minimal RiskScore
   const createMockRiskScore = (): RiskScore => ({
-    total: 50,
-    category: "medium",
+    score: 50,
+    level: "medium",
     factors: [],
   });
 
@@ -806,5 +806,280 @@ describe("buildFacts", () => {
 
     // findingIds should be identical
     expect(facts1.findings[0].findingId).toBe(facts2.findings[0].findingId);
+  });
+
+  it("should populate changeset.files from file-summary finding", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        kind: "file-summary",
+        category: "unknown",
+        confidence: "high",
+        evidence: [],
+        added: ["src/new.ts"],
+        modified: ["src/existing.ts"],
+        deleted: ["src/old.ts"],
+        renamed: [{ from: "src/before.ts", to: "src/after.ts" }],
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.changeset.files.added).toEqual(["src/new.ts"]);
+    expect(facts.changeset.files.modified).toEqual(["src/existing.ts"]);
+    expect(facts.changeset.files.deleted).toEqual(["src/old.ts"]);
+    expect(facts.changeset.files.renamed).toEqual([{ from: "src/before.ts", to: "src/after.ts" }]);
+    // file-summary should NOT be in findings array
+    expect(facts.findings.some(f => f.type === "file-summary")).toBe(false);
+  });
+
+  it("should populate changeset.byCategory from file-category finding", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "file-category",
+        kind: "file-category",
+        category: "unknown",
+        confidence: "high",
+        evidence: [],
+        categories: {
+          product: ["src/lib.ts"],
+          tests: ["tests/test.ts"],
+          ci: [],
+          infra: [],
+          database: ["supabase/migrations/001.sql"],
+          docs: [],
+          dependencies: [],
+          config: [],
+          artifacts: [],
+          other: [],
+        },
+        summary: [
+          { category: "product", count: 1 },
+          { category: "tests", count: 1 },
+          { category: "database", count: 1 },
+        ],
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.changeset.byCategory.product).toEqual(["src/lib.ts"]);
+    expect(facts.changeset.byCategory.tests).toEqual(["tests/test.ts"]);
+    expect(facts.changeset.byCategory.database).toEqual(["supabase/migrations/001.sql"]);
+    expect(facts.changeset.categorySummary).toHaveLength(3);
+    // file-category should NOT be in findings array
+    expect(facts.findings.some(f => f.type === "file-category")).toBe(false);
+  });
+
+  it("should populate changeset.warnings from large-diff finding", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "large-diff",
+        kind: "large-diff",
+        category: "unknown",
+        confidence: "high",
+        evidence: [],
+        filesChanged: 50,
+        linesChanged: 5000,
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.changeset.warnings).toHaveLength(1);
+    expect(facts.changeset.warnings[0].type).toBe("large-diff");
+    expect((facts.changeset.warnings[0] as any).filesChanged).toBe(50);
+    expect((facts.changeset.warnings[0] as any).linesChanged).toBe(5000);
+    // large-diff should NOT be in findings array
+    expect(facts.findings.some(f => f.type === "large-diff")).toBe(false);
+  });
+
+  it("should populate changeset.warnings from lockfile-mismatch finding", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "lockfile-mismatch",
+        kind: "lockfile-mismatch",
+        category: "dependencies",
+        confidence: "high",
+        evidence: [],
+        manifestChanged: true,
+        lockfileChanged: false,
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.changeset.warnings).toHaveLength(1);
+    expect(facts.changeset.warnings[0].type).toBe("lockfile-mismatch");
+    expect((facts.changeset.warnings[0] as any).manifestChanged).toBe(true);
+    expect((facts.changeset.warnings[0] as any).lockfileChanged).toBe(false);
+    // lockfile-mismatch should NOT be in findings array
+    expect(facts.findings.some(f => f.type === "lockfile-mismatch")).toBe(false);
+  });
+
+  it("should keep domain findings in findings array", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        kind: "file-summary",
+        category: "unknown",
+        confidence: "high",
+        evidence: [],
+        added: ["src/new.ts"],
+        modified: [],
+        deleted: [],
+        renamed: [],
+      },
+      {
+        type: "route-change",
+        kind: "route-change",
+        category: "routes",
+        confidence: "high",
+        evidence: [],
+        routeId: "/api/users",
+        file: "src/routes/api/users/+server.ts",
+        change: "added",
+        routeType: "endpoint",
+      },
+      {
+        type: "db-migration",
+        kind: "db-migration",
+        category: "database",
+        confidence: "high",
+        evidence: [],
+        tool: "supabase",
+        files: ["supabase/migrations/001.sql"],
+        risk: "medium",
+        reasons: ["Migration files changed"],
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    // Domain findings should be in findings array
+    expect(facts.findings).toHaveLength(2);
+    expect(facts.findings.some(f => f.type === "route-change")).toBe(true);
+    expect(facts.findings.some(f => f.type === "db-migration")).toBe(true);
+    // Meta finding should NOT be in findings array
+    expect(facts.findings.some(f => f.type === "file-summary")).toBe(false);
+  });
+
+  it("should use schema version 2.0", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    expect(facts.schemaVersion).toBe("2.0");
+  });
+
+  it("should have empty changeset when no meta-findings", async () => {
+    const changeSet = createMockChangeSet();
+    const findings: Finding[] = [
+      {
+        type: "env-var",
+        kind: "env-var",
+        category: "config_env",
+        confidence: "high",
+        evidence: [],
+        name: "API_KEY",
+        change: "added",
+        evidenceFiles: ["src/config.ts"],
+      },
+    ];
+    const riskScore = createMockRiskScore();
+
+    const facts = await buildFacts({
+      changeSet,
+      findings,
+      riskScore,
+      requestedProfile: "auto",
+      detectedProfile: "auto",
+      profileConfidence: "high",
+      profileReasons: ["Test"],
+      repoRoot: "/repo",
+      isDirty: false,
+    });
+
+    // Changeset should have default empty values
+    expect(facts.changeset.files.added).toEqual([]);
+    expect(facts.changeset.files.modified).toEqual([]);
+    expect(facts.changeset.files.deleted).toEqual([]);
+    expect(facts.changeset.files.renamed).toEqual([]);
+    expect(facts.changeset.warnings).toEqual([]);
+    // Domain finding should still be present
+    expect(facts.findings).toHaveLength(1);
+    expect(facts.findings[0].type).toBe("env-var");
   });
 });

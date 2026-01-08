@@ -247,6 +247,9 @@ export const fileCategoryAnalyzer: Analyzer = {
       return [];
     }
 
+    // Note: category is "unknown" because file-category is a meta-finding
+    // that summarizes all files - it doesn't belong to a specific domain area.
+    // This finding is skipped during category aggregation (see categories.ts).
     const finding: FileCategoryFinding = {
       type: "file-category",
       kind: "file-category",

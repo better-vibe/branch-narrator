@@ -614,6 +614,49 @@ export interface SkippedFile {
   detail?: string;
 }
 
+// ============================================================================
+// Changeset Info (organizational data about the changeset)
+// ============================================================================
+
+/**
+ * Warning about changeset characteristics (large diff, lockfile issues, etc.)
+ */
+export type ChangesetWarningType = "large-diff" | "lockfile-mismatch";
+
+export interface LargeDiffWarning {
+  type: "large-diff";
+  filesChanged: number;
+  linesChanged: number;
+}
+
+export interface LockfileMismatchWarning {
+  type: "lockfile-mismatch";
+  manifestChanged: boolean;
+  lockfileChanged: boolean;
+}
+
+export type ChangesetWarning = LargeDiffWarning | LockfileMismatchWarning;
+
+/**
+ * Organizational information about the changeset.
+ * This data describes the structure of changes, not domain-specific findings.
+ */
+export interface ChangesetInfo {
+  /** Files grouped by change status */
+  files: {
+    added: string[];
+    modified: string[];
+    deleted: string[];
+    renamed: Array<{ from: string; to: string }>;
+  };
+  /** Files grouped by category (product, tests, database, etc.) */
+  byCategory: Record<FileCategory, string[]>;
+  /** Category summary sorted by count */
+  categorySummary: Array<{ category: FileCategory; count: number }>;
+  /** Warnings about changeset characteristics */
+  warnings: ChangesetWarning[];
+}
+
 export interface FactsOutput {
   schemaVersion: string;
   generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
@@ -623,7 +666,10 @@ export interface FactsOutput {
   filters: Filters;
   summary: Summary;
   categories: CategoryAggregate[];
+  /** Organizational data about the changeset (files, categories, warnings) */
+  changeset: ChangesetInfo;
   risk: RiskScore;
+  /** Domain-specific findings only (no meta-findings like file-summary) */
   findings: Finding[];
   actions: Action[];
   skippedFiles: SkippedFile[];

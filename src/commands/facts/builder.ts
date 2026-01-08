@@ -4,11 +4,18 @@
 
 import type {
   ChangeSet,
+  ChangesetInfo,
+  ChangesetWarning,
   DiffMode,
   FactsOutput,
+  FileCategory,
+  FileCategoryFinding,
+  FileSummaryFinding,
   Finding,
   Filters,
   GitInfo,
+  LargeDiffFinding,
+  LockfileFinding,
   ProfileInfo,
   ProfileName,
   RiskScore,
@@ -75,6 +82,82 @@ function calculateStats(
     insertions,
     deletions,
     skippedFilesCount: skippedFiles.length,
+  };
+}
+
+/** Meta-finding types that should be extracted to changeset */
+const META_FINDING_TYPES = new Set([
+  "file-summary",
+  "file-category",
+  "large-diff",
+  "lockfile-mismatch",
+]);
+
+/**
+ * Check if a finding is a meta-finding (organizational, not domain-specific).
+ */
+function isMetaFinding(finding: Finding): boolean {
+  return META_FINDING_TYPES.has(finding.type);
+}
+
+/**
+ * Build changeset info from meta-findings.
+ */
+function buildChangesetInfo(findings: Finding[]): ChangesetInfo {
+  // Find the meta-findings
+  const fileSummary = findings.find(f => f.type === "file-summary") as FileSummaryFinding | undefined;
+  const fileCategory = findings.find(f => f.type === "file-category") as FileCategoryFinding | undefined;
+  const largeDiff = findings.find(f => f.type === "large-diff") as LargeDiffFinding | undefined;
+  const lockfileMismatch = findings.find(f => f.type === "lockfile-mismatch") as LockfileFinding | undefined;
+
+  // Build files structure
+  const files = {
+    added: fileSummary?.added ?? [],
+    modified: fileSummary?.modified ?? [],
+    deleted: fileSummary?.deleted ?? [],
+    renamed: fileSummary?.renamed ?? [],
+  };
+
+  // Build byCategory - ensure all categories are present
+  const defaultCategories: Record<FileCategory, string[]> = {
+    product: [],
+    tests: [],
+    ci: [],
+    infra: [],
+    database: [],
+    docs: [],
+    dependencies: [],
+    config: [],
+    artifacts: [],
+    other: [],
+  };
+  const byCategory = fileCategory?.categories ?? defaultCategories;
+
+  // Build category summary
+  const categorySummary = fileCategory?.summary ?? [];
+
+  // Build warnings
+  const warnings: ChangesetWarning[] = [];
+  if (largeDiff) {
+    warnings.push({
+      type: "large-diff",
+      filesChanged: largeDiff.filesChanged,
+      linesChanged: largeDiff.linesChanged,
+    });
+  }
+  if (lockfileMismatch) {
+    warnings.push({
+      type: "lockfile-mismatch",
+      manifestChanged: lockfileMismatch.manifestChanged,
+      lockfileChanged: lockfileMismatch.lockfileChanged,
+    });
+  }
+
+  return {
+    files,
+    byCategory,
+    categorySummary,
+    warnings,
   };
 }
 
@@ -214,23 +297,29 @@ export async function buildFacts(
     maxFindings: userFilters?.maxFindings,
   };
 
-  // Aggregate categories
-  const categories = aggregateCategories(findings, riskScore.factors);
+  // Build changeset info from meta-findings (before filtering them out)
+  const changeset = buildChangesetInfo(findings);
+
+  // Filter out meta-findings - they're now in the changeset structure
+  const domainFindings = findings.filter(f => !isMetaFinding(f));
+
+  // Aggregate categories (uses domain findings only)
+  const categories = aggregateCategories(domainFindings, riskScore.factors);
   const byArea = buildSummaryByArea(categories);
-  const highlights = buildHighlights(findings);
+  const highlights = buildHighlights(domainFindings);
 
   const summary = {
     byArea,
     highlights,
   };
 
-  // Derive actions
+  // Derive actions (uses all findings for completeness)
   const actions = deriveActions(findings, detectedProfile);
 
   const warnings = userWarnings ?? [];
 
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     generatedAt: noTimestamp ? undefined : new Date().toISOString(),
     git,
     profile,
@@ -238,8 +327,9 @@ export async function buildFacts(
     filters: filtersObj,
     summary,
     categories,
+    changeset,
     risk: riskScore,
-    findings,
+    findings: domainFindings,
     actions,
     skippedFiles,
     warnings,
