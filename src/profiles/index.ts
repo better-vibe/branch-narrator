@@ -8,6 +8,7 @@ import type { ChangeSet, Profile, ProfileName } from "../core/types.js";
 import { defaultProfile } from "./default.js";
 import { sveltekitProfile } from "./sveltekit.js";
 import { reactProfile } from "./react.js";
+import { stencilProfile } from "./stencil.js";
 
 /**
  * Check if a project is a SvelteKit project.
@@ -96,6 +97,29 @@ export function hasNextDependency(
 }
 
 /**
+ * Check if package.json contains Stencil dependency.
+ */
+export function hasStencilDependency(
+  packageJson: Record<string, unknown> | undefined
+): boolean {
+  if (!packageJson) return false;
+
+  const deps = packageJson.dependencies as Record<string, string> | undefined;
+  const devDeps = packageJson.devDependencies as
+    | Record<string, string>
+    | undefined;
+
+  return Boolean(deps?.["@stencil/core"] || devDeps?.["@stencil/core"]);
+}
+
+/**
+ * Check if Stencil config exists.
+ */
+export function hasStencilConfig(cwd: string = process.cwd()): boolean {
+  return existsSync(join(cwd, "stencil.config.ts")) || existsSync(join(cwd, "stencil.config.js"));
+}
+
+/**
  * Detect the appropriate profile for a project.
  */
 export function detectProfile(
@@ -108,6 +132,11 @@ export function detectProfile(
     hasSvelteKitDependency(changeSet.headPackageJson)
   ) {
     return "sveltekit";
+  }
+
+  // Check for Stencil
+  if (hasStencilDependency(changeSet.headPackageJson) || hasStencilConfig(cwd)) {
+    return "stencil";
   }
 
   // Check for React with React Router
@@ -133,6 +162,8 @@ export function getProfile(name: ProfileName): Profile {
       return sveltekitProfile;
     case "react":
       return reactProfile;
+    case "stencil":
+      return stencilProfile;
     case "auto":
       return defaultProfile;
     default:
@@ -154,5 +185,5 @@ export function resolveProfileName(
   return name;
 }
 
-export { defaultProfile, sveltekitProfile, reactProfile };
+export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile };
 

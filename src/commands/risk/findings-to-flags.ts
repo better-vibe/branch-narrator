@@ -24,6 +24,11 @@ import type {
   DependencyChangeFinding,
   DbMigrationFinding,
   TestChangeFinding,
+  StencilComponentChangeFinding,
+  StencilPropChangeFinding,
+  StencilEventChangeFinding,
+  StencilMethodChangeFinding,
+  StencilSlotChangeFinding,
 } from "../../core/types.js";
 import { buildFlagId } from "../../core/ids.js";
 
@@ -230,6 +235,208 @@ function sqlRiskToFlags(findings: SQLRiskFinding[]): RiskFlag[] {
 }
 
 /**
+ * Convert Stencil findings to flags.
+ */
+function stencilToFlags(findings: Finding[]): RiskFlag[] {
+  const flags: RiskFlag[] = [];
+
+  const componentFindings = findings.filter(f => f.type === "stencil-component-change") as StencilComponentChangeFinding[];
+  const propFindings = findings.filter(f => f.type === "stencil-prop-change") as StencilPropChangeFinding[];
+  const eventFindings = findings.filter(f => f.type === "stencil-event-change") as StencilEventChangeFinding[];
+  const methodFindings = findings.filter(f => f.type === "stencil-method-change") as StencilMethodChangeFinding[];
+  const slotFindings = findings.filter(f => f.type === "stencil-slot-change") as StencilSlotChangeFinding[];
+
+  // High severity: Tag changed
+  for (const f of componentFindings) {
+    if (f.change === "tag-changed") {
+      const ruleKey = "stencil.tag_changed";
+      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      flags.push({
+        id: ruleKey,
+        ruleKey,
+        flagId: buildFlagId(ruleKey, relatedFindingIds),
+        relatedFindingIds,
+        category: "api",
+        score: 45,
+        confidence: 0.95,
+        title: "Component tag changed",
+        summary: `Tag changed from "${f.fromTag}" to "${f.toTag}"`,
+        evidence: convertEvidence(f),
+        suggestedChecks: [
+          "Update all usages of this component",
+          "This is a breaking change",
+        ],
+        effectiveScore: Math.round(45 * 0.95),
+      });
+    }
+
+    if (f.change === "shadow-changed") {
+      const ruleKey = "stencil.shadow_changed";
+      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      flags.push({
+        id: ruleKey,
+        ruleKey,
+        flagId: buildFlagId(ruleKey, relatedFindingIds),
+        relatedFindingIds,
+        category: "api",
+        score: 25,
+        confidence: 0.9,
+        title: "Shadow DOM configuration changed",
+        summary: `Shadow DOM enabled changed from ${f.fromShadow} to ${f.toShadow}`,
+        evidence: convertEvidence(f),
+        suggestedChecks: [
+          "Check styles and global styling impact",
+        ],
+        effectiveScore: Math.round(25 * 0.9),
+      });
+    }
+  }
+
+  // High severity: Prop removed or changed
+  for (const f of propFindings) {
+    if (f.change === "removed") {
+      const ruleKey = "stencil.prop_removed";
+      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      flags.push({
+        id: ruleKey,
+        ruleKey,
+        flagId: buildFlagId(ruleKey, relatedFindingIds),
+        relatedFindingIds,
+        category: "api",
+        score: 40,
+        confidence: 0.95,
+        title: "Component prop removed",
+        summary: `Prop "${f.propName}" removed from <${f.tag}>`,
+        evidence: convertEvidence(f),
+        suggestedChecks: [
+          "This is a breaking change",
+          "Check usages",
+        ],
+        effectiveScore: Math.round(40 * 0.95),
+      });
+    } else if (f.change === "changed") {
+      const ruleKey = "stencil.prop_changed";
+      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      flags.push({
+        id: ruleKey,
+        ruleKey,
+        flagId: buildFlagId(ruleKey, relatedFindingIds),
+        relatedFindingIds,
+        category: "api",
+        score: 35,
+        confidence: 0.9,
+        title: "Component prop modified",
+        summary: `Prop "${f.propName}" options changed`,
+        evidence: convertEvidence(f),
+        suggestedChecks: [
+          "Check for attribute/reflect/mutable changes",
+        ],
+        effectiveScore: Math.round(35 * 0.9),
+      });
+    }
+  }
+
+  // High severity: Event removed or changed
+  for (const f of eventFindings) {
+      if (f.change === "removed") {
+        const ruleKey = "stencil.event_removed";
+        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        flags.push({
+          id: ruleKey,
+          ruleKey,
+          flagId: buildFlagId(ruleKey, relatedFindingIds),
+          relatedFindingIds,
+          category: "api",
+          score: 40,
+          confidence: 0.95,
+          title: "Component event removed",
+          summary: `Event "${f.eventName}" removed from <${f.tag}>`,
+          evidence: convertEvidence(f),
+          suggestedChecks: [
+            "This is a breaking change",
+            "Check event listeners",
+          ],
+          effectiveScore: Math.round(40 * 0.95),
+        });
+      } else if (f.change === "changed") {
+        const ruleKey = "stencil.event_changed";
+        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        flags.push({
+          id: ruleKey,
+          ruleKey,
+          flagId: buildFlagId(ruleKey, relatedFindingIds),
+          relatedFindingIds,
+          category: "api",
+          score: 35,
+          confidence: 0.9,
+          title: "Component event modified",
+          summary: `Event "${f.eventName}" options changed`,
+          evidence: convertEvidence(f),
+          suggestedChecks: [
+            "Check bubbles/composed/cancelable options",
+          ],
+          effectiveScore: Math.round(35 * 0.9),
+        });
+      }
+    }
+
+  // High severity: Method removed or changed
+  for (const f of methodFindings) {
+      if (f.change === "removed") {
+        const ruleKey = "stencil.method_removed";
+        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        flags.push({
+          id: ruleKey,
+          ruleKey,
+          flagId: buildFlagId(ruleKey, relatedFindingIds),
+          relatedFindingIds,
+          category: "api",
+          score: 40,
+          confidence: 0.95,
+          title: "Component method removed",
+          summary: `Method "${f.methodName}" removed from <${f.tag}>`,
+          evidence: convertEvidence(f),
+          suggestedChecks: [
+            "This is a breaking change",
+            "Check usages",
+          ],
+          effectiveScore: Math.round(40 * 0.95),
+        });
+      }
+      // Changed not fully implemented yet in analyzer, but if it were:
+      else if (f.change === "changed") {
+         // ...
+      }
+    }
+
+  // High severity: Slot removed
+  for (const f of slotFindings) {
+      if (f.change === "removed") {
+        const ruleKey = "stencil.slot_removed";
+        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        flags.push({
+          id: ruleKey,
+          ruleKey,
+          flagId: buildFlagId(ruleKey, relatedFindingIds),
+          relatedFindingIds,
+          category: "api",
+          score: 35,
+          confidence: 0.9,
+          title: "Component slot removed",
+          summary: `Slot "${f.slotName}" removed from <${f.tag}>`,
+          evidence: convertEvidence(f),
+          suggestedChecks: [
+             "Check content projection usages",
+          ],
+          effectiveScore: Math.round(35 * 0.9),
+        });
+      }
+    }
+
+  return flags;
+}
+
+/**
  * Convert findings to risk flags using rules.
  */
 export function findingsToFlags(findings: Finding[]): RiskFlag[] {
@@ -250,6 +457,7 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   // Apply conversion rules
   flags.push(...ciWorkflowToFlags(ciWorkflowFindings));
   flags.push(...sqlRiskToFlags(sqlRiskFindings));
+  flags.push(...stencilToFlags(findings));
   
   // Infrastructure changes
   for (const finding of infraFindings) {
