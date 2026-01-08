@@ -1,5 +1,27 @@
 # @better-vibe/branch-narrator
 
+## 1.4.0
+
+### Minor Changes
+
+- bacbd62: Add `stencil` profile for StencilJS support
+
+  Added a new `stencil` profile that automatically detects StencilJS projects. It includes:
+
+  - AST-based analyzer for Stencil components (tag, shadow, props, events, methods, slots).
+  - Risk reporting for breaking API changes (removed props, changed tags, etc.).
+  - Auto-detection based on `package.json` dependencies or `stencil.config.*`.
+
+  Use it with `branch-narrator facts --profile stencil` or rely on auto-detection.
+
+- fa5791e: Change default behavior: `unstaged` mode now includes untracked files
+
+  The `--mode unstaged` (default) now includes untracked files in addition to modified tracked files. This matches the typical working state of AI coding agents where new files are created but not yet staged.
+
+  Previously, only `--mode all` included untracked files. Now both `unstaged` and `all` include them by default.
+
+  To exclude untracked files, use `--mode staged` or pass `--no-untracked` (where available).
+
 ## 1.3.1
 
 ### Patch Changes
