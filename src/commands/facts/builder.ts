@@ -319,7 +319,7 @@ export async function buildFacts(
   const warnings = userWarnings ?? [];
 
   return {
-    schemaVersion: "2.0",
+    schemaVersion: "2.1",
     generatedAt: noTimestamp ? undefined : new Date().toISOString(),
     git,
     profile,

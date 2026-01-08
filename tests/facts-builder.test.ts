@@ -223,17 +223,6 @@ describe("deriveActions", () => {
         change: "modified",
         routeType: "page",
       },
-      {
-        type: "file-summary",
-        kind: "file-summary",
-        category: "unknown",
-        confidence: "high",
-        evidence: [],
-        added: [],
-        modified: ["pnpm-lock.yaml"],
-        deleted: [],
-        renamed: [],
-      },
     ];
 
     const actions = deriveActions(findings, "sveltekit");
@@ -241,30 +230,8 @@ describe("deriveActions", () => {
     expect(actions.some(a => a.id === "sveltekit-check")).toBe(true);
     const checkAction = actions.find(a => a.id === "sveltekit-check");
     expect(checkAction?.blocking).toBe(true);
-    expect(checkAction?.commands[0].cmd).toBe("pnpm check");
-  });
-
-  it("should detect bun package manager from lockfile", () => {
-    const findings: Finding[] = [
-      {
-        type: "file-summary",
-        kind: "file-summary",
-        category: "unknown",
-        confidence: "high",
-        evidence: [],
-        added: [],
-        modified: ["bun.lock", "package.json"],
-        deleted: [],
-        renamed: [],
-      },
-    ];
-
-    const actions = deriveActions(findings, "sveltekit");
-
-    const checkAction = actions.find(a => a.id === "sveltekit-check");
-    expect(checkAction?.commands[0].cmd).toBe("bun run check");
-    const testAction = actions.find(a => a.id === "run-tests");
-    expect(testAction?.commands[0].cmd).toBe("bun run test");
+    expect(checkAction?.category).toBe("types");
+    expect(checkAction?.triggers).toContain("Route files changed");
   });
 
   it("should generate test action when test changes detected", () => {
@@ -285,6 +252,8 @@ describe("deriveActions", () => {
     expect(actions.some(a => a.id === "run-tests")).toBe(true);
     const testAction = actions.find(a => a.id === "run-tests");
     expect(testAction?.blocking).toBe(true);
+    expect(testAction?.category).toBe("tests");
+    expect(testAction?.triggers.some(t => t.includes("test file(s) changed"))).toBe(true);
   });
 
   it("should generate migration actions for database changes", () => {
@@ -305,6 +274,9 @@ describe("deriveActions", () => {
     const actions = deriveActions(findings, "auto");
 
     expect(actions.some(a => a.id === "apply-migrations")).toBe(true);
+    const migrateAction = actions.find(a => a.id === "apply-migrations");
+    expect(migrateAction?.category).toBe("database");
+    expect(migrateAction?.triggers.some(t => t.includes("migration file(s) changed"))).toBe(true);
   });
 
   it("should mark migration blocking if dangerous SQL", () => {
@@ -326,10 +298,12 @@ describe("deriveActions", () => {
 
     const migrateAction = actions.find(a => a.id === "apply-migrations");
     expect(migrateAction?.blocking).toBe(true);
-    expect(migrateAction?.reason).toContain("DANGEROUS SQL");
+    expect(migrateAction?.triggers.some(t => t.includes("DANGEROUS SQL"))).toBe(true);
 
     // Should also have backup action
     expect(actions.some(a => a.id === "backup-db")).toBe(true);
+    const backupAction = actions.find(a => a.id === "backup-db");
+    expect(backupAction?.category).toBe("database");
   });
 
   it("should generate action for env var changes", () => {
@@ -351,6 +325,8 @@ describe("deriveActions", () => {
     expect(actions.some(a => a.id === "update-env-docs")).toBe(true);
     const envAction = actions.find(a => a.id === "update-env-docs");
     expect(envAction?.blocking).toBe(false);
+    expect(envAction?.category).toBe("environment");
+    expect(envAction?.triggers.some(t => t.includes("DATABASE_URL"))).toBe(true);
   });
 
   it("should sort actions with blocking first", () => {
@@ -385,6 +361,31 @@ describe("deriveActions", () => {
     // Non-blocking should come after
     const lastAction = actions[actions.length - 1];
     expect(lastAction.blocking).toBe(false);
+  });
+
+  it("should include trigger context for major dependency changes", () => {
+    const findings: Finding[] = [
+      {
+        type: "dependency-change",
+        kind: "dependency-change",
+        category: "dependencies",
+        confidence: "high",
+        evidence: [],
+        name: "react",
+        section: "dependencies",
+        from: "17.0.0",
+        to: "18.0.0",
+        impact: "major",
+      },
+    ];
+
+    const actions = deriveActions(findings, "auto");
+
+    const depAction = actions.find(a => a.id === "review-dependencies");
+    expect(depAction).toBeDefined();
+    expect(depAction?.category).toBe("dependencies");
+    expect(depAction?.triggers.some(t => t.includes("react"))).toBe(true);
+    expect(depAction?.triggers.some(t => t.includes("17.0.0 → 18.0.0"))).toBe(true);
   });
 });
 
@@ -1024,7 +1025,7 @@ describe("buildFacts", () => {
     expect(facts.findings.some(f => f.type === "file-summary")).toBe(false);
   });
 
-  it("should use schema version 2.0", async () => {
+  it("should use schema version 2.1", async () => {
     const changeSet = createMockChangeSet();
     const findings: Finding[] = [];
     const riskScore = createMockRiskScore();
@@ -1041,7 +1042,7 @@ describe("buildFacts", () => {
       isDirty: false,
     });
 
-    expect(facts.schemaVersion).toBe("2.0");
+    expect(facts.schemaVersion).toBe("2.1");
   });
 
   it("should have empty changeset when no meta-findings", async () => {

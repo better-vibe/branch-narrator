@@ -598,14 +598,37 @@ export interface Summary {
   highlights: string[];
 }
 
+/**
+ * Category of action for grouping and filtering.
+ */
+export type ActionCategory =
+  | "tests"
+  | "types"
+  | "database"
+  | "environment"
+  | "dependencies"
+  | "cloudflare"
+  | "documentation";
+
+/**
+ * Recommended action for the AI agent to consider.
+ *
+ * Actions provide context about what needs attention and why,
+ * without prescribing specific commands. AI agents have more
+ * context about the project's setup (package manager, CI system,
+ * deployment target) to determine the appropriate commands.
+ */
 export interface Action {
+  /** Unique identifier for the action (e.g., "run-tests", "apply-migrations") */
   id: string;
+  /** Category for grouping related actions */
+  category: ActionCategory;
+  /** Whether this action blocks PR merge (requires resolution before merging) */
   blocking: boolean;
+  /** Human-readable explanation of what needs attention and why */
   reason: string;
-  commands: Array<{
-    cmd: string;
-    when: "local" | "ci" | "local-or-ci";
-  }>;
+  /** Context about what triggered this action (finding types, file patterns, etc.) */
+  triggers: string[];
 }
 
 export interface SkippedFile {

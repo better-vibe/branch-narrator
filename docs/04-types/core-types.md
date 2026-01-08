@@ -178,13 +178,58 @@ interface LockfileMismatchWarning {
 
 ---
 
+## Action
+
+Recommended action for AI agents to consider. Actions provide context about what needs attention and why, without prescribing specific commands.
+
+```typescript
+type ActionCategory =
+  | "tests"
+  | "types"
+  | "database"
+  | "environment"
+  | "dependencies"
+  | "cloudflare"
+  | "documentation";
+
+interface Action {
+  id: string;              // Unique identifier (e.g., "run-tests", "apply-migrations")
+  category: ActionCategory; // Grouping category
+  blocking: boolean;        // Whether this blocks PR merge
+  reason: string;           // Human-readable explanation
+  triggers: string[];       // Context about what triggered this action
+}
+```
+
+**Design Philosophy:**
+
+Actions focus on **what** needs attention and **why**, not **how** to do it. AI agents have more context about the project's setup (package manager, CI system, deployment target) to determine the appropriate commands.
+
+**Example:**
+
+```json
+{
+  "id": "apply-migrations",
+  "category": "database",
+  "blocking": true,
+  "reason": "Apply database migrations in a safe environment and verify data integrity before production",
+  "triggers": [
+    "1 migration file(s) changed",
+    "DROP TABLE detected",
+    "DANGEROUS SQL DETECTED (DROP, TRUNCATE, or destructive operations)"
+  ]
+}
+```
+
+---
+
 ## FactsOutput
 
 The complete output of the `facts` command.
 
 ```typescript
 interface FactsOutput {
-  schemaVersion: string;        // "2.0"
+  schemaVersion: string;        // "2.1"
   generatedAt?: string;         // ISO timestamp
   git: GitInfo;
   profile: ProfileInfo;

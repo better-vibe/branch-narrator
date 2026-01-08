@@ -1,138 +1,115 @@
 /**
  * Action derivation from findings and risk.
+ *
+ * Actions provide context about what needs attention and why,
+ * without prescribing specific commands. AI agents have more
+ * context about the project's setup (package manager, CI system,
+ * deployment target) to determine the appropriate commands.
  */
 
 import type {
   Action,
-  FileCategoryFinding,
-  FileSummaryFinding,
+  DbMigrationFinding,
+  DependencyChangeFinding,
+  EnvVarFinding,
   Finding,
   ProfileName,
 } from "../../core/types.js";
 
 /**
- * Detected package manager type.
- */
-type PackageManager = "bun" | "pnpm" | "yarn" | "npm";
-
-/**
- * Detect package manager from findings by looking at lockfiles.
- * Priority: bun > pnpm > yarn > npm
- */
-function detectPackageManager(findings: Finding[]): PackageManager {
-  // Get all file paths from findings
-  const allFiles: string[] = [];
-
-  for (const finding of findings) {
-    if (finding.type === "file-summary") {
-      const f = finding as FileSummaryFinding;
-      allFiles.push(...f.added, ...f.modified, ...f.deleted);
-      allFiles.push(...f.renamed.map(r => r.to));
-    }
-    if (finding.type === "file-category") {
-      const f = finding as FileCategoryFinding;
-      allFiles.push(...f.categories.dependencies);
-    }
-  }
-
-  // Check for lockfiles in priority order
-  if (allFiles.some(f => f === "bun.lock" || f === "bun.lockb")) {
-    return "bun";
-  }
-  if (allFiles.some(f => f === "pnpm-lock.yaml")) {
-    return "pnpm";
-  }
-  if (allFiles.some(f => f === "yarn.lock")) {
-    return "yarn";
-  }
-
-  // Default to npm
-  return "npm";
-}
-
-/**
- * Get run command prefix for package manager.
- */
-function getRunCmd(pm: PackageManager): string {
-  switch (pm) {
-    case "bun":
-      return "bun run";
-    case "pnpm":
-      return "pnpm";
-    case "yarn":
-      return "yarn";
-    case "npm":
-      return "npm run";
-  }
-}
-
-/**
  * Derive actionable recommendations from findings and risk.
+ *
+ * Each action provides:
+ * - `id`: Unique identifier
+ * - `category`: Grouping category
+ * - `blocking`: Whether this blocks PR merge
+ * - `reason`: What needs attention and why
+ * - `triggers`: Context about what triggered this action
  */
 export function deriveActions(
   findings: Finding[],
   profile: ProfileName
 ): Action[] {
   const actions: Action[] = [];
-  const pm = detectPackageManager(findings);
-  const runCmd = getRunCmd(pm);
 
-  // SvelteKit check
+  // SvelteKit type checking
   if (profile === "sveltekit" || profile === "auto") {
-    // Check if there are route changes or any significant changes
     const hasRouteChanges = findings.some(f => f.type === "route-change");
     if (hasRouteChanges || findings.length > 0) {
+      const triggers: string[] = [];
+      if (hasRouteChanges) {
+        triggers.push("Route files changed");
+      }
+      if (findings.length > 0 && !hasRouteChanges) {
+        triggers.push("Source files changed");
+      }
+
       actions.push({
         id: "sveltekit-check",
+        category: "types",
         blocking: true,
-        reason: "Run SvelteKit type checker to verify no type errors",
-        commands: [
-          { cmd: `${runCmd} check`, when: "local-or-ci" },
-        ],
+        reason: "Run SvelteKit type checker to verify no type errors were introduced",
+        triggers,
       });
     }
   }
 
   // Test execution
-  const hasTestChanges = findings.some(f => f.type === "test-change");
+  const testFindings = findings.filter(f => f.type === "test-change");
+  const hasTestChanges = testFindings.length > 0;
   if (hasTestChanges || findings.length > 0) {
+    const triggers: string[] = [];
+    if (hasTestChanges) {
+      triggers.push(`${testFindings.length} test file(s) changed`);
+    }
+    if (findings.length > 0 && !hasTestChanges) {
+      triggers.push("Source files changed without corresponding test changes");
+    }
+
     actions.push({
       id: "run-tests",
+      category: "tests",
       blocking: true,
-      reason: "Run tests to verify functionality",
-      commands: [
-        { cmd: `${runCmd} test`, when: "local-or-ci" },
-      ],
+      reason: "Run test suite to verify functionality and catch regressions",
+      triggers,
     });
   }
 
   // Database migrations
-  const dbMigrations = findings.filter(f => f.type === "db-migration");
+  const dbMigrations = findings.filter(
+    (f): f is DbMigrationFinding => f.type === "db-migration"
+  );
   if (dbMigrations.length > 0) {
-    const hasDangerousSQL = dbMigrations.some(
-      m => m.risk === "high"
-    );
+    const hasDangerousSQL = dbMigrations.some(m => m.risk === "high");
+    const migrationFiles = dbMigrations.flatMap(m => m.files);
+    const reasons = [...new Set(dbMigrations.flatMap(m => m.reasons))];
+
+    const triggers: string[] = [
+      `${migrationFiles.length} migration file(s) changed`,
+      ...reasons,
+    ];
+
+    if (hasDangerousSQL) {
+      triggers.push("DANGEROUS SQL DETECTED (DROP, TRUNCATE, or destructive operations)");
+    }
 
     actions.push({
       id: "apply-migrations",
+      category: "database",
       blocking: hasDangerousSQL,
       reason: hasDangerousSQL
-        ? "Apply database migrations locally and verify (DANGEROUS SQL DETECTED)"
+        ? "Apply database migrations in a safe environment and verify data integrity before production"
         : "Apply and test database migrations in development environment",
-      commands: [
-        { cmd: "supabase db reset --local", when: "local" },
-        { cmd: "supabase db push --preview", when: "ci" },
-      ],
+      triggers,
     });
 
     if (hasDangerousSQL) {
       actions.push({
         id: "backup-db",
+        category: "database",
         blocking: true,
         reason: "Create database backup before applying destructive migrations",
-        commands: [
-          { cmd: "# Ensure database backups are current", when: "local-or-ci" },
-        ],
+        triggers: ["High-risk SQL operations detected in migrations"],
       });
     }
   }
@@ -142,43 +119,66 @@ export function deriveActions(
     f => f.type === "cloudflare-change"
   );
   if (cloudflareChanges.length > 0) {
+    const areas = [...new Set(cloudflareChanges.map(f => f.area))];
+    const files = cloudflareChanges.flatMap(f => f.files);
+
     actions.push({
       id: "verify-cloudflare-config",
+      category: "cloudflare",
       blocking: false,
       reason: "Verify Cloudflare configuration and bindings match across environments",
-      commands: [
-        { cmd: "wrangler whoami", when: "local" },
-        { cmd: "# Check bindings in wrangler.toml match remote config", when: "local-or-ci" },
+      triggers: [
+        `Cloudflare ${areas.join(", ")} configuration changed`,
+        `Files: ${files.join(", ")}`,
       ],
     });
   }
 
   // Environment variables
-  const envVarChanges = findings.filter(f => f.type === "env-var");
+  const envVarChanges = findings.filter(
+    (f): f is EnvVarFinding => f.type === "env-var"
+  );
   if (envVarChanges.length > 0) {
+    const varNames = envVarChanges.map(f => f.name);
+    const addedVars = envVarChanges.filter(f => f.change === "added");
+
+    const triggers: string[] = [];
+    if (addedVars.length > 0) {
+      triggers.push(`New environment variable(s): ${addedVars.map(f => f.name).join(", ")}`);
+    }
+    if (envVarChanges.length > addedVars.length) {
+      triggers.push(`Modified environment variable(s): ${varNames.filter(n => !addedVars.some(a => a.name === n)).join(", ")}`);
+    }
+
     actions.push({
       id: "update-env-docs",
+      category: "environment",
       blocking: false,
-      reason: "Update .env.example and documentation with new environment variables",
-      commands: [
-        { cmd: "# Update .env.example with new variables", when: "local" },
-        { cmd: "# Document new environment variables in README", when: "local" },
-      ],
+      reason: "Update .env.example and documentation with new or changed environment variables",
+      triggers,
     });
   }
 
   // Dependency changes with high risk
   const majorDependencyChanges = findings.filter(
-    f => f.type === "dependency-change" && f.impact === "major"
+    (f): f is DependencyChangeFinding =>
+      f.type === "dependency-change" && f.impact === "major"
   );
   if (majorDependencyChanges.length > 0) {
+    const deps = majorDependencyChanges.map(f => {
+      const from = f.from || "new";
+      const to = f.to || "removed";
+      return `${f.name} (${from} → ${to})`;
+    });
+
     actions.push({
       id: "review-dependencies",
+      category: "dependencies",
       blocking: false,
-      reason: "Review major dependency changes and update migration guides",
-      commands: [
-        { cmd: "# Review CHANGELOG for breaking changes", when: "local" },
-        { cmd: "# Update dependency documentation", when: "local" },
+      reason: "Review major dependency changes for breaking changes and update migration guides if needed",
+      triggers: [
+        `Major version changes: ${deps.join(", ")}`,
+        "Check CHANGELOG and migration guides for breaking changes",
       ],
     });
   }
