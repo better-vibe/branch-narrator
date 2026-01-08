@@ -318,7 +318,7 @@ Display a colorized summary of changes in the terminal.
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 
 ### `pr-body` Command
 
@@ -330,7 +330,7 @@ Generate a raw Markdown PR description.
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `-u, --uncommitted` | `false` | **[DEPRECATED]** Use `--mode unstaged` instead |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 | `--interactive` | `false` | Prompt for additional context |
 
 ### `facts` Command
@@ -342,7 +342,7 @@ Output JSON findings for programmatic use.
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 
 ### `dump-diff` Command
 

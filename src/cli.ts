@@ -160,7 +160,7 @@ program
   .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil)",
+    "Profile to use (auto|sveltekit|react|stencil|next)",
     "auto"
   )
   .action(async (options) => {
@@ -215,7 +215,7 @@ program
   .option("-u, --uncommitted", "[DEPRECATED] Use --mode unstaged instead", false)
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil)",
+    "Profile to use (auto|sveltekit|react|stencil|next)",
     "auto"
   )
   .option("--interactive", "Prompt for additional context", false)
@@ -293,7 +293,7 @@ program
   .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil)",
+    "Profile to use (auto|sveltekit|react|stencil|next)",
     "auto"
   )
   .option("--format <type>", "Output format: json", "json")
@@ -762,7 +762,7 @@ program
   .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil)",
+    "Profile to use (auto|sveltekit|react|stencil|next)",
     "auto"
   )
   .option("--format <type>", "Output format: json|md|text", "md")

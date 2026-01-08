@@ -20,18 +20,23 @@ flowchart TD
     A[CLI: --profile option] --> B{Value?}
     B -->|"auto"| C[detectProfile]
     B -->|"sveltekit"| D[Use SvelteKit]
+    B -->|"next"| N[Use Next.js]
 
     C --> E{src/routes exists?}
     E -->|Yes| D
     E -->|No| F{@sveltejs/kit in package.json?}
     F -->|Yes| D
-    F -->|No| J{react + react-router-dom?}
-    J -->|Yes| K{next in package.json?}
-    K -->|No| L[Use React]
-    K -->|Yes| G[Use Default]
-    J -->|No| G[Use Default]
+    F -->|No| S{@stencil/core?}
+    S -->|Yes| T[Use Stencil]
+    S -->|No| J{next in package.json?}
+    J -->|Yes| N
+    J -->|No| K{react + react-router-dom?}
+    K -->|Yes| L[Use React]
+    K -->|No| G[Use Default]
 
     D --> H[SvelteKit Analyzers]
+    N --> O[Next.js Analyzers]
+    T --> U[Stencil Analyzers]
     L --> M[React Analyzers]
     G --> I[Default Analyzers]
 ```
@@ -41,7 +46,9 @@ flowchart TD
 | Profile | Description | Detection |
 |---------|-------------|-----------|
 | `sveltekit` | SvelteKit fullstack apps | `src/routes/` or `@sveltejs/kit` |
-| `react` | React + React Router apps | `react` + `react-router-dom` (no `next`) |
+| `stencil` | Stencil web components | `@stencil/core` or `stencil.config.ts` |
+| `next` | Next.js App Router apps | `next` dependency + `app/` directory |
+| `react` | React + React Router apps | `react` + `react-router-dom` |
 | `auto` (default) | Generic projects | Fallback when no framework detected |
 
 ## Profile Comparison
@@ -72,6 +79,17 @@ graph LR
         S9[security-files]
     end
 
+    subgraph NextJS["Next.js Profile"]
+        N1[file-summary]
+        N2[file-category]
+        N3[next-routes]
+        N4[env-var]
+        N5[cloudflare]
+        N6[vitest]
+        N7[dependencies]
+        N8[security-files]
+    end
+
     subgraph React["React Profile"]
         R1[file-summary]
         R2[file-category]
@@ -91,6 +109,9 @@ graph LR
 **SvelteKit-specific:**
 - `route-detector` - SvelteKit routes
 - `supabase` - Migration analysis
+
+**Next.js-specific:**
+- `next-routes` - App Router route detection (pages, layouts, API routes, middleware)
 
 **React-specific:**
 - `react-router-routes` - React Router route detection
@@ -132,6 +153,7 @@ When a profile is auto-detected, the `facts` command includes detailed reasons e
 |---------|-----------------|
 | `sveltekit` | "Found src/routes/ directory (SvelteKit file-based routing)", "Found @sveltejs/kit in package.json dependencies" |
 | `stencil` | "Found @stencil/core in package.json dependencies", "Found stencil.config.ts or stencil.config.js" |
+| `next` | "Found next in package.json dependencies", "Found app/ directory (Next.js App Router)" |
 | `react` | "Found react and react-dom in package.json dependencies", "Found react-router or react-router-dom in package.json dependencies" |
 | `auto` | "No framework-specific markers detected, using default analyzers" |
 
@@ -164,7 +186,6 @@ branch-narrator pr-body --profile sveltekit
 
 | Profile | Framework | Status |
 |---------|-----------|--------|
-| `nextjs` | Next.js | 🔮 Planned |
 | `astro` | Astro | 🔮 Planned |
 | `remix` | Remix | 🔮 Planned |
 

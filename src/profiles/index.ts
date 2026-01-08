@@ -9,6 +9,7 @@ import { defaultProfile } from "./default.js";
 import { sveltekitProfile } from "./sveltekit.js";
 import { reactProfile } from "./react.js";
 import { stencilProfile } from "./stencil.js";
+import { nextProfile } from "./next.js";
 
 /**
  * Result of profile detection with reasons.
@@ -129,6 +130,21 @@ export function hasStencilConfig(cwd: string = process.cwd()): boolean {
 }
 
 /**
+ * Check if a project has Next.js App Router directory.
+ */
+export function isNextAppDir(cwd: string = process.cwd()): boolean {
+  // Check for app/ directory (Next.js 13+ App Router)
+  if (existsSync(join(cwd, "app"))) {
+    return true;
+  }
+  // Check for src/app/ directory
+  if (existsSync(join(cwd, "src", "app"))) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Detect the appropriate profile for a project with reasons.
  */
 export function detectProfileWithReasons(
@@ -173,12 +189,34 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for React with React Router
+  // Check for Next.js with App Router
+  const hasNext = hasNextDependency(changeSet.headPackageJson);
+  const hasAppDir = isNextAppDir(cwd);
+
+  if (hasNext && hasAppDir) {
+    reasons.push("Found next in package.json dependencies");
+    reasons.push("Found app/ directory (Next.js App Router)");
+    return {
+      profile: "next",
+      confidence: "high",
+      reasons,
+    };
+  }
+
+  if (hasNext) {
+    reasons.push("Found next in package.json dependencies");
+    return {
+      profile: "next",
+      confidence: "medium",
+      reasons,
+    };
+  }
+
+  // Check for React with React Router (only if not Next.js)
   const hasReact = hasReactDependency(changeSet.headPackageJson);
   const hasRouter = hasReactRouterDependency(changeSet.headPackageJson);
-  const hasNext = hasNextDependency(changeSet.headPackageJson);
 
-  if (hasReact && hasRouter && !hasNext) {
+  if (hasReact && hasRouter) {
     reasons.push("Found react and react-dom in package.json dependencies");
     reasons.push("Found react-router or react-router-dom in package.json dependencies");
     return {
@@ -219,6 +257,8 @@ export function getProfile(name: ProfileName): Profile {
       return reactProfile;
     case "stencil":
       return stencilProfile;
+    case "next":
+      return nextProfile;
     case "auto":
       return defaultProfile;
     default:
@@ -240,5 +280,5 @@ export function resolveProfileName(
   return name;
 }
 
-export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile };
+export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile };
 

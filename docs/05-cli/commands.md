@@ -17,7 +17,7 @@ branch-narrator pretty [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `react`, or `stencil` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 
 ### Diff Modes
 
@@ -70,7 +70,7 @@ branch-narrator pr-body [options]
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `-u, --uncommitted` | `false` | **[DEPRECATED]** Use `--mode unstaged` instead |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `react`, or `stencil` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 | `--interactive` | `false` | Prompt for context |
 
 ### Diff Modes
@@ -121,7 +121,7 @@ branch-narrator facts [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `react`, or `stencil` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 | `--format <type>` | `json` | Output format: `json` |
 | `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
 | `--redact` | `false` | Redact obvious secret values in evidence excerpts |
@@ -679,7 +679,7 @@ Either `--finding <id>` or `--flag <id>` must be provided.
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `react`, or `stencil` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 | `--format <type>` | `md` | Output format: `json`, `md`, or `text` |
 | `--unified <n>` | `3` | Lines of unified context for patch hunks |
 | `--no-patch` | (off) | Do not include patch context, only evidence |

@@ -22,4 +22,5 @@ export * from "./ci-workflows.js";
 export * from "./infra.js";
 export * from "./api-contracts.js";
 export { stencilAnalyzer } from "./stencil.js";
+export { nextRoutesAnalyzer } from "./next-routes.js";
 

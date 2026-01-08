@@ -115,16 +115,18 @@ branch-narrator facts --profile <name>
 |---------|-------------|
 | `auto` | Auto-detect based on project |
 | `sveltekit` | SvelteKit-specific analyzers |
-| `react` | React + React Router analyzers |
 | `stencil` | StencilJS component analyzers |
+| `next` | Next.js App Router analyzers |
+| `react` | React + React Router analyzers |
 
 ### Auto-Detection Logic
 
 1. Check for `src/routes/` directory → SvelteKit
 2. Check for `@sveltejs/kit` in package.json → SvelteKit
 3. Check for `@stencil/core` or `stencil.config.*` → Stencil
-4. Check for `react` + `react-router-dom` (without `next`) → React
-5. Otherwise → Default profile
+4. Check for `next` in package.json → Next.js
+5. Check for `react` + `react-router-dom` → React
+6. Otherwise → Default profile
 
 ---
 

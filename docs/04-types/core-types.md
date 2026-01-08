@@ -110,7 +110,7 @@ interface Analyzer {
 Profile configuration.
 
 ```typescript
-type ProfileName = "auto" | "sveltekit" | "react";
+type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next";
 
 interface Profile {
   name: ProfileName;
