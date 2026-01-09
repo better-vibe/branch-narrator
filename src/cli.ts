@@ -889,6 +889,104 @@ program
     }
   });
 
+// snap command - local workspace snapshots for agent iteration
+const snap = program
+  .command("snap")
+  .description("Manage local workspace snapshots for agent iteration");
+
+snap
+  .command("save [label]")
+  .description("Create a new snapshot of current workspace state")
+  .option("--out <path>", "Write snapshotId to file instead of stdout")
+  .action(async (label: string | undefined, options: { out?: string }) => {
+    try {
+      const { executeSnapSave } = await import("./commands/snap/index.js");
+      const result = await executeSnapSave({
+        label,
+        out: options.out,
+      });
+
+      // Print snapshotId to stdout (unless --out is used)
+      if (!options.out) {
+        console.log(result.snapshotId);
+      } else {
+        info(`Snapshot ${result.snapshotId} saved to ${options.out}`);
+      }
+
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+snap
+  .command("list")
+  .description("List all snapshots")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .action(async (options: { pretty: boolean }) => {
+    try {
+      const { executeSnapList, renderSnapListJSON } = await import("./commands/snap/index.js");
+      const index = await executeSnapList();
+      console.log(renderSnapListJSON(index, options.pretty));
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+snap
+  .command("show <snapshotId>")
+  .description("Show snapshot details")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .action(async (snapshotId: string, options: { pretty: boolean }) => {
+    try {
+      const { executeSnapShow, renderSnapShowJSON } = await import("./commands/snap/index.js");
+      const snapshot = await executeSnapShow(snapshotId);
+      console.log(renderSnapShowJSON(snapshot, options.pretty));
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+snap
+  .command("diff <idA> <idB>")
+  .description("Compare two snapshots")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .action(async (idA: string, idB: string, options: { pretty: boolean }) => {
+    try {
+      const { executeSnapDiff, renderSnapDiffJSON } = await import("./commands/snap/index.js");
+      const delta = await executeSnapDiff(idA, idB);
+      console.log(renderSnapDiffJSON(delta, options.pretty));
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+snap
+  .command("restore <snapshotId>")
+  .description("Restore workspace to snapshot state (creates automatic backup first)")
+  .action(async (snapshotId: string) => {
+    try {
+      const { executeSnapRestore } = await import("./commands/snap/index.js");
+      const result = await executeSnapRestore(snapshotId);
+
+      info(`Restored to snapshot ${result.snapshotId}`);
+      info(`Pre-restore backup: ${result.backupSnapshotId}`);
+
+      if (result.verified) {
+        info("Verification: passed");
+      } else {
+        warn("Verification: patch hashes differ (this may be expected for empty patches)");
+      }
+
+      process.exit(0);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
 /**
  * Handle errors and exit with appropriate code.
  */

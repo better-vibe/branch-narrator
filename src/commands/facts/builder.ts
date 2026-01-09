@@ -153,25 +153,32 @@ function buildChangesetInfo(findings: Finding[]): ChangesetInfo {
     });
   }
 
+  // Include change descriptions if available
+  const changeDescriptions = fileSummary?.changeDescriptions;
+
   return {
     files,
     byCategory,
     categorySummary,
+    changeDescriptions,
     warnings,
   };
 }
 
 /**
  * Build highlights from findings.
+ * Generates human-readable summary bullets for notable findings.
  */
 function buildHighlights(findings: Finding[]): string[] {
   const highlights: string[] = [];
 
+  // Route changes
   const routeChanges = findings.filter(f => f.type === "route-change");
   if (routeChanges.length > 0) {
     highlights.push(`${routeChanges.length} route(s) changed`);
   }
 
+  // Database migrations
   const dbMigrations = findings.filter(f => f.type === "db-migration");
   if (dbMigrations.length > 0) {
     const highRisk = dbMigrations.some(m => m.risk === "high");
@@ -182,15 +189,122 @@ function buildHighlights(findings: Finding[]): string[] {
     );
   }
 
+  // SQL risks (separate from migrations)
+  const sqlRisks = findings.filter(f => f.type === "sql-risk");
+  const destructiveSql = sqlRisks.filter(s => s.riskType === "destructive");
+  if (destructiveSql.length > 0) {
+    highlights.push(`Destructive SQL detected in ${destructiveSql.length} file(s)`);
+  }
+
+  // Dependency changes (major versions)
   const depChanges = findings.filter(f => f.type === "dependency-change");
   const majorChanges = depChanges.filter(d => d.impact === "major");
   if (majorChanges.length > 0) {
     highlights.push(`${majorChanges.length} major dependency update(s)`);
   }
 
+  // New dependencies
+  const newDeps = depChanges.filter(d => d.impact === "new");
+  if (newDeps.length > 0) {
+    highlights.push(`${newDeps.length} new dependency(ies) added`);
+  }
+
+  // Environment variables
   const envVars = findings.filter(f => f.type === "env-var");
   if (envVars.length > 0) {
-    highlights.push(`${envVars.length} new environment variable(s)`);
+    const added = envVars.filter(e => e.change === "added");
+    highlights.push(
+      added.length > 0
+        ? `${added.length} new environment variable(s)`
+        : `${envVars.length} environment variable(s) touched`
+    );
+  }
+
+  // Security files
+  const securityFiles = findings.filter(f => f.type === "security-file");
+  if (securityFiles.length > 0) {
+    highlights.push("Security-sensitive files changed");
+  }
+
+  // CI/CD workflows
+  const ciWorkflows = findings.filter(f => f.type === "ci-workflow");
+  if (ciWorkflows.length > 0) {
+    const securityIssues = ciWorkflows.filter(c => 
+      c.riskType === "permissions_broadened" || c.riskType === "pull_request_target"
+    );
+    if (securityIssues.length > 0) {
+      highlights.push("CI workflow security changes detected");
+    } else {
+      highlights.push(`${ciWorkflows.length} CI workflow(s) modified`);
+    }
+  }
+
+  // Infrastructure changes
+  const infraChanges = findings.filter(f => f.type === "infra-change");
+  if (infraChanges.length > 0) {
+    const types = [...new Set(infraChanges.map(i => i.infraType))];
+    highlights.push(`Infrastructure changes: ${types.join(", ")}`);
+  }
+
+  // Cloudflare changes
+  const cfChanges = findings.filter(f => f.type === "cloudflare-change");
+  if (cfChanges.length > 0) {
+    const areas = [...new Set(cfChanges.map(c => c.area))];
+    highlights.push(`Cloudflare ${areas.join("/")} configuration changed`);
+  }
+
+  // API contract changes
+  const apiChanges = findings.filter(f => f.type === "api-contract-change");
+  if (apiChanges.length > 0) {
+    highlights.push(`${apiChanges.length} API contract(s) modified`);
+  }
+
+  // Test changes
+  const testChanges = findings.filter(f => f.type === "test-change");
+  if (testChanges.length > 0) {
+    const files = testChanges.flatMap(t => t.files);
+    highlights.push(`${files.length} test file(s) modified`);
+  }
+
+  // Convention violations (test gaps)
+  const violations = findings.filter(f => f.type === "convention-violation");
+  if (violations.length > 0) {
+    const totalFiles = violations.reduce((sum, v) => sum + v.files.length, 0);
+    highlights.push(`${totalFiles} source file(s) missing corresponding tests`);
+  }
+
+  // Test gaps (explicit)
+  const testGaps = findings.filter(f => f.type === "test-gap");
+  if (testGaps.length > 0) {
+    const totalUntested = testGaps.reduce((sum, t) => sum + t.prodFilesChanged, 0);
+    highlights.push(`${totalUntested} modified file(s) lack test coverage`);
+  }
+
+  // Impact analysis (high blast radius)
+  const impactFindings = findings.filter(f => f.type === "impact-analysis");
+  const highImpact = impactFindings.filter(i => i.blastRadius === "high");
+  if (highImpact.length > 0) {
+    highlights.push(`${highImpact.length} file(s) with high blast radius`);
+  }
+
+  // Stencil component changes (group all Stencil findings)
+  const stencilFindings = findings.filter(f => 
+    f.type === "stencil-component-change" ||
+    f.type === "stencil-prop-change" ||
+    f.type === "stencil-event-change" ||
+    f.type === "stencil-method-change" ||
+    f.type === "stencil-slot-change"
+  );
+  if (stencilFindings.length > 0) {
+    const components = new Set(stencilFindings.map(s => s.tag));
+    highlights.push(`${components.size} Stencil component(s) with API changes`);
+  }
+
+  // High-risk flags
+  const riskFlags = findings.filter(f => f.type === "risk-flag");
+  const highRiskFlags = riskFlags.filter(r => r.risk === "high");
+  if (highRiskFlags.length > 0) {
+    highlights.push(`${highRiskFlags.length} high-risk condition(s) detected`);
   }
 
   return highlights;

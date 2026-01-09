@@ -14,6 +14,7 @@
 | [06-development](./06-development/) | Contributing, testing, coding standards |
 | [07-profiles](./07-profiles/) | Framework profiles and detection |
 | [08-rendering](./08-rendering/) | Output generation and risk scoring |
+| [10-snapshots](./10-snapshots/) | Local workspace snapshots for agent iteration |
 
 ---
 

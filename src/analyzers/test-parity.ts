@@ -97,6 +97,19 @@ async function findTestFile(sourcePath: string): Promise<string | null> {
     if (allFiles.has(mirrorSrc)) return mirrorSrc;
   }
 
+  // 3. Hyphenated: src/commands/facts/builder.ts -> tests/facts-builder.test.ts
+  // This handles the common convention of combining parent directory with filename
+  const pathParts = relativePath.split(path.sep);
+  if (pathParts.length > 1) {
+    // Try parent-basename pattern: commands/facts/builder -> facts-builder
+    const parentDir = pathParts[pathParts.length - 2];
+    const hyphenated = `${parentDir}-${baseName}`;
+    for (const testExt of testExts) {
+      const hyphenatedPath = path.join("tests", `${hyphenated}${testExt}`);
+      if (allFiles.has(hyphenatedPath)) return hyphenatedPath;
+    }
+  }
+
   return null;
 }
 

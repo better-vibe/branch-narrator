@@ -3,9 +3,12 @@
  */
 
 import type {
+  ConventionViolationFinding,
   FileCategory,
   FileCategoryFinding,
+  FileSummaryFinding,
   Finding,
+  LargeDiffFinding,
   RiskLevel,
   RiskScore,
   RiskFactor,
@@ -215,6 +218,66 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
           evidence: finding.evidence,
         });
         break;
+
+      case "convention-violation":
+        {
+          const violationFinding = finding as ConventionViolationFinding;
+          const fileCount = violationFinding.files.length;
+          // Only add risk if significant number of files lack tests
+          if (fileCount > 5) {
+            const weight = 10;
+            score += weight;
+            evidenceBullets.push(`⚡ ${fileCount} source files lack test coverage`);
+            factors.push({
+              kind: "test-coverage-gap",
+              weight,
+              explanation: `${fileCount} source files lack test coverage`,
+              evidence: violationFinding.evidence.slice(0, 3),
+            });
+          }
+        }
+        break;
+
+      case "large-diff":
+        {
+          const largeDiffFinding = finding as LargeDiffFinding;
+          const weight = largeDiffFinding.linesChanged > 1000 
+            ? 15 
+            : largeDiffFinding.linesChanged > 500 
+            ? 10 
+            : 5;
+          score += weight;
+          evidenceBullets.push(
+            `ℹ️ Large diff: ${largeDiffFinding.filesChanged} files, ${largeDiffFinding.linesChanged} lines`
+          );
+          factors.push({
+            kind: "large-diff",
+            weight,
+            explanation: `Large diff: ${largeDiffFinding.filesChanged} files, ${largeDiffFinding.linesChanged} lines`,
+            evidence: largeDiffFinding.evidence,
+          });
+        }
+        break;
+    }
+  }
+
+  // Check for core module changes (types.ts, index.ts in core directories)
+  const coreFilePatterns = [/\/types\.ts$/, /\/core\/.*\.ts$/, /\/index\.ts$/];
+  const fileSummary = findings.find(f => f.type === "file-summary") as FileSummaryFinding | undefined;
+  if (fileSummary) {
+    const coreFilesModified = fileSummary.modified.filter(file => 
+      coreFilePatterns.some(p => p.test(file))
+    );
+    if (coreFilesModified.length > 0) {
+      const weight = 10;
+      score += weight;
+      evidenceBullets.push(`⚡ Core module files modified: ${coreFilesModified.join(", ")}`);
+      factors.push({
+        kind: "core-module-change",
+        weight,
+        explanation: `Core module files modified (types.ts, index.ts): ${coreFilesModified.length} file(s)`,
+        evidence: [],
+      });
     }
   }
 

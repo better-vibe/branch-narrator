@@ -23,6 +23,21 @@ const EXCLUDE_PATTERNS = [
   /^\.git\//,
 ];
 
+// File extensions that support import analysis (code files only)
+// Excludes docs, config, and other non-importable files
+const ANALYZABLE_EXTENSIONS = new Set([
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".mjs",
+  ".cjs",
+  ".mts",
+  ".cts",
+  ".vue",
+  ".svelte",
+]);
+
 // Patterns for detecting test files
 const TEST_FILE_PATTERNS = [
   // Match .test.{js,jsx,ts,tsx} (case-insensitive)
@@ -32,6 +47,10 @@ const TEST_FILE_PATTERNS = [
   /^tests\//i,
   /^__tests__\//i,
 ];
+
+// Pattern to match code files (for filtering dependents)
+// Only these files can have actual imports, excludes docs/config/lockfiles
+const CODE_FILE_PATTERN = /\.(js|jsx|ts|tsx|mjs|cjs|mts|cts|vue|svelte)$/i;
 
 /**
  * Batch search for dependents using git grep.
@@ -93,6 +112,10 @@ async function findDependentsBatch(
 
         // Skip excluded files
         if (EXCLUDE_PATTERNS.some(p => p.test(file))) continue;
+        
+        // Skip non-code files (docs, config, lockfiles, etc.)
+        // These may contain filename text but aren't actual imports
+        if (!CODE_FILE_PATTERN.test(file)) continue;
 
         // Check which basename(s) matched in this line
         for (const baseName of chunk) {
@@ -181,12 +204,9 @@ async function analyzeDependency(
       }
     }
 
-    if (!usageContext) {
-      // Fallback if no clean import statement found (maybe dynamic import or require)
-      // Just take the first line with the reference
-      const match = lines.find(l => l.includes(sourceBaseName));
-      if (match) usageContext = match.trim();
-    }
+    // Note: We intentionally don't fall back to any matching line.
+    // If no import/export statement was found, usageContext stays empty.
+    // This avoids showing garbage like random doc text or config values.
 
     const isTestFile = TEST_FILE_PATTERNS.some(p => p.test(dependentPath));
 
@@ -208,11 +228,16 @@ export const impactAnalyzer: Analyzer = {
   async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];
 
-    // Filter relevant source files
-    const sourceFiles = changeSet.files.filter(f =>
-      (f.status === "modified" || f.status === "renamed") &&
-      !EXCLUDE_PATTERNS.some(p => p.test(f.path))
-    );
+    // Filter relevant source files - only code files that can be imported
+    const sourceFiles = changeSet.files.filter(f => {
+      // Only modified or renamed files
+      if (f.status !== "modified" && f.status !== "renamed") return false;
+      // Skip excluded paths
+      if (EXCLUDE_PATTERNS.some(p => p.test(f.path))) return false;
+      // Only analyze files with importable extensions (skip docs, config, etc.)
+      const ext = path.extname(f.path).toLowerCase();
+      return ANALYZABLE_EXTENSIONS.has(ext);
+    });
 
     if (sourceFiles.length === 0) return [];
 
@@ -270,7 +295,7 @@ export const impactAnalyzer: Analyzer = {
         findings.push({
           type: "impact-analysis",
           kind: "impact-analysis",
-          category: "tests", // Keeping category as tests/quality related
+          category: "impact",
           confidence: "medium",
           evidence: evidence,
           sourceFile: source.path,

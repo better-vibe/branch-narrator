@@ -1,0 +1,61 @@
+---
+alwaysApply: false
+---
+# branch-narrator (local change analysis tool)
+
+Use `dist/cli.js` to get deterministic, repo-grounded context about changes
+between git refs. It does not use an LLM and will not invent intent.
+
+## When to use this tool
+Call `dist/cli.js` when you need any of the following:
+- A PR description / summary of what changed
+- A changelog-style summary of modifications
+- What routes/endpoints/config/dependencies changed
+- A risk review based on the diff
+
+If you need accurate context, run the commands below BEFORE writing conclusions.
+
+If you want to know which are the existing commands, run:
+- `dist/cli.js --help`
+- `dist/cli.js <command> --help`
+
+---
+
+## Primary commands
+
+### 1) Get structured facts (preferred)
+Run:
+- `dist/cli.js facts --mode branch --base main --head HEAD`
+
+This returns JSON findings. Use it to produce:
+- A concise summary (facts-based)
+- A list of key areas changed (routes, db, config, deps, tests, infra)
+- Risks/notes that cite evidence from findings (file paths, patterns)
+
+Do not guess "why" a change was made. If the user needs intent, ask them.
+
+### 2) Get a prompt-ready diff (filtered)
+Run:
+- `dist/cli.js dump-diff --mode branch --base main --head HEAD --out .ai/diff.txt`
+
+Then read `.ai/diff.txt` for line-level context.
+
+If the diff seems too large or noisy, re-run with excludes/includes if supported
+by the CLI (prefer excluding lockfiles, generated files, logs, and build output).
+
+---
+
+## Related rule
+When asked to write a PR description, follow the `PR Description` rule and call
+`facts` + `dump-diff` first.
+
+---
+
+## Default mode
+The CLI defaults to `unstaged` mode (local changes) if no flags are provided.
+For PR descriptions, always specify `--mode branch`.
+
+## Default refs
+If the user doesn't specify refs (and `branch` mode is implied/requested):
+- base: `main`
+- head: `HEAD`

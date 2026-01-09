@@ -1,6 +1,6 @@
 # CLI Commands
 
-branch-narrator provides seven commands for different use cases.
+branch-narrator provides eight commands for different use cases.
 
 ## pretty
 
@@ -877,6 +877,173 @@ branch-narrator integrate cursor --force
 
 ---
 
+## snap
+
+Manage local workspace snapshots for agent iteration. Snapshots capture the full
+workspace state (staged + unstaged + untracked) and embed analysis artifacts for
+comparison and rollback.
+
+```bash
+branch-narrator snap <subcommand> [options]
+```
+
+### Subcommands
+
+#### snap save [label]
+
+Create a new snapshot of the current workspace state.
+
+```bash
+branch-narrator snap save [label] [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--out <path>` | (stdout) | Write snapshotId to file instead of stdout |
+
+**Output:** Prints the snapshot ID (12 hex characters) to stdout.
+
+```bash
+# Create snapshot with auto-generated label
+branch-narrator snap save
+
+# Create snapshot with custom label
+branch-narrator snap save "before-refactor"
+
+# Write snapshot ID to file for scripting
+branch-narrator snap save --out .ai/current-snapshot.txt
+```
+
+#### snap list
+
+List all snapshots with summary information.
+
+```bash
+branch-narrator snap list [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
+
+**Output:** JSON object with snapshot index.
+
+```bash
+# List all snapshots
+branch-narrator snap list
+
+# Pretty-print output
+branch-narrator snap list --pretty
+```
+
+#### snap show <snapshotId>
+
+Show the full details of a specific snapshot.
+
+```bash
+branch-narrator snap show <snapshotId> [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
+
+**Output:** Full snapshot.json content including embedded analysis.
+
+```bash
+# Show snapshot details
+branch-narrator snap show abc123def456
+
+# Pretty-print output
+branch-narrator snap show abc123def456 --pretty
+```
+
+#### snap diff <idA> <idB>
+
+Compare two snapshots and output a delta.
+
+```bash
+branch-narrator snap diff <idA> <idB> [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
+
+**Output:** JSON delta with findings/flags/files changes and risk score delta.
+
+```bash
+# Compare two snapshots
+branch-narrator snap diff abc123 def456
+
+# Pretty-print output
+branch-narrator snap diff abc123 def456 --pretty
+```
+
+#### snap restore <snapshotId>
+
+Restore the workspace to match a snapshot exactly.
+
+```bash
+branch-narrator snap restore <snapshotId>
+```
+
+**Safety:** Before restoring, automatically creates a backup snapshot named
+`auto/pre-restore/<timestamp>` so the current state can always be recovered.
+
+**Requirements:** HEAD must match the snapshot's `headSha`. Snapshots can only
+be restored when on the same commit.
+
+```bash
+# Restore to a previous snapshot
+branch-narrator snap restore abc123def456
+```
+
+### Storage Location
+
+All snapshot data is stored under `.branch-narrator/snapshots/`:
+
+```
+.branch-narrator/
+  snapshots/
+    index.json
+    <snapshotId>/
+      snapshot.json
+      staged.patch
+      unstaged.patch
+      untracked/
+        manifest.json
+        blobs/
+```
+
+**Important:** Add `.branch-narrator/` to your `.gitignore` file. Snapshots
+contain local workspace state and should not be committed.
+
+### Agent Workflow Example
+
+```bash
+# 1. Save initial state
+INITIAL=$(branch-narrator snap save "before-changes")
+
+# 2. Make changes...
+
+# 3. Save progress
+ATTEMPT1=$(branch-narrator snap save "attempt-1")
+
+# 4. Compare to see what changed
+branch-narrator snap diff $INITIAL $ATTEMPT1 --pretty
+
+# 5. If regression detected, restore initial state
+branch-narrator snap restore $INITIAL
+
+# 6. Pre-restore backup is available in snap list
+branch-narrator snap list
+```
+
+See [Snapshots Documentation](../10-snapshots/overview.md) for detailed information.
+
+---
+
 ## Exit Codes
 
 | Code | Description |
@@ -899,6 +1066,12 @@ branch-narrator dump-diff --help
 branch-narrator risk-report --help
 branch-narrator zoom --help
 branch-narrator integrate --help
+branch-narrator snap --help
+branch-narrator snap save --help
+branch-narrator snap list --help
+branch-narrator snap show --help
+branch-narrator snap diff --help
+branch-narrator snap restore --help
 
 # Show version
 branch-narrator --version

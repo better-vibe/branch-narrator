@@ -32,8 +32,9 @@ export function deriveActions(
 ): Action[] {
   const actions: Action[] = [];
 
-  // SvelteKit type checking
-  if (profile === "sveltekit" || profile === "auto") {
+  // SvelteKit type checking - only suggest when profile is explicitly SvelteKit
+  // (not "auto" which means no framework was detected)
+  if (profile === "sveltekit") {
     const hasRouteChanges = findings.some(f => f.type === "route-change");
     if (hasRouteChanges || findings.length > 0) {
       const triggers: string[] = [];

@@ -58,6 +58,7 @@ export type Category =
   | "docs"
   | "infra"
   | "api"
+  | "impact"
   | "unknown";
 
 export type Confidence = "high" | "medium" | "low";
@@ -76,6 +77,8 @@ export interface FileSummaryFinding {
   modified: string[];
   deleted: string[];
   renamed: Array<{ from: string; to: string }>;
+  /** Heuristic-based descriptions of what changed in each file */
+  changeDescriptions?: Array<{ file: string; description: string }>;
   tags?: string[];
   findingId?: string; // Stable ID, format: "finding.file-summary#<hash>"
 }
@@ -676,6 +679,8 @@ export interface ChangesetInfo {
   byCategory: Record<FileCategory, string[]>;
   /** Category summary sorted by count */
   categorySummary: Array<{ category: FileCategory; count: number }>;
+  /** Heuristic-based descriptions of what changed in each file */
+  changeDescriptions?: Array<{ file: string; description: string }>;
   /** Warnings about changeset characteristics */
   warnings: ChangesetWarning[];
 }
