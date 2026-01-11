@@ -121,6 +121,78 @@ branch-narrator facts --out .ai/baseline.json
 branch-narrator facts --since .ai/baseline.json --pretty
 ```
 
+### Generate SARIF Output (for CI/Code Scanning)
+
+[SARIF (Static Analysis Results Interchange Format)](https://sarifweb.azurewebsites.net/) is a standardized JSON format for static analysis tools. Use `--format sarif` to output findings in a format compatible with GitHub Code Scanning and other SARIF consumers.
+
+```bash
+# Generate SARIF output for GitHub Code Scanning
+branch-narrator facts --mode branch --base main --head HEAD --format sarif
+
+# Save to file for upload
+branch-narrator facts --format sarif --out branch-narrator.sarif
+
+# Pretty-printed SARIF
+branch-narrator facts --format sarif --pretty
+```
+
+**SARIF Rule Mapping:**
+
+The following findings are mapped to stable SARIF rules:
+
+- **BNR001**: Dangerous SQL in migration (DROP, TRUNCATE, ALTER TYPE, etc.) - `error`
+- **BNR002**: Non-destructive migration changed - `warning`
+- **BNR003**: Major version bump in critical dependencies (@sveltejs/kit, svelte, vite, react, next) - `warning`
+- **BNR004**: New environment variable reference detected - `warning`
+- **BNR005**: Cloudflare configuration changed - `note`
+- **BNR006**: API endpoint changed (added/modified/deleted) - `note`
+
+**GitHub Actions Example:**
+
+```yaml
+name: Code Scanning
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for diff analysis
+
+      - name: Install branch-narrator
+        run: npm install -g @better-vibe/branch-narrator
+
+      - name: Generate SARIF
+        run: |
+          branch-narrator facts \
+            --mode branch \
+            --base ${{ github.event.pull_request.base.sha }} \
+            --head ${{ github.event.pull_request.head.sha }} \
+            --format sarif \
+            --out branch-narrator.sarif
+
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: branch-narrator.sarif
+          category: branch-narrator
+```
+
+**Limitations:**
+- SARIF output is deterministic and based on heuristics only (no LLM calls)
+- Line numbers are included when evidence is based on added diff lines
+- Not all finding types are mapped to SARIF rules (see mapping above for covered types)
+- No autofix suggestions in MVP (SARIF `fixes` field not populated)
+
 ### Risk Report (General-Purpose Security & Quality Analysis)
 
 ```bash

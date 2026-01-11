@@ -296,7 +296,7 @@ program
     "Profile to use (auto|sveltekit|react|stencil|next)",
     "auto"
   )
-  .option("--format <type>", "Output format: json", "json")
+  .option("--format <type>", "Output format: json|sarif", "json")
   .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
   .option("--redact", "Redact obvious secret values in evidence excerpts", false)
   .option(
@@ -351,8 +351,8 @@ program
       });
 
       // Validate format
-      if (options.format !== "json") {
-        logError(`Invalid format: ${options.format}. Only json is supported.`);
+      if (options.format !== "json" && options.format !== "sarif") {
+        logError(`Invalid format: ${options.format}. Use json or sarif.`);
         process.exit(1);
       }
 
@@ -458,20 +458,29 @@ program
         output = facts;
       }
 
-      // Output JSON
-      const json = options.pretty
-        ? JSON.stringify(output, null, 2)
-        : JSON.stringify(output);
+      // Output JSON or SARIF
+      let outputText: string;
+      if (options.format === "sarif") {
+        const { renderSarif } = await import("./render/sarif.js");
+        const sarif = renderSarif(output, changeSet);
+        outputText = options.pretty
+          ? JSON.stringify(sarif, null, 2)
+          : JSON.stringify(sarif);
+      } else {
+        outputText = options.pretty
+          ? JSON.stringify(output, null, 2)
+          : JSON.stringify(output);
+      }
 
       // Write to file or stdout
       if (options.out) {
         const { writeFile, mkdir } = await import("node:fs/promises");
         const { dirname } = await import("node:path");
         await mkdir(dirname(options.out), { recursive: true });
-        await writeFile(options.out, json, "utf-8");
+        await writeFile(options.out, outputText, "utf-8");
         info(`Facts written to ${options.out}`);
       } else {
-        console.log(json);
+        console.log(outputText);
       }
       process.exit(0);
     } catch (error) {
