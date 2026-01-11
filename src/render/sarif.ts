@@ -223,6 +223,32 @@ function getPackageVersion(): string {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Build a proper file URI from a file path.
+ * Handles both Windows and Unix paths correctly.
+ */
+function buildFileUri(path: string): string {
+  // Normalize backslashes to forward slashes for Windows
+  const normalized = path.replace(/\\/g, "/");
+  
+  // On Windows, paths start with drive letter (e.g., C:/path)
+  // On Unix, paths start with / (e.g., /home/user)
+  // file:// + C:/path = file:///C:/path (three slashes)
+  // file:// + /path = file:///path (three slashes)
+  
+  if (normalized.startsWith("/")) {
+    // Unix path: /home/user -> file:///home/user/
+    return "file://" + normalized + "/";
+  } else {
+    // Windows path: C:/path -> file:///C:/path/
+    return "file:///" + normalized + "/";
+  }
+}
+
+// ============================================================================
 // Renderer
 // ============================================================================
 
@@ -260,7 +286,7 @@ export function renderSarif(facts: FactsOutput, changeSet: ChangeSet): SarifLog 
         results,
         originalUriBaseIds: {
           SRCROOT: {
-            uri: "file:///" + facts.git.repoRoot.replace(/\\/g, "/") + "/",
+            uri: buildFileUri(facts.git.repoRoot),
           },
         },
       },
@@ -444,48 +470,36 @@ function mapEnvVarFinding(
   const locations: SarifLocation[] = [];
 
   for (const ev of finding.evidence) {
-    const diff = changeSet.diffs.find((d) => d.path === ev.file);
-    if (diff && ev.excerpt) {
-      // Try to find the line number by searching for the excerpt in additions
-      const additionsWithLines = getAdditionsWithLineNumbers(diff);
-      const match = additionsWithLines.find((add) =>
-        add.line.includes(ev.excerpt)
-      );
-
-      if (match) {
-        locations.push({
-          physicalLocation: {
-            artifactLocation: {
-              uri: ev.file,
-              uriBaseId: "SRCROOT",
-            },
-            region: {
-              startLine: match.lineNumber,
-            },
-          },
-        });
-      } else {
-        // Fallback: no line number
-        locations.push({
-          physicalLocation: {
-            artifactLocation: {
-              uri: ev.file,
-              uriBaseId: "SRCROOT",
-            },
-          },
-        });
+    // Use ev.line if already set, otherwise try to compute from diff
+    let lineNumber = ev.line;
+    
+    if (!lineNumber && ev.excerpt) {
+      const diff = changeSet.diffs.find((d) => d.path === ev.file);
+      if (diff) {
+        // Try to find the line number by searching for the excerpt in additions
+        const additionsWithLines = getAdditionsWithLineNumbers(diff);
+        const match = additionsWithLines.find((add) =>
+          add.line.includes(ev.excerpt)
+        );
+        if (match) {
+          lineNumber = match.lineNumber;
+        }
       }
-    } else {
-      // Fallback: no line number
-      locations.push({
-        physicalLocation: {
-          artifactLocation: {
-            uri: ev.file,
-            uriBaseId: "SRCROOT",
-          },
-        },
-      });
     }
+
+    locations.push({
+      physicalLocation: {
+        artifactLocation: {
+          uri: ev.file,
+          uriBaseId: "SRCROOT",
+        },
+        region: lineNumber
+          ? {
+              startLine: lineNumber,
+            }
+          : undefined,
+      },
+    });
   }
 
   return {
