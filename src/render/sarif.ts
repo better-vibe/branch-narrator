@@ -228,24 +228,18 @@ function getPackageVersion(): string {
 
 /**
  * Build a proper file URI from a file path.
- * Handles both Windows and Unix paths correctly.
+ * Handles both Windows and Unix paths correctly per RFC 3986.
  */
 function buildFileUri(path: string): string {
   // Normalize backslashes to forward slashes for Windows
   const normalized = path.replace(/\\/g, "/");
   
-  // On Windows, paths start with drive letter (e.g., C:/path)
-  // On Unix, paths start with / (e.g., /home/user)
-  // file:// + C:/path = file:///C:/path (three slashes)
-  // file:// + /path = file:///path (three slashes)
+  // RFC 3986: file URI scheme is file:// followed by absolute path
+  // Unix path: /home/user -> file:///home/user/ (file:// + /home/user/)
+  // Windows path: C:/path -> file:///C:/path/ (file:// + /C:/path/)
   
-  if (normalized.startsWith("/")) {
-    // Unix path: /home/user -> file:///home/user/
-    return "file://" + normalized + "/";
-  } else {
-    // Windows path: C:/path -> file:///C:/path/
-    return "file:///" + normalized + "/";
-  }
+  // All file URIs should have three slashes after the scheme
+  return "file:///" + normalized + "/";
 }
 
 // ============================================================================
@@ -473,7 +467,7 @@ function mapEnvVarFinding(
     // Use ev.line if already set, otherwise try to compute from diff
     let lineNumber = ev.line;
     
-    if (!lineNumber && ev.excerpt) {
+    if (lineNumber == null && ev.excerpt) {
       const diff = changeSet.diffs.find((d) => d.path === ev.file);
       if (diff) {
         // Try to find the line number by searching for the excerpt in additions
@@ -493,7 +487,7 @@ function mapEnvVarFinding(
           uri: ev.file,
           uriBaseId: "SRCROOT",
         },
-        region: lineNumber
+        region: lineNumber != null
           ? {
               startLine: lineNumber,
             }
