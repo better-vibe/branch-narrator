@@ -3,60 +3,156 @@
  * This serves as the Single Source of Truth for tool usage instructions.
  */
 
-export const BRANCH_NARRATOR_USAGE = `# branch-narrator (local change analysis tool)
+export const BRANCH_NARRATOR_USAGE = `# branch-narrator CLI Reference
 
 Use \`branch-narrator\` to get deterministic, repo-grounded context about changes
 between git refs. It does not use an LLM and will not invent intent.
 
-## When to use this tool
-Call \`branch-narrator\` when the user asks for:
-- A PR description / summary of what changed
-- A changelog-style summary of modifications
-- What routes/endpoints/config/dependencies changed
-- A risk review based on the diff
+## Quick Start
 
-If you need accurate context, run the commands below BEFORE writing conclusions.
+Run \`branch-narrator --help\` for all options.
 
----
+## Commands
 
-## Primary commands
+### facts (Primary)
 
-### 1) Get structured facts (preferred)
-Run:
-- \`branch-narrator facts --mode branch --base main --head HEAD\`
+Get structured JSON analysis of changes. This is the primary command for understanding what changed.
 
-This returns JSON findings. Use it to produce:
-- A concise summary (facts-based)
-- A list of key areas changed (routes, db, config, deps, tests, infra)
-- Risks/notes that cite evidence from findings (file paths, patterns)
+**When to use:**
+- User asks for a PR description or summary of changes
+- You need structured data about routes, endpoints, dependencies, or config changes
+- You want to understand the scope of modifications
 
-Do not guess "why" a change was made. If the user needs intent, ask them.
+**Example:**
+\`\`\`bash
+branch-narrator facts --mode branch --base main --head HEAD
+\`\`\`
 
-### 2) Get a prompt-ready diff (filtered)
-Run:
-- \`branch-narrator dump-diff --mode branch --base main --head HEAD --out .ai/diff.txt\`
-
-Then read \`.ai/diff.txt\` for line-level context.
-
-If the diff seems too large or noisy, re-run with excludes/includes if supported
-by the CLI (prefer excluding lockfiles, generated files, logs, and build output).
+**Output:** JSON with categorized findings including file summaries, route changes, dependency updates, environment variables, and more.
 
 ---
 
-## Related rule
-When asked to write a PR description, follow the \`PR Description\` rule and call
-\`facts\` + \`dump-diff\` first.
+### risk-report
+
+Get a risk score (0-100) with evidence-backed security and stability flags.
+
+**When to use:**
+- User asks about security implications or risks
+- Before merging changes that touch sensitive areas (auth, DB, infra)
+- When reviewing PRs for potential issues
+
+**Example:**
+\`\`\`bash
+branch-narrator risk-report --mode branch --base main --head HEAD
+\`\`\`
+
+**Output:** Risk score with categorized flags (high/medium/low) and evidence for each flag.
 
 ---
 
-## Default mode
-The CLI defaults to \`unstaged\` mode (local changes) if no flags are provided.
-For PR descriptions, always specify \`--mode branch\`.
+### zoom
 
-## Default refs
-If the user doesn't specify refs (and \`branch\` mode is implied/requested):
-- base: \`main\`
-- head: \`HEAD\`
+Drill into a specific finding or risk flag by its stable ID.
+
+**When to use:**
+- You need more details about a specific finding from \`facts\`
+- You want to understand a risk flag from \`risk-report\`
+- You need to cite specific evidence in a PR description
+
+**Examples:**
+\`\`\`bash
+# Zoom into a finding
+branch-narrator zoom --finding <id> --mode branch --base main
+
+# Zoom into a risk flag
+branch-narrator zoom --flag <id> --mode branch --base main
+\`\`\`
+
+**Output:** Detailed information about the specific finding or flag, including file paths and line-level context.
+
+---
+
+### dump-diff
+
+Get filtered diff output for line-level code review context.
+
+**When to use:**
+- You need raw diff content for precise code analysis
+- Writing detailed PR descriptions that cite specific lines
+- When \`facts\` doesn't provide enough detail
+
+**Example:**
+\`\`\`bash
+branch-narrator dump-diff --mode branch --base main --head HEAD --unified 3 --out .ai/diff.txt
+\`\`\`
+
+**Output:** Unified diff written to the specified file, filtered to exclude noise (lockfiles, generated files).
+
+---
+
+### snap
+
+Save and restore workspace snapshots for safe experimentation.
+
+**When to use:**
+- Before making risky or experimental changes
+- When you want a restore point during complex refactoring
+- To compare workspace states
+
+**Examples:**
+\`\`\`bash
+# Save current state
+branch-narrator snap save "before-refactor"
+
+# List saved snapshots
+branch-narrator snap list
+
+# Restore a snapshot
+branch-narrator snap restore <id>
+
+# Show snapshot details
+branch-narrator snap show <id>
+
+# Compare two snapshots
+branch-narrator snap diff <idA> <idB>
+\`\`\`
+
+---
+
+## Decision Tree
+
+Use this to decide which command to run:
+
+\`\`\`
+User asks to understand changes     → run \`facts\`
+User asks about risks/security      → run \`risk-report\`
+Need details on specific item       → run \`zoom --finding <id>\` or \`zoom --flag <id>\`
+Need raw diff for code review       → run \`dump-diff\`
+Before risky/experimental changes   → run \`snap save\`
+\`\`\`
+
+## Common Workflows
+
+### PR Description
+1. Run \`facts --mode branch --base main --head HEAD\`
+2. Run \`dump-diff --mode branch --base main --head HEAD --out .ai/diff.txt\`
+3. Use the structured facts and diff to write the PR description
+
+### Risk Review
+1. Run \`risk-report --mode branch --base main --head HEAD\`
+2. For high-severity flags, run \`zoom --flag <id>\` to get details
+3. Summarize risks with evidence citations
+
+### Code Review Context
+1. Run \`facts\` for overview
+2. Run \`dump-diff\` for specific file changes
+3. Use \`zoom\` for detailed investigation of specific findings
+
+## Default Behavior
+
+- **Mode:** Defaults to \`unstaged\` (local uncommitted changes) if no mode specified
+- **Base/Head:** For branch mode, defaults to \`main\` and \`HEAD\` if not specified
+- **For PR descriptions:** Always use \`--mode branch\`
 `;
 
 export const PR_DESCRIPTION_TEMPLATE = `# PR Description (use branch-narrator)
@@ -65,81 +161,47 @@ When the user asks to write a PR description, generate a Markdown PR body they
 can copy-paste directly. Ground everything in the repo diff; do not invent
 intent or outcomes.
 
-## Required tool calls (do this first)
-1) Get structured facts:
-   - \`branch-narrator facts --mode branch --base main --head HEAD\`
+## Required Steps
 
-2) Dump a filtered diff with unified context:
-   - \`branch-narrator dump-diff --mode branch --base main --head HEAD --unified 3 --out .ai/diff.txt\`
+1. Get structured facts:
+   \`branch-narrator facts --mode branch --base main --head HEAD\`
 
-Read:
-- the JSON output from \`facts\`
-- \`.ai/diff.txt\` for exact line-level evidence
+2. Dump a filtered diff:
+   \`branch-narrator dump-diff --mode branch --base main --head HEAD --unified 3 --out .ai/diff.txt\`
+
+3. Read the JSON output and \`.ai/diff.txt\` for evidence
 
 If the user provides different refs, use them instead of \`main..HEAD\`.
 
-## How to write the PR description
-- Output ONLY the final PR Markdown (no preamble, no tool logs).
-- Use \`facts\` to decide which sections are relevant.
-- Use \`.ai/diff.txt\` to cite specifics (files/paths, endpoints, migrations).
-- Never claim "why" unless the user stated it. If intent is unclear, add a
-  short "Open questions" section.
+## Writing Guidelines
 
-## PR body template (include sections based on scope)
+- Output ONLY the final PR Markdown (no preamble, no tool logs)
+- Use \`facts\` output to decide which sections are relevant
+- Use diff to cite specifics (files, endpoints, migrations)
+- Never claim "why" unless the user stated it
+- If intent is unclear, add an "Open questions" section
 
-### Title (suggested)
-Provide a short title suggestion (one line). Keep it factual.
+## PR Structure
 
-### Markdown PR description (copy-paste)
-Use this structure (omit sections that are truly irrelevant; otherwise include
-and write "N/A"):
+Include these sections based on what's relevant to the changes:
 
-## Summary
-- 2–6 bullets describing what changed (facts-based, no speculation).
-- Mention high-impact areas: routes/endpoints, DB migrations, env/config,
-  Cloudflare/deploy, dependencies, tests.
+### Summary
+2-6 bullets describing what changed (facts-based, no speculation).
+Mention high-impact areas: routes, DB, env/config, dependencies, tests.
 
-## Product impact
-Describe user-visible changes from a product perspective:
-- What changes in behavior/UI/flows?
-- What's new/removed/changed?
-- Any feature-flagged behavior? (If unknown, say "Not detected in diff".)
+### Product Impact
+User-visible changes from a product perspective.
 
-## QA / Testing
-### Automated
-- List the most relevant commands (based on repo conventions):
-  - \`pnpm test\` (if tests/Vitest are present)
-  - \`pnpm check\` (SvelteKit typecheck, if applicable)
+### Testing
+- Automated: relevant test commands
+- Manual: checklist derived from routes/endpoints touched
 
-### Manual smoke test
-- Provide a checklist of manual verification steps derived from the diff:
-  - Routes/pages touched (from \`facts\` route-change findings)
-  - Endpoints changed and methods (GET/POST/etc.)
-  - Auth/session flows if relevant
-  - Supabase-related flows if migrations/policies changed
+### Technical Notes
+Key implementation details for reviewers.
 
-### Edge cases / regressions to watch
-- Bullet list of likely regressions based on what changed (cite evidence).
+### Deployment Notes
+Env vars, migrations, infrastructure changes (if applicable).
 
-## Technical notes
-- Key implementation details a reviewer should know (files/modules touched).
-- Notable refactors, dependency upgrades, config changes.
-
-## Deployment / Ops notes
-Include if relevant (based on facts/diff):
-- Env vars added/changed (names only; never include secret values)
-- Supabase migrations (risk level + filenames)
-- Cloudflare changes (wrangler/workflows/bindings)
-- Backward compatibility / rollout considerations
-
-## Risks & mitigations
-- List concrete risks with evidence (file paths, migration keywords, major bumps).
-- For each risk, add a mitigation or verification step.
-
-## Open questions (only if needed)
-- Ask for missing info required to finalize the PR description (e.g. intended
-  product behavior, rollout plan, screenshots).
-
-## Evidence (optional, short)
-- 3–10 bullets pointing to the most important files changed.
+### Risks & Mitigations
+Concrete risks with evidence and verification steps.
 `;
