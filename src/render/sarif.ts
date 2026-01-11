@@ -18,6 +18,9 @@ import type {
   CloudflareChangeFinding,
 } from "../core/types.js";
 import { getAdditionsWithLineNumbers } from "../git/parser.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 // ============================================================================
 // SARIF 2.1.0 Types (subset needed for our use case)
@@ -190,6 +193,35 @@ const CRITICAL_DEPENDENCIES = [
 ];
 
 // ============================================================================
+// Version Loading
+// ============================================================================
+
+let cachedVersion: string | undefined;
+
+/**
+ * Get the package version from package.json.
+ * Cached after first read for performance.
+ */
+function getPackageVersion(): string {
+  if (cachedVersion) {
+    return cachedVersion;
+  }
+
+  try {
+    // Get the directory of this module
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    // Navigate to package.json (../../package.json from src/render/sarif.ts)
+    const packageJsonPath = join(currentDir, "..", "..", "package.json");
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+    cachedVersion = packageJson.version || "unknown";
+    return cachedVersion;
+  } catch {
+    // Fallback if we can't read package.json
+    return "unknown";
+  }
+}
+
+// ============================================================================
 // Renderer
 // ============================================================================
 
@@ -219,7 +251,7 @@ export function renderSarif(facts: FactsOutput, changeSet: ChangeSet): SarifLog 
         tool: {
           driver: {
             name: "branch-narrator",
-            version: "1.5.2", // TODO: Read from package.json dynamically
+            version: getPackageVersion(),
             informationUri: "https://github.com/better-vibe/branch-narrator",
             rules,
           },
@@ -227,7 +259,7 @@ export function renderSarif(facts: FactsOutput, changeSet: ChangeSet): SarifLog 
         results,
         originalUriBaseIds: {
           SRCROOT: {
-            uri: "file:///" + facts.git.repoRoot + "/",
+            uri: "file:///" + facts.git.repoRoot.replace(/\\/g, "/") + "/",
           },
         },
       },
