@@ -227,18 +227,20 @@ function getPackageVersion(): string {
 // ============================================================================
 
 /**
- * Build a proper file URI from a file path.
+ * Build a proper file URI from a directory path for SARIF originalUriBaseIds.
  * Handles both Windows and Unix paths correctly per RFC 3986.
+ * Always includes trailing slash as this represents a base directory.
  */
 function buildFileUri(path: string): string {
   // Normalize backslashes to forward slashes for Windows
   const normalized = path.replace(/\\/g, "/");
   
-  // RFC 3986: file URI scheme is file:// followed by absolute path
-  // Unix path: /home/user -> file:///home/user/ (file:// + /home/user/)
-  // Windows path: C:/path -> file:///C:/path/ (file:// + /C:/path/)
+  // RFC 3986: file URI scheme is file:/// followed by absolute path
+  // Unix directory: /home/user → file:///home/user/
+  // Windows directory: C:/path → file:///C:/path/
   
-  // All file URIs should have three slashes after the scheme
+  // All file URIs have three slashes total (file:// + / + path)
+  // Trailing slash indicates directory per SARIF spec
   return "file:///" + normalized + "/";
 }
 
