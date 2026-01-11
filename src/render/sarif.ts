@@ -196,7 +196,7 @@ const CRITICAL_DEPENDENCIES = [
 // Version Loading
 // ============================================================================
 
-let cachedVersion: string | undefined;
+let cachedVersion: string | null = null;
 
 /**
  * Get the package version from package.json.
@@ -213,8 +213,9 @@ function getPackageVersion(): string {
     // Navigate to package.json (../../package.json from src/render/sarif.ts)
     const packageJsonPath = join(currentDir, "..", "..", "package.json");
     const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-    cachedVersion = packageJson.version || "unknown";
-    return cachedVersion;
+    const version = packageJson.version || "unknown";
+    cachedVersion = version;
+    return version;
   } catch {
     // Fallback if we can't read package.json
     return "unknown";
