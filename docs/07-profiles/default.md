@@ -20,8 +20,32 @@ The default profile is used when:
 | `vitest` | Detect test changes |
 | `dependencies` | Analyze package.json |
 | `security-files` | Detect security-sensitive files |
-| `test-parity` | Enforce test file convention |
 | `impact` | Analyze blast radius of changes |
+| `large-diff` | Detect large changesets |
+| `lockfiles` | Detect lockfile/manifest mismatches |
+| `test-gaps` | Detect production code changes without tests |
+| `sql-risks` | Detect risky SQL in migrations |
+| `ci-workflows` | Detect CI/CD workflow changes |
+| `infra` | Detect infrastructure changes |
+| `api-contracts` | Detect API contract changes |
+
+## Opt-In Analyzers
+
+These analyzers are NOT included by default but can be enabled via CLI flags:
+
+| Analyzer | Flag | Purpose |
+|----------|------|---------|
+| `test-parity` | `--test-parity` | Check if each source file has a corresponding test file |
+
+### Enabling Test Parity
+
+Test parity checking is opt-in because it requires git file system operations that can be slow on large repositories:
+
+```bash
+# Enable test parity checking
+branch-narrator facts --mode branch --base main --test-parity
+branch-narrator risk-report --mode branch --base main --test-parity
+```
 
 ## What's NOT Included
 
@@ -29,6 +53,9 @@ The default profile is used when:
 |----------|--------|
 | `route-detector` | SvelteKit-specific |
 | `supabase` | Often paired with SvelteKit |
+| `next-routes` | Next.js-specific |
+| `react-router` | React Router-specific |
+| `stencil` | StencilJS-specific |
 
 ## Features
 
@@ -80,8 +107,14 @@ export const defaultProfile: Profile = {
     vitestAnalyzer,
     dependencyAnalyzer,
     securityFilesAnalyzer,
-    testParityAnalyzer,
     impactAnalyzer,
+    analyzeLargeDiff,
+    analyzeLockfiles,
+    analyzeTestGaps,
+    analyzeSQLRisks,
+    analyzeCIWorkflows,
+    analyzeInfra,
+    analyzeAPIContracts,
   ],
 };
 ```
@@ -92,4 +125,3 @@ If you need framework-specific analysis:
 
 1. Force a profile: `--profile sveltekit`
 2. Or create a custom profile (see [Adding Profiles](./overview.md))
-

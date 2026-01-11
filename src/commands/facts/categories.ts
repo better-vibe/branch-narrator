@@ -14,28 +14,79 @@ import type {
  * Map risk factor kind to category.
  */
 function riskFactorKindToCategory(kind: string): Category {
-  if (kind.includes("db-migration") || kind.includes("database")) {
+  // Database-related
+  if (kind.includes("db-migration") || kind.includes("database") || kind.includes("sql")) {
     return "database";
   }
-  if (kind.includes("dependency")) {
+  // Dependency-related
+  if (kind.includes("dependency") || kind.includes("deps")) {
     return "dependencies";
   }
+  // Route-related
   if (kind.includes("route")) {
     return "routes";
   }
-  if (kind.includes("env-var")) {
+  // Config/env-related
+  if (kind.includes("env-var") || kind.includes("config")) {
     return "config_env";
   }
-  if (kind.includes("security")) {
+  // Security/infrastructure
+  if (kind.includes("security") || kind.includes("infra") || kind.includes("docker") || kind.includes("k8s") || kind.includes("terraform")) {
     return "infra";
   }
-  if (kind.includes("cloudflare")) {
+  // Cloudflare
+  if (kind.includes("cloudflare") || kind.includes("wrangler") || kind.includes("workers")) {
     return "cloudflare";
   }
+  // CI/CD
+  if (kind.includes("ci") || kind.includes("workflow") || kind.includes("pipeline")) {
+    return "ci";
+  }
+  // Test-related
   if (kind.includes("test")) {
     return "tests";
   }
+  // API-related
+  if (kind.includes("api") || kind.includes("contract")) {
+    return "api";
+  }
+  // Impact/core module changes - these affect the system broadly
+  // Large diffs also affect reviewability and risk, so map to impact
+  if (kind.includes("core-module") || kind.includes("impact") || kind.includes("blast-radius") || kind.includes("large-diff") || kind.includes("churn")) {
+    return "impact";
+  }
+  // Documentation
+  if (kind.includes("doc")) {
+    return "docs";
+  }
   return "unknown";
+}
+
+/**
+ * Score evidence by information density.
+ * Higher scores = more informative/actionable evidence.
+ */
+function scoreEvidence(evidence: Evidence): number {
+  const excerpt = evidence.excerpt.toLowerCase();
+  let score = 0;
+  
+  // Prefer evidence with numbers (quantified impact)
+  if (/\d+/.test(excerpt)) score += 10;
+  
+  // Prefer evidence mentioning blast radius, impact, risk
+  if (excerpt.includes("blast radius")) score += 15;
+  if (excerpt.includes("high")) score += 5;
+  if (excerpt.includes("critical")) score += 8;
+  if (excerpt.includes("breaking")) score += 8;
+  
+  // Prefer evidence with specific action words
+  if (excerpt.includes("added") || excerpt.includes("removed") || excerpt.includes("modified")) score += 3;
+  
+  // Penalize generic/low-info evidence
+  if (excerpt === "imports module") score -= 10;
+  if (excerpt.startsWith("depends on")) score -= 5;
+  
+  return score;
 }
 
 /**
@@ -71,11 +122,8 @@ export function aggregateCategories(
     const agg = categoryMap.get(category)!;
     agg.count += 1;
 
-    // Add evidence (limit to top 3 total per category)
-    if (agg.evidence.length < 3 && finding.evidence.length > 0) {
-      const remaining = 3 - agg.evidence.length;
-      agg.evidence.push(...finding.evidence.slice(0, remaining));
-    }
+    // Collect all evidence first, we'll select best ones later
+    agg.evidence.push(...finding.evidence);
   }
 
   // Process risk factors to accumulate weights
@@ -114,22 +162,40 @@ export function aggregateCategories(
     const agg = categoryMap.get(category)!;
     agg.riskWeight += factor.weight;
 
-    // Add evidence from risk factor if not already present
-    if (agg.evidence.length < 3 && factor.evidence.length > 0) {
-      const remaining = 3 - agg.evidence.length;
-      agg.evidence.push(...factor.evidence.slice(0, remaining));
-    }
+    // Collect all evidence from risk factors too
+    agg.evidence.push(...factor.evidence);
   }
 
-  // Convert to array and sort deterministically
+  // Convert to array and select top 3 evidence by information score
   const categories: CategoryAggregate[] = Array.from(
     categoryMap.entries()
-  ).map(([id, data]) => ({
-    id,
-    count: data.count,
-    riskWeight: data.riskWeight,
-    topEvidence: data.evidence.slice(0, 3),
-  }));
+  ).map(([id, data]) => {
+    // Sort evidence by score (descending), then by file path (ascending) for determinism
+    const sortedEvidence = [...data.evidence].sort((a, b) => {
+      const scoreA = scoreEvidence(a);
+      const scoreB = scoreEvidence(b);
+      if (scoreB !== scoreA) return scoreB - scoreA; // Higher score first
+      return a.file.localeCompare(b.file); // Alphabetical for ties
+    });
+    
+    // Dedupe by file to avoid repetition
+    const seen = new Set<string>();
+    const deduped: Evidence[] = [];
+    for (const ev of sortedEvidence) {
+      if (!seen.has(ev.file)) {
+        seen.add(ev.file);
+        deduped.push(ev);
+      }
+      if (deduped.length >= 3) break;
+    }
+    
+    return {
+      id,
+      count: data.count,
+      riskWeight: data.riskWeight,
+      topEvidence: deduped,
+    };
+  });
 
   // Sort: riskWeight desc, count desc, id asc
   categories.sort((a, b) => {

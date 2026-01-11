@@ -329,6 +329,7 @@ program
   .option("--no-timestamp", "Omit generatedAt for deterministic output")
   .option("--since <path>", "Compare current output to a previous JSON file")
   .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
+  .option("--test-parity", "Enable test parity checking (opt-in, may be slow on large repos)", false)
   .action(async (options) => {
     try {
       // Import executeFacts dynamically to avoid circular dependencies
@@ -401,6 +402,13 @@ program
       for (const analyzer of profile.analyzers) {
         const analyzerFindings = await analyzer.analyze(changeSet);
         findings.push(...analyzerFindings);
+      }
+
+      // Run test parity analyzer if explicitly enabled (opt-in)
+      if (options.testParity) {
+        const { testParityAnalyzer } = await import("./analyzers/test-parity.js");
+        const testParityFindings = await testParityAnalyzer.analyze(changeSet);
+        findings.push(...testParityFindings);
       }
 
       // Compute risk
@@ -619,6 +627,7 @@ program
   .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
   .option("--since <path>", "Compare current output to a previous JSON file")
   .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
+  .option("--test-parity", "Enable test parity checking (opt-in, may be slow on large repos)", false)
   .action(async (options) => {
     try {
       // Import risk report command dynamically
@@ -684,6 +693,7 @@ program
         explainScore: options.explainScore,
         noTimestamp: options.timestamp === false,
         mode,
+        testParity: options.testParity,
       });
 
       // If --since is provided, compute delta and force JSON format

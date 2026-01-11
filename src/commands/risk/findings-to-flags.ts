@@ -24,6 +24,7 @@ import type {
   DependencyChangeFinding,
   DbMigrationFinding,
   TestChangeFinding,
+  TestParityViolationFinding,
   StencilComponentChangeFinding,
   StencilPropChangeFinding,
   StencilEventChangeFinding,
@@ -708,6 +709,46 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
         "Review test coverage changes",
       ],
       effectiveScore: Math.round(5 * 0.8),
+    });
+  }
+  
+  // Test parity violations (opt-in analyzer)
+  const testParityViolations = findings.filter(f => f.type === "test-parity-violation") as TestParityViolationFinding[];
+  if (testParityViolations.length > 0) {
+    const relatedFindingIds = testParityViolations.map(f => f.findingId).filter((id): id is string => !!id);
+    const ruleKey = "tests.missing_parity";
+    
+    // Score based on confidence distribution
+    const highConfidenceCount = testParityViolations.filter(v => v.confidence === "high").length;
+    const mediumConfidenceCount = testParityViolations.filter(v => v.confidence === "medium").length;
+    
+    // Higher score if more high-confidence violations
+    const baseScore = 12 + (highConfidenceCount * 2) + (mediumConfidenceCount * 1);
+    const cappedScore = Math.min(baseScore, 25);
+    
+    // Confidence is higher if we have more high-confidence violations
+    const avgConfidence = highConfidenceCount > mediumConfidenceCount ? 0.85 : 0.7;
+    
+    flags.push({
+      id: ruleKey,
+      ruleKey,
+      flagId: buildFlagId(ruleKey, relatedFindingIds),
+      relatedFindingIds,
+      category: "tests",
+      score: cappedScore,
+      confidence: avgConfidence,
+      title: "Source files without test coverage",
+      summary: `${testParityViolations.length} source ${testParityViolations.length === 1 ? "file" : "files"} modified without corresponding tests`,
+      evidence: testParityViolations.slice(0, 5).map(v => ({
+        file: v.sourceFile,
+        lines: [`No test file found (expected: ${v.expectedTestLocations[0] || "unknown"})`],
+      })),
+      suggestedChecks: [
+        "Add tests for new/changed code",
+        "Verify existing tests cover the changes",
+        "Consider if these files need unit tests",
+      ],
+      effectiveScore: Math.round(cappedScore * avgConfidence),
     });
   }
   

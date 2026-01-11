@@ -125,6 +125,14 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "test-parity-violation": {
+      // Fingerprint: type + sourceFile + sorted(expectedTestLocations)
+      const sourceFile = normalizePathForHash(finding.sourceFile);
+      const expectedLocs = sortForHash(finding.expectedTestLocations.map(normalizePathForHash));
+      fingerprint = `test-parity-violation:${sourceFile}:${expectedLocs.join(",")}`;
+      break;
+    }
+
     case "impact-analysis": {
       // Fingerprint: type + sourceFile + sorted(affectedFiles)
       const sourceFile = normalizePathForHash(finding.sourceFile);

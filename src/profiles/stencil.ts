@@ -7,7 +7,6 @@ import {
   fileSummaryAnalyzer,
   fileCategoryAnalyzer,
   dependencyAnalyzer,
-  testParityAnalyzer,
   impactAnalyzer,
   stencilAnalyzer,
 } from "../analyzers/index.js";
@@ -18,7 +17,6 @@ export const stencilProfile: Profile = {
     fileSummaryAnalyzer,
     fileCategoryAnalyzer,
     dependencyAnalyzer,
-    testParityAnalyzer,
     impactAnalyzer,
     stencilAnalyzer,
   ],

@@ -274,15 +274,18 @@ export const impactAnalyzer: Analyzer = {
             }
         }
 
+        // Determine blast radius label for more informative evidence
+        const blastLabel = dependents.length > 10 ? "High" : dependents.length > 3 ? "Medium" : "Low";
+        
         const evidence = [
-            createEvidence(source.path, `Modified file ${source.path} is imported by ${dependents.length} other file(s).`),
+            createEvidence(source.path, `${blastLabel} blast radius: ${dependents.length} file(s) depend on this module`),
             ...impactedFilesInfo.slice(0, 5).map(info => {
-                let text = `Depends on ${source.path}`;
-                if (info.details.importedSymbols?.length > 0) {
-                    text += ` (imports: ${info.details.importedSymbols.join(", ")})`;
-                }
+                // More descriptive evidence showing what symbols are imported
+                let text = info.details.importedSymbols?.length > 0
+                    ? `Imports: ${info.details.importedSymbols.slice(0, 3).join(", ")}${info.details.importedSymbols.length > 3 ? ` (+${info.details.importedSymbols.length - 3} more)` : ""}`
+                    : `Imports module`;
                 if (info.details.isTestFile) {
-                    text += " [TEST]";
+                    text += " [test file]";
                 }
                 return createEvidence(info.file, text);
             })

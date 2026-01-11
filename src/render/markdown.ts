@@ -16,6 +16,7 @@ import type {
   RouteChangeFinding,
   SecurityFileFinding,
   TestChangeFinding,
+  TestParityViolationFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 import { getCategoryLabel } from "../analyzers/file-category.js";
@@ -452,6 +453,22 @@ export function renderMarkdown(context: RenderContext): string {
       if (v.files.length > 5) {
         output += `  - ...and ${v.files.length - 5} more\n`;
       }
+    }
+    output += "\n";
+  }
+
+  // Test Parity Violations
+  const testParityViolations =
+    (groups.get("test-parity-violation") as TestParityViolationFinding[]) ?? [];
+  if (testParityViolations.length > 0) {
+    output += "## 🧪 Test Coverage Gaps\n\n";
+    output += `Found ${testParityViolations.length} source file(s) without corresponding tests:\n\n`;
+    for (const v of testParityViolations.slice(0, 10)) {
+      const confidenceLabel = v.confidence === "high" ? "🔴" : v.confidence === "medium" ? "🟡" : "⚪";
+      output += `- ${confidenceLabel} \`${v.sourceFile}\`\n`;
+    }
+    if (testParityViolations.length > 10) {
+      output += `- ...and ${testParityViolations.length - 10} more\n`;
     }
     output += "\n";
   }

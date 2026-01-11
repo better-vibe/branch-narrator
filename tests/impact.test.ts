@@ -101,8 +101,8 @@ describe("impactAnalyzer", () => {
 
     // Evidence checks
     const evidenceText = finding.evidence.map((e: any) => e.excerpt).join(" ");
-    expect(evidenceText).toContain("imports: add");
-    expect(evidenceText).toContain("[TEST]");
+    expect(evidenceText).toContain("Imports: add");
+    expect(evidenceText).toContain("[test file]");
   });
 
   it("should handle default imports", async () => {

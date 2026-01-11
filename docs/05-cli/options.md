@@ -297,6 +297,42 @@ Shows file lists, estimated sizes, and chunk counts.
 
 ---
 
+## --test-parity
+
+Enable test parity checking. Available on `facts` and `risk-report` commands.
+
+```bash
+branch-narrator facts --mode branch --base main --test-parity
+branch-narrator risk-report --mode branch --base main --test-parity
+```
+
+### Behavior
+
+When enabled, the test parity analyzer checks if modified/added source files have corresponding test files. This is an opt-in feature because it requires git file system operations that can be slow on large repositories.
+
+### Output
+
+Produces `test-parity-violation` findings for each source file without a corresponding test. In risk reports, these are aggregated into a `tests.missing_parity` flag.
+
+### Example
+
+```bash
+# Check for test coverage gaps
+branch-narrator risk-report --mode branch --base main --test-parity --format text
+```
+
+Output:
+```
+tests.missing_parity (score: 18, confidence: 0.75)
+  Source files modified without corresponding tests
+  - src/services/auth.ts: No test file found
+  - src/utils/helpers.ts: No test file found
+```
+
+**Default:** Disabled (opt-in only)
+
+---
+
 ## Environment Variables
 
 ### DEBUG
