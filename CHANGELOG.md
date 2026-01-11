@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.5.2
+
+### Patch Changes
+
+- 12ad85d: add snapshot command feature
+
 ## 1.5.1
 
 ### Patch Changes
