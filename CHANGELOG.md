@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.6.1
+
+### Patch Changes
+
+- 8aebcc9: improve file-summary for changeDescription
+
 ## 1.6.0
 
 ### Minor Changes

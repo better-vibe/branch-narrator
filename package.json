@@ -3,7 +3,7 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "A local-first CLI that reads git diff and generates structured PR descriptions",
   "type": "module",
   "bin": {
