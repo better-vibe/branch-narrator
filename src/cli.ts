@@ -458,6 +458,14 @@ program
         output = facts;
       }
 
+      // Validate format compatibility
+      if (options.format === "sarif" && options.since) {
+        throw new BranchNarratorError(
+          "The --since option cannot be used with --format sarif. Remove --since or choose a different output format.",
+          1
+        );
+      }
+
       // Output JSON or SARIF
       let outputText: string;
       if (options.format === "sarif") {

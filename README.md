@@ -136,6 +136,8 @@ branch-narrator facts --format sarif --out branch-narrator.sarif
 branch-narrator facts --format sarif --pretty
 ```
 
+For detailed technical documentation on the SARIF renderer—including the output schema, rule mappings (BNR001–BNR006), how line number tracking works, and known limitations—see [`docs/08-rendering/sarif.md`](docs/08-rendering/sarif.md).
+
 **SARIF Rule Mapping:**
 
 The following findings are mapped to stable SARIF rules:
