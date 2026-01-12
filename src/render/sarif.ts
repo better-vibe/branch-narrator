@@ -18,9 +18,7 @@ import type {
   CloudflareChangeFinding,
 } from "../core/types.js";
 import { getAdditionsWithLineNumbers } from "../git/parser.js";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { getVersionSync } from "../core/version.js";
 
 // ============================================================================
 // SARIF 2.1.0 Types (subset needed for our use case)
@@ -192,35 +190,7 @@ const CRITICAL_DEPENDENCIES = [
   "@stencil/core",
 ];
 
-// ============================================================================
-// Version Loading
-// ============================================================================
 
-let cachedVersion: string | null = null;
-
-/**
- * Get the package version from package.json.
- * Cached after first read for performance.
- */
-function getPackageVersion(): string {
-  if (cachedVersion) {
-    return cachedVersion;
-  }
-
-  try {
-    // Get the directory of this module
-    const currentDir = dirname(fileURLToPath(import.meta.url));
-    // Navigate to package.json (../../package.json from src/render/sarif.ts)
-    const packageJsonPath = join(currentDir, "..", "..", "package.json");
-    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-    const version = packageJson.version || "unknown";
-    cachedVersion = version;
-    return version;
-  } catch {
-    // Fallback if we can't read package.json
-    return "unknown";
-  }
-}
 
 // ============================================================================
 // Helper Functions
@@ -274,7 +244,7 @@ export function renderSarif(facts: FactsOutput, changeSet: ChangeSet): SarifLog 
         tool: {
           driver: {
             name: "branch-narrator",
-            version: getPackageVersion(),
+            version: getVersionSync(),
             informationUri: "https://github.com/better-vibe/branch-narrator",
             rules,
           },
