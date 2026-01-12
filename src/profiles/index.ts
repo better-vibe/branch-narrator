@@ -362,7 +362,7 @@ export function detectProfileWithReasons(
     }
     return {
       profile: "astro",
-      confidence: hasAstro && hasAstroConf ? "high" : "high",
+      confidence: hasAstro && hasAstroConf ? "high" : "medium",
       reasons,
     };
   }

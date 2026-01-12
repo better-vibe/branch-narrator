@@ -122,7 +122,11 @@ function getRouteType(filePath: string): RouteType {
   if (isNuxtLayout(filePath)) {
     return "layout";
   }
-  if (filePath.includes("error.vue") || filePath.includes("[...")) {
+  if (
+    filePath.includes("error.vue") ||
+    filePath.includes("404.vue") ||
+    filePath.includes("500.vue")
+  ) {
     return "error";
   }
   return "page";
