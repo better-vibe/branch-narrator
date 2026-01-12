@@ -1,5 +1,5 @@
 ---
-"branch-narrator": minor
+"@better-vibe/branch-narrator": minor
 ---
 
 Add new analyzers and profiles for enhanced framework detection

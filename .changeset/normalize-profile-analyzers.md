@@ -1,5 +1,5 @@
 ---
-"branch-narrator": minor
+"@better-vibe/branch-narrator": minor
 ---
 
 Normalize analyzer coverage across all profiles for consistent analysis capabilities.

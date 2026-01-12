@@ -3,6 +3,8 @@
  */
 
 import type {
+  APIContractChangeFinding,
+  CIWorkflowFinding,
   CloudflareChangeFinding,
   ConventionViolationFinding,
   DbMigrationFinding,
@@ -11,12 +13,27 @@ import type {
   FileCategoryFinding,
   FileSummaryFinding,
   Finding,
+  GraphQLChangeFinding,
   ImpactAnalysisFinding,
+  InfraChangeFinding,
+  LargeDiffFinding,
+  LockfileFinding,
+  MonorepoConfigFinding,
+  PackageExportsFinding,
   RenderContext,
   RouteChangeFinding,
   SecurityFileFinding,
+  SQLRiskFinding,
+  StencilComponentChangeFinding,
+  StencilEventChangeFinding,
+  StencilMethodChangeFinding,
+  StencilPropChangeFinding,
+  StencilSlotChangeFinding,
+  TailwindConfigFinding,
   TestChangeFinding,
+  TestGapFinding,
   TestParityViolationFinding,
+  TypeScriptConfigFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 import { getCategoryLabel } from "../analyzers/file-category.js";
@@ -108,6 +125,44 @@ function renderSummary(groups: Map<string, Finding[]>): string {
     bullets.push(`${totalFiles} security-sensitive file(s) changed`);
   }
 
+  // GraphQL breaking changes
+  const graphqlChanges = groups.get("graphql-change") as
+    | GraphQLChangeFinding[]
+    | undefined;
+  if (graphqlChanges && graphqlChanges.length > 0) {
+    const breakingCount = graphqlChanges.filter((g) => g.isBreaking).length;
+    if (breakingCount > 0) {
+      bullets.push(`${breakingCount} GraphQL breaking change(s)`);
+    }
+  }
+
+  // CI workflow risks
+  const ciWorkflows = groups.get("ci-workflow") as
+    | CIWorkflowFinding[]
+    | undefined;
+  if (ciWorkflows && ciWorkflows.length > 0) {
+    bullets.push(`${ciWorkflows.length} CI workflow change(s) detected`);
+  }
+
+  // Stencil component changes
+  const stencilComponents = groups.get("stencil-component-change") as
+    | StencilComponentChangeFinding[]
+    | undefined;
+  if (stencilComponents && stencilComponents.length > 0) {
+    bullets.push(`${stencilComponents.length} component API change(s)`);
+  }
+
+  // Package exports breaking changes
+  const packageExports = groups.get("package-exports") as
+    | PackageExportsFinding[]
+    | undefined;
+  if (packageExports && packageExports.length > 0) {
+    const breakingExports = packageExports.filter((p) => p.isBreaking);
+    if (breakingExports.length > 0) {
+      bullets.push(`Package API breaking changes detected`);
+    }
+  }
+
   if (bullets.length === 0) {
     bullets.push("Minor changes detected");
   }
@@ -195,6 +250,27 @@ function renderRoutes(routes: RouteChangeFinding[]): string {
   }
 
   return output + "\n";
+}
+
+/**
+ * Render API Contract changes.
+ */
+function renderAPIContracts(contracts: APIContractChangeFinding[]): string {
+  if (contracts.length === 0) {
+    return "";
+  }
+
+  let output = "## API Contracts\n\n";
+  output += "The following API specification files have changed:\n\n";
+
+  for (const contract of contracts) {
+    for (const file of contract.files) {
+      output += `- \`${file}\`\n`;
+    }
+  }
+  output += "\n";
+
+  return output;
 }
 
 /**
@@ -312,6 +388,547 @@ function renderDependencies(deps: DependencyChangeFinding[]): string {
 }
 
 /**
+ * Render GraphQL Schema section.
+ */
+function renderGraphQL(changes: GraphQLChangeFinding[]): string {
+  if (changes.length === 0) {
+    return "";
+  }
+
+  let output = "## GraphQL Schema\n\n";
+
+  // Check for breaking changes
+  const breakingChanges = changes.filter((c) => c.isBreaking);
+  if (breakingChanges.length > 0) {
+    output += "### 🔴 Breaking Changes\n\n";
+    for (const change of breakingChanges) {
+      output += `**File:** \`${change.file}\`\n`;
+      if (change.breakingChanges.length > 0) {
+        for (const bc of change.breakingChanges) {
+          output += `- ${bc}\n`;
+        }
+      }
+      output += "\n";
+    }
+  }
+
+  // Show added elements
+  const withAdditions = changes.filter((c) => c.addedElements.length > 0);
+  if (withAdditions.length > 0) {
+    output += "### Added Elements\n\n";
+    for (const change of withAdditions) {
+      output += `**File:** \`${change.file}\`\n`;
+      for (const elem of change.addedElements.slice(0, 10)) {
+        output += `- ${elem}\n`;
+      }
+      if (change.addedElements.length > 10) {
+        output += `- ...and ${change.addedElements.length - 10} more\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  // Summary table for all changes
+  output += "### All Schema Changes\n\n";
+  output += "| File | Status | Breaking |\n";
+  output += "|------|--------|----------|\n";
+  for (const change of changes) {
+    const breakingEmoji = change.isBreaking ? "🔴 Yes" : "🟢 No";
+    output += `| \`${change.file}\` | ${change.status} | ${breakingEmoji} |\n`;
+  }
+  output += "\n";
+
+  return output;
+}
+
+/**
+ * Render TypeScript Config section.
+ */
+function renderTypeScriptConfig(configs: TypeScriptConfigFinding[]): string {
+  if (configs.length === 0) {
+    return "";
+  }
+
+  let output = "### TypeScript Configuration\n\n";
+
+  for (const config of configs) {
+    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
+    output += `**File:** \`${config.file}\` ${breakingEmoji}\n\n`;
+
+    // Strictness changes
+    if (config.strictnessChanges.length > 0) {
+      output += "**Strictness Changes:**\n";
+      for (const change of config.strictnessChanges) {
+        output += `- ${change}\n`;
+      }
+      output += "\n";
+    }
+
+    // Changed options
+    const { added, removed, modified } = config.changedOptions;
+    if (added.length > 0) {
+      output += `**Added:** ${added.map((o) => `\`${o}\``).join(", ")}\n`;
+    }
+    if (removed.length > 0) {
+      output += `**Removed:** ${removed.map((o) => `\`${o}\``).join(", ")}\n`;
+    }
+    if (modified.length > 0) {
+      output += `**Modified:** ${modified.map((o) => `\`${o}\``).join(", ")}\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Render Tailwind Config section.
+ */
+function renderTailwindConfig(configs: TailwindConfigFinding[]): string {
+  if (configs.length === 0) {
+    return "";
+  }
+
+  let output = "### Tailwind Configuration\n\n";
+
+  for (const config of configs) {
+    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
+    output += `**File:** \`${config.file}\` (${config.configType}) ${breakingEmoji}\n\n`;
+
+    if (config.affectedSections.length > 0) {
+      output += "**Affected Sections:**\n";
+      for (const section of config.affectedSections) {
+        output += `- ${section}\n`;
+      }
+      output += "\n";
+    }
+
+    if (config.isBreaking && config.breakingReasons.length > 0) {
+      output += "**Breaking Changes:**\n";
+      for (const reason of config.breakingReasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render Monorepo Config section.
+ */
+function renderMonorepoConfig(configs: MonorepoConfigFinding[]): string {
+  if (configs.length === 0) {
+    return "";
+  }
+
+  let output = "### Monorepo Configuration\n\n";
+
+  for (const config of configs) {
+    output += `**Tool:** ${config.tool}\n`;
+    output += `**File:** \`${config.file}\`\n\n`;
+
+    if (config.affectedFields.length > 0) {
+      output += "**Changed Fields:**\n";
+      for (const field of config.affectedFields) {
+        output += `- ${field}\n`;
+      }
+      output += "\n";
+    }
+
+    if (config.impacts.length > 0) {
+      output += "**Impacts:**\n";
+      for (const impact of config.impacts) {
+        output += `- ${impact}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render combined Configuration section.
+ */
+function renderConfiguration(
+  tsConfigs: TypeScriptConfigFinding[],
+  tailwindConfigs: TailwindConfigFinding[],
+  monorepoConfigs: MonorepoConfigFinding[]
+): string {
+  const hasTsConfig = tsConfigs.length > 0;
+  const hasTailwind = tailwindConfigs.length > 0;
+  const hasMonorepo = monorepoConfigs.length > 0;
+
+  if (!hasTsConfig && !hasTailwind && !hasMonorepo) {
+    return "";
+  }
+
+  let output = "## Configuration Changes\n\n";
+
+  if (hasTsConfig) {
+    output += renderTypeScriptConfig(tsConfigs);
+  }
+  if (hasTailwind) {
+    output += renderTailwindConfig(tailwindConfigs);
+  }
+  if (hasMonorepo) {
+    output += renderMonorepoConfig(monorepoConfigs);
+  }
+
+  return output;
+}
+
+/**
+ * Render Package Exports / API section.
+ */
+function renderPackageExports(exports: PackageExportsFinding[]): string {
+  if (exports.length === 0) {
+    return "";
+  }
+
+  let output = "## Package API\n\n";
+
+  for (const exp of exports) {
+    const breakingEmoji = exp.isBreaking ? "🔴 Breaking" : "🟢 Non-breaking";
+    output += `**Status:** ${breakingEmoji}\n\n`;
+
+    // Removed exports (breaking)
+    if (exp.removedExports.length > 0) {
+      output += "### Removed Exports\n\n";
+      for (const removed of exp.removedExports) {
+        output += `- 🔴 \`${removed}\`\n`;
+      }
+      output += "\n";
+    }
+
+    // Added exports
+    if (exp.addedExports.length > 0) {
+      output += "### Added Exports\n\n";
+      for (const added of exp.addedExports) {
+        output += `- 🟢 \`${added}\`\n`;
+      }
+      output += "\n";
+    }
+
+    // Legacy field changes
+    if (exp.legacyFieldChanges.length > 0) {
+      output += "### Entry Point Changes\n\n";
+      output += "| Field | From | To |\n";
+      output += "|-------|------|----|\n";
+      for (const change of exp.legacyFieldChanges) {
+        output += `| \`${change.field}\` | ${change.from ?? "-"} | ${change.to ?? "-"} |\n`;
+      }
+      output += "\n";
+    }
+
+    // Bin changes
+    if (exp.binChanges.added.length > 0 || exp.binChanges.removed.length > 0) {
+      output += "### Binary Commands\n\n";
+      if (exp.binChanges.added.length > 0) {
+        output += `**Added:** ${exp.binChanges.added.map((b) => `\`${b}\``).join(", ")}\n`;
+      }
+      if (exp.binChanges.removed.length > 0) {
+        output += `**Removed:** ${exp.binChanges.removed.map((b) => `\`${b}\``).join(", ")}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render Stencil Component API changes.
+ */
+function renderStencilChanges(groups: Map<string, Finding[]>): string {
+  const componentChanges =
+    (groups.get("stencil-component-change") as StencilComponentChangeFinding[]) ?? [];
+  const propChanges =
+    (groups.get("stencil-prop-change") as StencilPropChangeFinding[]) ?? [];
+  const eventChanges =
+    (groups.get("stencil-event-change") as StencilEventChangeFinding[]) ?? [];
+  const methodChanges =
+    (groups.get("stencil-method-change") as StencilMethodChangeFinding[]) ?? [];
+  const slotChanges =
+    (groups.get("stencil-slot-change") as StencilSlotChangeFinding[]) ?? [];
+
+  const hasChanges =
+    componentChanges.length > 0 ||
+    propChanges.length > 0 ||
+    eventChanges.length > 0 ||
+    methodChanges.length > 0 ||
+    slotChanges.length > 0;
+
+  if (!hasChanges) {
+    return "";
+  }
+
+  let output = "## Component API (Stencil)\n\n";
+
+  // Group all changes by component tag
+  const byTag = new Map<string, {
+    component?: StencilComponentChangeFinding;
+    props: StencilPropChangeFinding[];
+    events: StencilEventChangeFinding[];
+    methods: StencilMethodChangeFinding[];
+    slots: StencilSlotChangeFinding[];
+  }>();
+
+  // Initialize groups for all tags
+  const initTag = (tag: string) => {
+    if (!byTag.has(tag)) {
+      byTag.set(tag, { props: [], events: [], methods: [], slots: [] });
+    }
+  };
+
+  for (const c of componentChanges) {
+    initTag(c.tag);
+    byTag.get(c.tag)!.component = c;
+  }
+  for (const p of propChanges) {
+    initTag(p.tag);
+    byTag.get(p.tag)!.props.push(p);
+  }
+  for (const e of eventChanges) {
+    initTag(e.tag);
+    byTag.get(e.tag)!.events.push(e);
+  }
+  for (const m of methodChanges) {
+    initTag(m.tag);
+    byTag.get(m.tag)!.methods.push(m);
+  }
+  for (const s of slotChanges) {
+    initTag(s.tag);
+    byTag.get(s.tag)!.slots.push(s);
+  }
+
+  // Render each component
+  for (const [tag, changes] of byTag) {
+    output += `### \`<${tag}>\`\n\n`;
+
+    // Component-level changes
+    if (changes.component) {
+      const c = changes.component;
+      const changeEmoji = c.change === "removed" ? "🔴" : c.change === "added" ? "🟢" : "🟡";
+      output += `**Component:** ${changeEmoji} ${c.change}`;
+      if (c.change === "tag-changed") {
+        output += ` (${c.fromTag} → ${c.toTag})`;
+      }
+      if (c.change === "shadow-changed") {
+        output += ` (shadow: ${c.fromShadow} → ${c.toShadow})`;
+      }
+      output += `\n`;
+      output += `**File:** \`${c.file}\`\n\n`;
+    }
+
+    // Props
+    if (changes.props.length > 0) {
+      output += "**Props:**\n";
+      for (const p of changes.props) {
+        const emoji = p.change === "removed" ? "🔴" : p.change === "added" ? "🟢" : "🟡";
+        let detail = "";
+        if (p.details?.typeText) {
+          detail = `: ${p.details.typeText}`;
+        }
+        output += `- ${emoji} \`${p.propName}\`${detail} (${p.change})\n`;
+      }
+      output += "\n";
+    }
+
+    // Events
+    if (changes.events.length > 0) {
+      output += "**Events:**\n";
+      for (const e of changes.events) {
+        const emoji = e.change === "removed" ? "🔴" : e.change === "added" ? "🟢" : "🟡";
+        output += `- ${emoji} \`${e.eventName}\` (${e.change})\n`;
+      }
+      output += "\n";
+    }
+
+    // Methods
+    if (changes.methods.length > 0) {
+      output += "**Methods:**\n";
+      for (const m of changes.methods) {
+        const emoji = m.change === "removed" ? "🔴" : m.change === "added" ? "🟢" : "🟡";
+        const sig = m.signature ? `: ${m.signature}` : "";
+        output += `- ${emoji} \`${m.methodName}\`${sig} (${m.change})\n`;
+      }
+      output += "\n";
+    }
+
+    // Slots
+    if (changes.slots.length > 0) {
+      output += "**Slots:**\n";
+      for (const s of changes.slots) {
+        const emoji = s.change === "removed" ? "🔴" : "🟢";
+        const slotName = s.slotName === "default" ? "(default)" : `"${s.slotName}"`;
+        output += `- ${emoji} ${slotName} (${s.change})\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render CI Workflow findings.
+ */
+function renderCIWorkflow(findings: CIWorkflowFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "### CI Workflows\n\n";
+
+  for (const finding of findings) {
+    const riskEmoji =
+      finding.riskType === "permissions_broadened" ||
+      finding.riskType === "pull_request_target" ||
+      finding.riskType === "remote_script_download"
+        ? "🔴"
+        : "🟡";
+
+    const riskLabel = finding.riskType.replace(/_/g, " ");
+    output += `${riskEmoji} **${riskLabel}**\n`;
+    output += `- File: \`${finding.file}\`\n`;
+    output += `- ${finding.details}\n\n`;
+  }
+
+  return output;
+}
+
+/**
+ * Render SQL Risk findings.
+ */
+function renderSQLRisk(findings: SQLRiskFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "## SQL Risk\n\n";
+
+  for (const finding of findings) {
+    const riskEmoji =
+      finding.riskType === "destructive"
+        ? "🔴"
+        : finding.riskType === "unscoped_modification"
+          ? "🔴"
+          : "🟡";
+
+    const riskLabel = finding.riskType.replace(/_/g, " ");
+    output += `${riskEmoji} **${riskLabel}**\n`;
+    output += `- File: \`${finding.file}\`\n`;
+    output += `- ${finding.details}\n\n`;
+  }
+
+  return output;
+}
+
+/**
+ * Render Infrastructure changes.
+ */
+function renderInfraChanges(findings: InfraChangeFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "### Infrastructure\n\n";
+
+  // Group by infra type
+  const byType = new Map<string, InfraChangeFinding[]>();
+  for (const finding of findings) {
+    if (!byType.has(finding.infraType)) {
+      byType.set(finding.infraType, []);
+    }
+    byType.get(finding.infraType)!.push(finding);
+  }
+
+  for (const [infraType, typeFindings] of byType) {
+    const label =
+      infraType === "dockerfile"
+        ? "Docker"
+        : infraType === "terraform"
+          ? "Terraform"
+          : infraType === "k8s"
+            ? "Kubernetes"
+            : infraType;
+
+    output += `**${label}:**\n`;
+    const allFiles = typeFindings.flatMap((f) => f.files);
+    for (const file of allFiles) {
+      output += `- \`${file}\`\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Render combined CI / Infrastructure section.
+ */
+function renderCIInfrastructure(
+  ciFindings: CIWorkflowFinding[],
+  infraFindings: InfraChangeFinding[]
+): string {
+  if (ciFindings.length === 0 && infraFindings.length === 0) {
+    return "";
+  }
+
+  let output = "## CI / Infrastructure\n\n";
+  output += renderCIWorkflow(ciFindings);
+  output += renderInfraChanges(infraFindings);
+
+  return output;
+}
+
+/**
+ * Render Warnings section (large-diff, lockfile-mismatch, test-gap).
+ */
+function renderWarnings(groups: Map<string, Finding[]>): string {
+  const largeDiff =
+    (groups.get("large-diff") as LargeDiffFinding[]) ?? [];
+  const lockfileMismatch =
+    (groups.get("lockfile-mismatch") as LockfileFinding[]) ?? [];
+  const testGap =
+    (groups.get("test-gap") as TestGapFinding[]) ?? [];
+
+  const hasWarnings =
+    largeDiff.length > 0 || lockfileMismatch.length > 0 || testGap.length > 0;
+
+  if (!hasWarnings) {
+    return "";
+  }
+
+  let output = "## ⚠️ Warnings\n\n";
+
+  // Large diff warning
+  for (const ld of largeDiff) {
+    output += `- **Large diff detected:** ${ld.filesChanged} files changed, ${ld.linesChanged} lines modified\n`;
+  }
+
+  // Lockfile mismatch warning
+  for (const lm of lockfileMismatch) {
+    if (lm.manifestChanged && !lm.lockfileChanged) {
+      output += `- **Lockfile mismatch:** package.json changed but lockfile not updated\n`;
+    } else if (!lm.manifestChanged && lm.lockfileChanged) {
+      output += `- **Lockfile mismatch:** lockfile changed but package.json not updated\n`;
+    }
+  }
+
+  // Test gap warning
+  for (const tg of testGap) {
+    output += `- **Test coverage gap:** ${tg.prodFilesChanged} production files changed, only ${tg.testFilesChanged} test files changed\n`;
+  }
+
+  output += "\n";
+  return output;
+}
+
+/**
  * Render Suggested test plan section.
  */
 function renderTestPlan(
@@ -421,14 +1038,37 @@ export function renderMarkdown(context: RenderContext): string {
   const routes = (groups.get("route-change") as RouteChangeFinding[]) ?? [];
   output += renderRoutes(routes);
 
+  // API Contracts
+  const apiContracts =
+    (groups.get("api-contract-change") as APIContractChangeFinding[]) ?? [];
+  output += renderAPIContracts(apiContracts);
+
+  // GraphQL Schema
+  const graphqlChanges =
+    (groups.get("graphql-change") as GraphQLChangeFinding[]) ?? [];
+  output += renderGraphQL(graphqlChanges);
+
   // Database (Supabase)
   const migrations =
     (groups.get("db-migration") as DbMigrationFinding[]) ?? [];
   output += renderDatabase(migrations);
 
+  // SQL Risk
+  const sqlRisks = (groups.get("sql-risk") as SQLRiskFinding[]) ?? [];
+  output += renderSQLRisk(sqlRisks);
+
   // Config / Env
   const envVars = (groups.get("env-var") as EnvVarFinding[]) ?? [];
   output += renderEnvVars(envVars);
+
+  // Configuration Changes (TypeScript, Tailwind, Monorepo)
+  const tsConfigs =
+    (groups.get("typescript-config") as TypeScriptConfigFinding[]) ?? [];
+  const tailwindConfigs =
+    (groups.get("tailwind-config") as TailwindConfigFinding[]) ?? [];
+  const monorepoConfigs =
+    (groups.get("monorepo-config") as MonorepoConfigFinding[]) ?? [];
+  output += renderConfiguration(tsConfigs, tailwindConfigs, monorepoConfigs);
 
   // Cloudflare
   const cloudflare =
@@ -439,6 +1079,21 @@ export function renderMarkdown(context: RenderContext): string {
   const deps =
     (groups.get("dependency-change") as DependencyChangeFinding[]) ?? [];
   output += renderDependencies(deps);
+
+  // Package API (exports)
+  const packageExports =
+    (groups.get("package-exports") as PackageExportsFinding[]) ?? [];
+  output += renderPackageExports(packageExports);
+
+  // Component API (Stencil)
+  output += renderStencilChanges(groups);
+
+  // CI / Infrastructure
+  const ciWorkflows =
+    (groups.get("ci-workflow") as CIWorkflowFinding[]) ?? [];
+  const infraChanges =
+    (groups.get("infra-change") as InfraChangeFinding[]) ?? [];
+  output += renderCIInfrastructure(ciWorkflows, infraChanges);
 
   // Convention Violations
   const violations =
@@ -492,6 +1147,9 @@ export function renderMarkdown(context: RenderContext): string {
       output += "\n";
     }
   }
+
+  // Warnings (large-diff, lockfile-mismatch, test-gap)
+  output += renderWarnings(groups);
 
   // Suggested test plan
   output += renderTestPlan(context, groups);
