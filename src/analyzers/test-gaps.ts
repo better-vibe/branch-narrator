@@ -2,6 +2,7 @@
  * Test gap analyzer - detects when prod code changes without test changes.
  */
 
+import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
   ChangeSet,
@@ -63,6 +64,7 @@ export const analyzeTestGaps: Analyzer = {
 
     let prodFilesChanged = 0;
     let testFilesChanged = 0;
+    const prodFiles: string[] = [];
 
     for (const file of changeSet.files) {
       // Skip docs and config
@@ -74,17 +76,29 @@ export const analyzeTestGaps: Analyzer = {
         testFilesChanged++;
       } else {
         prodFilesChanged++;
+        prodFiles.push(file.path);
       }
     }
 
     // Flag if production code changed significantly without tests
     if (prodFilesChanged >= 3 && testFilesChanged === 0) {
+      // Create evidence showing the prod files that changed without tests
+      // Use first file as the "main" evidence with the summary, rest as supporting
+      const evidence = prodFiles.slice(0, 5).map((file, index) =>
+        createEvidence(
+          file,
+          index === 0
+            ? `${prodFilesChanged} production file(s) changed with no test updates`
+            : "No corresponding test changes"
+        )
+      );
+
       findings.push({
         type: "test-gap",
         kind: "test-gap",
-        category: "tests",
+        category: "quality",
         confidence: "medium",
-        evidence: [],
+        evidence,
         prodFilesChanged,
         testFilesChanged,
       });

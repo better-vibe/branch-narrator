@@ -21,6 +21,7 @@ The default profile is used when:
 | `dependencies` | Analyze package.json |
 | `security-files` | Detect security-sensitive files |
 | `impact` | Analyze blast radius of changes |
+| `graphql` | Detect GraphQL schema changes |
 | `large-diff` | Detect large changesets |
 | `lockfiles` | Detect lockfile/manifest mismatches |
 | `test-gaps` | Detect production code changes without tests |
@@ -108,6 +109,7 @@ export const defaultProfile: Profile = {
     dependencyAnalyzer,
     securityFilesAnalyzer,
     impactAnalyzer,
+    graphqlAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
     analyzeTestGaps,

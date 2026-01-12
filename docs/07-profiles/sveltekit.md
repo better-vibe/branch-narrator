@@ -22,6 +22,15 @@ The SvelteKit profile is auto-detected when:
 | `vitest` | Detect test changes |
 | `dependencies` | Analyze package.json |
 | `security-files` | Detect security-sensitive files |
+| `impact` | Analyze blast radius of changes |
+| `tailwind` | Detect Tailwind CSS config changes |
+| `large-diff` | Detect large changesets |
+| `lockfiles` | Detect lockfile/manifest mismatches |
+| `test-gaps` | Detect production code changes without tests |
+| `sql-risks` | Detect risky SQL in migrations |
+| `ci-workflows` | Detect CI/CD workflow changes |
+| `infra` | Detect infrastructure changes |
+| `api-contracts` | Detect API contract changes |
 
 ## SvelteKit-Specific Features
 
@@ -94,6 +103,15 @@ export const sveltekitProfile: Profile = {
     vitestAnalyzer,
     dependencyAnalyzer,
     securityFilesAnalyzer,
+    impactAnalyzer,
+    tailwindAnalyzer,
+    analyzeLargeDiff,
+    analyzeLockfiles,
+    analyzeTestGaps,
+    analyzeSQLRisks,
+    analyzeCIWorkflows,
+    analyzeInfra,
+    analyzeAPIContracts,
   ],
 };
 ```

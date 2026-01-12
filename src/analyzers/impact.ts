@@ -38,16 +38,6 @@ const ANALYZABLE_EXTENSIONS = new Set([
   ".svelte",
 ]);
 
-// Patterns for detecting test files
-const TEST_FILE_PATTERNS = [
-  // Match .test.{js,jsx,ts,tsx} (case-insensitive)
-  /\.test\.[jt]sx?$/i,
-  // Match .spec.{js,jsx,ts,tsx} (case-insensitive)
-  /\.spec\.[jt]sx?$/i,
-  /^tests\//i,
-  /^__tests__\//i,
-];
-
 // Pattern to match code files (for filtering dependents)
 // Only these files can have actual imports, excludes docs/config/lockfiles
 const CODE_FILE_PATTERN = /\.(js|jsx|ts|tsx|mjs|cjs|mts|cts|vue|svelte)$/i;
@@ -148,7 +138,7 @@ async function analyzeDependency(
   dependentPath: string,
   sourcePath: string,
   cwd: string = process.cwd()
-): Promise<{ importedSymbols: string[]; usageContext: string; isTestFile: boolean } | null> {
+): Promise<{ importedSymbols: string[]; usageContext: string } | null> {
   try {
     const content = await fs.readFile(path.join(cwd, dependentPath), "utf-8");
     const sourceBaseName = path.basename(sourcePath, path.extname(sourcePath));
@@ -208,12 +198,9 @@ async function analyzeDependency(
     // If no import/export statement was found, usageContext stays empty.
     // This avoids showing garbage like random doc text or config values.
 
-    const isTestFile = TEST_FILE_PATTERNS.some(p => p.test(dependentPath));
-
     return {
       importedSymbols,
       usageContext,
-      isTestFile
     };
 
   } catch (error) {
@@ -267,10 +254,10 @@ export const impactAnalyzer: Analyzer = {
                  if (details) {
                      impactedFilesInfo.push({ file: dep, details });
                  } else {
-                     impactedFilesInfo.push({ file: dep, details: { importedSymbols: [], usageContext: "", isTestFile: false } });
+                     impactedFilesInfo.push({ file: dep, details: { importedSymbols: [], usageContext: "" } });
                  }
             } else {
-                impactedFilesInfo.push({ file: dep, details: { importedSymbols: [], usageContext: "", isTestFile: false } });
+                impactedFilesInfo.push({ file: dep, details: { importedSymbols: [], usageContext: "" } });
             }
         }
 
@@ -281,12 +268,9 @@ export const impactAnalyzer: Analyzer = {
             createEvidence(source.path, `${blastLabel} blast radius: ${dependents.length} file(s) depend on this module`),
             ...impactedFilesInfo.slice(0, 5).map(info => {
                 // More descriptive evidence showing what symbols are imported
-                let text = info.details.importedSymbols?.length > 0
+                const text = info.details.importedSymbols?.length > 0
                     ? `Imports: ${info.details.importedSymbols.slice(0, 3).join(", ")}${info.details.importedSymbols.length > 3 ? ` (+${info.details.importedSymbols.length - 3} more)` : ""}`
                     : `Imports module`;
-                if (info.details.isTestFile) {
-                    text += " [test file]";
-                }
                 return createEvidence(info.file, text);
             })
         ];
@@ -304,7 +288,6 @@ export const impactAnalyzer: Analyzer = {
           sourceFile: source.path,
           affectedFiles: dependents,
           importedSymbols: Array.from(allSymbols),
-          isTestFile: impactedFilesInfo.every(i => i.details.isTestFile), // True if ALL dependents are tests
           usageContext: impactedFilesInfo[0]?.details.usageContext, // Example context from first file
           blastRadius: dependents.length > 10 ? "high" : dependents.length > 3 ? "medium" : "low",
           tags: ["impact", "dependency"]

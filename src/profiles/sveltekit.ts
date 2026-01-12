@@ -13,6 +13,7 @@ import {
   securityFilesAnalyzer,
   supabaseAnalyzer,
   vitestAnalyzer,
+  impactAnalyzer,
   analyzeLargeDiff,
   analyzeLockfiles,
   analyzeTestGaps,
@@ -21,6 +22,7 @@ import {
   analyzeInfra,
   analyzeAPIContracts,
 } from "../analyzers/index.js";
+import { tailwindAnalyzer } from "../analyzers/tailwind.js";
 
 /**
  * SvelteKit profile with all relevant analyzers.
@@ -37,6 +39,8 @@ export const sveltekitProfile: Profile = {
     vitestAnalyzer,
     dependencyAnalyzer,
     securityFilesAnalyzer,
+    impactAnalyzer,
+    tailwindAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
     analyzeTestGaps,

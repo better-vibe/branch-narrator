@@ -12,12 +12,25 @@ The profile is automatically detected if:
 
 The following analyzers are enabled in this profile:
 
-- **stencil**: AST-based analysis of Stencil components (props, events, methods, slots).
-- **file-summary**: General file change statistics.
-- **file-category**: Categorization of changed files.
-- **dependencies**: Analysis of package.json changes.
-- **test-parity**: Checks for corresponding test files.
-- **impact**: Analyzes the impact of changes on other files.
+| Analyzer | Purpose |
+|----------|---------|
+| `file-summary` | General file change statistics |
+| `file-category` | Categorization of changed files |
+| `stencil` | AST-based analysis of Stencil components (props, events, methods, slots) |
+| `env-var` | Extract environment variables |
+| `cloudflare` | Detect Cloudflare changes |
+| `vitest` | Detect test changes |
+| `dependencies` | Analysis of package.json changes |
+| `security-files` | Detect security-sensitive files |
+| `impact` | Analyzes the impact of changes on other files |
+| `typescript-config` | Detect TypeScript config changes |
+| `large-diff` | Detect large changesets |
+| `lockfiles` | Detect lockfile/manifest mismatches |
+| `test-gaps` | Detect production code changes without tests |
+| `sql-risks` | Detect risky SQL in migrations |
+| `ci-workflows` | Detect CI/CD workflow changes |
+| `infra` | Detect infrastructure changes |
+| `api-contracts` | Detect API contract changes |
 
 ## Usage
 

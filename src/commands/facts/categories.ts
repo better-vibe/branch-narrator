@@ -42,9 +42,13 @@ function riskFactorKindToCategory(kind: string): Category {
   if (kind.includes("ci") || kind.includes("workflow") || kind.includes("pipeline")) {
     return "ci";
   }
-  // Test-related
-  if (kind.includes("test")) {
+  // Test-related (actual test file changes)
+  if (kind.includes("test") && !kind.includes("test-gap") && !kind.includes("test-coverage")) {
     return "tests";
+  }
+  // Quality-related (test gaps, coverage issues)
+  if (kind.includes("test-gap") || kind.includes("test-coverage") || kind.includes("quality")) {
+    return "quality";
   }
   // API-related
   if (kind.includes("api") || kind.includes("contract")) {

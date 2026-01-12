@@ -19,6 +19,7 @@ import {
   analyzeCIWorkflows,
   analyzeInfra,
   analyzeAPIContracts,
+  graphqlAnalyzer,
 } from "../analyzers/index.js";
 
 /**
@@ -35,6 +36,7 @@ export const defaultProfile: Profile = {
     dependencyAnalyzer,
     securityFilesAnalyzer,
     impactAnalyzer,
+    graphqlAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
     analyzeTestGaps,

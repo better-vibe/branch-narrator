@@ -38,9 +38,12 @@ flowchart TD
 | `vitestAnalyzer` | Detect test file changes |
 | `dependencyAnalyzer` | Detect dependency changes |
 | `securityFilesAnalyzer` | Detect security-sensitive files |
+| `impactAnalyzer` | Analyze blast radius of changes |
+| `tailwindAnalyzer` | Detect Tailwind CSS config changes |
 | `analyzeLargeDiff` | Warn about large changesets |
 | `analyzeLockfiles` | Check lockfile consistency |
 | `analyzeTestGaps` | Detect missing test coverage |
+| `analyzeSQLRisks` | Detect risky SQL in migrations |
 | `analyzeCIWorkflows` | Detect CI/CD changes |
 | `analyzeInfra` | Detect infrastructure changes |
 | `analyzeAPIContracts` | Detect API contract changes |

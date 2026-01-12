@@ -66,7 +66,7 @@ describe("impactAnalyzer", () => {
     });
   };
 
-  it("should find imported symbols and identify test files", async () => {
+  it("should find imported symbols from dependents", async () => {
     mockChangeSet.files = [
       { path: "src/utils/math.ts", status: "modified" },
     ];
@@ -102,7 +102,6 @@ describe("impactAnalyzer", () => {
     // Evidence checks
     const evidenceText = finding.evidence.map((e: any) => e.excerpt).join(" ");
     expect(evidenceText).toContain("Imports: add");
-    expect(evidenceText).toContain("[test file]");
   });
 
   it("should handle default imports", async () => {
@@ -202,41 +201,5 @@ import { createUser } from './types/user';
 
     const findings = await impactAnalyzer.analyze(mockChangeSet);
     expect(findings).toHaveLength(0);
-  });
-
-  it("should set isTestFile to true only if all dependents are tests", async () => {
-      mockChangeSet.files = [
-          { path: "src/internal-helper.ts", status: "modified" }
-      ];
-
-      mockGitGrep([
-          "tests/helper.test.ts:import '../src/internal-helper'"
-      ]);
-
-      mockFileContent({
-          "tests/helper.test.ts": "import '../src/internal-helper';"
-      });
-
-      const findings = await impactAnalyzer.analyze(mockChangeSet);
-      expect((findings[0] as any).isTestFile).toBe(true);
-  });
-
-  it("should set isTestFile to false if mixed dependents", async () => {
-      mockChangeSet.files = [
-          { path: "src/utils.ts", status: "modified" }
-      ];
-
-      mockGitGrep([
-          "src/app.ts:import './utils'",
-          "tests/utils.test.ts:import './utils'"
-      ]);
-
-      mockFileContent({
-          "src/app.ts": "import './utils';",
-          "tests/utils.test.ts": "import './utils';"
-      });
-
-      const findings = await impactAnalyzer.analyze(mockChangeSet);
-      expect((findings[0] as any).isTestFile).toBe(false);
   });
 });

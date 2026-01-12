@@ -53,68 +53,57 @@ flowchart TD
 
 ## Profile Comparison
 
-```mermaid
-graph LR
-    subgraph Default["Default Profile"]
-        D1[file-summary]
-        D2[file-category]
-        D3[env-var]
-        D4[cloudflare]
-        D5[vitest]
-        D6[dependencies]
-        D7[security-files]
-        D8[test-parity]
-        D9[impact]
-    end
+All profiles share a common set of core analyzers for comprehensive coverage:
 
-    subgraph SvelteKit["SvelteKit Profile"]
-        S1[file-summary]
-        S2[file-category]
-        S3[route-detector]
-        S4[supabase]
-        S5[env-var]
-        S6[cloudflare]
-        S7[vitest]
-        S8[dependencies]
-        S9[security-files]
-    end
+### Core Analyzers (All Profiles)
 
-    subgraph NextJS["Next.js Profile"]
-        N1[file-summary]
-        N2[file-category]
-        N3[next-routes]
-        N4[env-var]
-        N5[cloudflare]
-        N6[vitest]
-        N7[dependencies]
-        N8[security-files]
-    end
+| Analyzer | Purpose |
+|----------|---------|
+| `file-summary` | Summarize file changes |
+| `file-category` | Categorize files by type |
+| `dependencies` | Analyze package.json |
 
-    subgraph React["React Profile"]
-        R1[file-summary]
-        R2[file-category]
-        R3[react-router-routes]
-        R4[env-var]
-        R5[cloudflare]
-        R6[vitest]
-        R7[dependencies]
-        R8[security-files]
-    end
-```
+### Frontend Profile Analyzers
 
-**Default-specific:**
-- `test-parity` - Convention enforcement for test coverage
-- `impact` - Blast radius analysis for modified files
+These analyzers are included in all frontend profiles (SvelteKit, Next.js, React, Vue, Astro, Stencil):
+
+| Analyzer | Purpose |
+|----------|---------|
+| `env-var` | Extract environment variables |
+| `cloudflare` | Detect Cloudflare changes |
+| `vitest` | Detect test changes |
+| `security-files` | Detect security-sensitive files |
+| `impact` | Analyze blast radius of changes |
+| `large-diff` | Detect large changesets |
+| `lockfiles` | Detect lockfile/manifest mismatches |
+| `test-gaps` | Detect missing test coverage |
+| `sql-risks` | Detect risky SQL in migrations |
+| `ci-workflows` | Detect CI/CD changes |
+| `infra` | Detect infrastructure changes |
+| `api-contracts` | Detect API contract changes |
+
+### Framework-Specific Analyzers
+
+**Default profile:**
+- `graphql` - Detect GraphQL schema changes (auto-detects .graphql/.gql files)
 
 **SvelteKit-specific:**
-- `route-detector` - SvelteKit routes
+- `route-detector` - SvelteKit file-based routes
 - `supabase` - Migration analysis
+- `tailwind` - Tailwind CSS config changes
 
 **Next.js-specific:**
 - `next-routes` - App Router route detection (pages, layouts, API routes, middleware)
+- `tailwind` - Tailwind CSS config changes
 
 **React-specific:**
 - `react-router-routes` - React Router route detection
+- `tailwind` - Tailwind CSS config changes
+- `typescript-config` - TypeScript config changes
+
+**Stencil-specific:**
+- `stencil` - Web component analysis (props, events, methods, slots)
+- `typescript-config` - TypeScript config changes
 
 ## API
 
@@ -182,10 +171,32 @@ branch-narrator pr-body
 branch-narrator pr-body --profile sveltekit
 ```
 
+## Analyzer Coverage Matrix
+
+| Analyzer | default | sveltekit | next | react | vue | astro | stencil | library |
+|----------|---------|-----------|------|-------|-----|-------|---------|---------|
+| file-summary | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| file-category | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| dependencies | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| env-var | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| cloudflare | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| vitest | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| security-files | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| impact | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| large-diff | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| lockfiles | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| test-gaps | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| sql-risks | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| ci-workflows | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| infra | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| api-contracts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| graphql | ✅ | - | - | - | - | - | - | - |
+| tailwind | - | ✅ | ✅ | ✅ | ✅ | ✅ | - | - |
+| typescript-config | - | - | - | ✅ | ✅ | ✅ | ✅ | ✅ |
+
 ## Planned Profiles
 
 | Profile | Framework | Status |
 |---------|-----------|--------|
-| `astro` | Astro | 🔮 Planned |
 | `remix` | Remix | 🔮 Planned |
 

@@ -59,6 +59,7 @@ export type Category =
   | "infra"
   | "api"
   | "impact"
+  | "quality"
   | "unknown";
 
 export type Confidence = "high" | "medium" | "low";
@@ -270,7 +271,6 @@ export interface ImpactAnalysisFinding {
   affectedFiles: string[];
   importedSymbols?: string[];
   usageContext?: string;
-  isTestFile?: boolean;
   blastRadius: "low" | "medium" | "high";
   tags?: string[];
   findingId?: string; // Stable ID, format: "finding.impact-analysis#<hash>"

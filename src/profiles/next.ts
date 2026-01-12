@@ -7,6 +7,7 @@ import {
   analyzeLargeDiff,
   analyzeLockfiles,
   analyzeTestGaps,
+  analyzeSQLRisks,
   analyzeCIWorkflows,
   analyzeInfra,
   analyzeAPIContracts,
@@ -17,8 +18,10 @@ import {
   fileSummaryAnalyzer,
   securityFilesAnalyzer,
   vitestAnalyzer,
+  impactAnalyzer,
 } from "../analyzers/index.js";
 import { nextRoutesAnalyzer } from "../analyzers/next-routes.js";
+import { tailwindAnalyzer } from "../analyzers/tailwind.js";
 
 /**
  * Next.js profile with all relevant analyzers for App Router projects.
@@ -34,9 +37,12 @@ export const nextProfile: Profile = {
     vitestAnalyzer,
     dependencyAnalyzer,
     securityFilesAnalyzer,
+    impactAnalyzer,
+    tailwindAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
     analyzeTestGaps,
+    analyzeSQLRisks,
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
