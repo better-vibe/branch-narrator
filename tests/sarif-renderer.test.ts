@@ -547,6 +547,732 @@ describe("SARIF renderer", () => {
     expect(sarif.runs[0].results).toHaveLength(1);
     expect(sarif.runs[0].results[0].locations).toHaveLength(0);
   });
+
+  // ============================================================================
+  // BNR007-BNR017 Tests (New Rules)
+  // ============================================================================
+
+  test("should map ci-workflow permissions_broadened to BNR007 with error level", () => {
+    const findings: Finding[] = [
+      {
+        type: "ci-workflow",
+        kind: "ci-workflow",
+        category: "ci",
+        confidence: "high",
+        evidence: [
+          {
+            file: ".github/workflows/ci.yml",
+            excerpt: "permissions: write-all",
+            line: 10,
+          },
+        ],
+        file: ".github/workflows/ci.yml",
+        riskType: "permissions_broadened",
+        details: "Workflow now has write-all permissions",
+        findingId: "finding.ci-workflow#perms",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR007");
+    expect(results[0].level).toBe("error");
+    expect(results[0].message.text).toContain("permissions broadened");
+  });
+
+  test("should map ci-workflow pull_request_target to BNR008 with error level", () => {
+    const findings: Finding[] = [
+      {
+        type: "ci-workflow",
+        kind: "ci-workflow",
+        category: "ci",
+        confidence: "high",
+        evidence: [
+          {
+            file: ".github/workflows/pr.yml",
+            excerpt: "on: pull_request_target",
+            line: 3,
+          },
+        ],
+        file: ".github/workflows/pr.yml",
+        riskType: "pull_request_target",
+        details: "Workflow uses pull_request_target trigger",
+        findingId: "finding.ci-workflow#prt",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR008");
+    expect(results[0].level).toBe("error");
+    expect(results[0].message.text).toContain("pull_request_target");
+  });
+
+  test("should not map ci-workflow pipeline_changed to SARIF", () => {
+    const findings: Finding[] = [
+      {
+        type: "ci-workflow",
+        kind: "ci-workflow",
+        category: "ci",
+        confidence: "high",
+        evidence: [{ file: ".github/workflows/ci.yml", excerpt: "" }],
+        file: ".github/workflows/ci.yml",
+        riskType: "pipeline_changed",
+        details: "Workflow modified",
+        findingId: "finding.ci-workflow#changed",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    // pipeline_changed is not mapped to SARIF
+    expect(sarif.runs[0].results).toHaveLength(0);
+  });
+
+  test("should map security-file to BNR009 with warning level", () => {
+    const findings: Finding[] = [
+      {
+        type: "security-file",
+        kind: "security-file",
+        category: "security",
+        confidence: "high",
+        evidence: [
+          {
+            file: "src/auth/middleware.ts",
+            excerpt: "export function checkAuth",
+          },
+        ],
+        files: ["src/auth/middleware.ts"],
+        reasons: ["middleware"],
+        findingId: "finding.security-file#auth",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR009");
+    expect(results[0].level).toBe("warning");
+    expect(results[0].message.text).toContain("Security-sensitive");
+  });
+
+  test("should map breaking graphql-change to BNR010 with error level", () => {
+    const findings: Finding[] = [
+      {
+        type: "graphql-change",
+        kind: "graphql-change",
+        category: "api",
+        confidence: "high",
+        evidence: [
+          {
+            file: "schema.graphql",
+            excerpt: "type Query { ... }",
+            line: 1,
+          },
+        ],
+        file: "schema.graphql",
+        status: "modified",
+        isBreaking: true,
+        breakingChanges: ["Removed field User.email", "Removed type Address"],
+        addedElements: [],
+        findingId: "finding.graphql-change#breaking",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR010");
+    expect(results[0].level).toBe("error");
+    expect(results[0].message.text).toContain("Breaking GraphQL");
+    expect(results[0].message.text).toContain("Removed field User.email");
+  });
+
+  test("should not map non-breaking graphql-change to SARIF", () => {
+    const findings: Finding[] = [
+      {
+        type: "graphql-change",
+        kind: "graphql-change",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "schema.graphql", excerpt: "" }],
+        file: "schema.graphql",
+        status: "modified",
+        isBreaking: false,
+        breakingChanges: [],
+        addedElements: ["Added field User.phone"],
+        findingId: "finding.graphql-change#safe",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    expect(sarif.runs[0].results).toHaveLength(0);
+  });
+
+  test("should map breaking package-exports to BNR011 with error level", () => {
+    const findings: Finding[] = [
+      {
+        type: "package-exports",
+        kind: "package-exports",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "package.json", excerpt: '"exports": {...}' }],
+        isBreaking: true,
+        addedExports: [],
+        removedExports: ["./utils", "./helpers"],
+        legacyFieldChanges: [],
+        binChanges: { added: [], removed: [] },
+        findingId: "finding.package-exports#breaking",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR011");
+    expect(results[0].level).toBe("error");
+    expect(results[0].message.text).toContain("Breaking package exports");
+    expect(results[0].message.text).toContain("./utils");
+  });
+
+  test("should not map non-breaking package-exports to SARIF", () => {
+    const findings: Finding[] = [
+      {
+        type: "package-exports",
+        kind: "package-exports",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "package.json", excerpt: "" }],
+        isBreaking: false,
+        addedExports: ["./new-feature"],
+        removedExports: [],
+        legacyFieldChanges: [],
+        binChanges: { added: [], removed: [] },
+        findingId: "finding.package-exports#safe",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    expect(sarif.runs[0].results).toHaveLength(0);
+  });
+
+  test("should map stencil removed prop to BNR012", () => {
+    const findings: Finding[] = [
+      {
+        type: "stencil-prop-change",
+        kind: "stencil-prop-change",
+        category: "api",
+        confidence: "high",
+        evidence: [
+          {
+            file: "src/components/button/button.tsx",
+            excerpt: "@Prop() disabled: boolean;",
+          },
+        ],
+        tag: "my-button",
+        propName: "disabled",
+        change: "removed",
+        file: "src/components/button/button.tsx",
+        findingId: "finding.stencil-prop#removed",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR012");
+    expect(results[0].level).toBe("warning");
+    expect(results[0].message.text).toContain("Stencil prop removed");
+    expect(results[0].message.text).toContain("my-button");
+    expect(results[0].message.text).toContain("disabled");
+  });
+
+  test("should not map stencil added prop to SARIF", () => {
+    const findings: Finding[] = [
+      {
+        type: "stencil-prop-change",
+        kind: "stencil-prop-change",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "src/components/button/button.tsx", excerpt: "" }],
+        tag: "my-button",
+        propName: "loading",
+        change: "added",
+        file: "src/components/button/button.tsx",
+        findingId: "finding.stencil-prop#added",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    expect(sarif.runs[0].results).toHaveLength(0);
+  });
+
+  test("should map stencil removed component to BNR012", () => {
+    const findings: Finding[] = [
+      {
+        type: "stencil-component-change",
+        kind: "stencil-component-change",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "src/components/old/old.tsx", excerpt: "" }],
+        tag: "my-old-component",
+        change: "removed",
+        file: "src/components/old/old.tsx",
+        findingId: "finding.stencil-component#removed",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR012");
+    expect(results[0].message.text).toContain("Stencil component removed");
+    expect(results[0].message.text).toContain("my-old-component");
+  });
+
+  test("should map stencil removed event to BNR012", () => {
+    const findings: Finding[] = [
+      {
+        type: "stencil-event-change",
+        kind: "stencil-event-change",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "src/components/button/button.tsx", excerpt: "" }],
+        tag: "my-button",
+        eventName: "myClick",
+        change: "removed",
+        file: "src/components/button/button.tsx",
+        findingId: "finding.stencil-event#removed",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR012");
+    expect(results[0].message.text).toContain("Stencil event removed");
+  });
+
+  test("should map stencil removed method to BNR012", () => {
+    const findings: Finding[] = [
+      {
+        type: "stencil-method-change",
+        kind: "stencil-method-change",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "src/components/modal/modal.tsx", excerpt: "" }],
+        tag: "my-modal",
+        methodName: "open",
+        change: "removed",
+        file: "src/components/modal/modal.tsx",
+        findingId: "finding.stencil-method#removed",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR012");
+    expect(results[0].message.text).toContain("Stencil method removed");
+  });
+
+  test("should map stencil removed slot to BNR012", () => {
+    const findings: Finding[] = [
+      {
+        type: "stencil-slot-change",
+        kind: "stencil-slot-change",
+        category: "api",
+        confidence: "high",
+        evidence: [{ file: "src/components/card/card.tsx", excerpt: "" }],
+        tag: "my-card",
+        slotName: "header",
+        change: "removed",
+        file: "src/components/card/card.tsx",
+        findingId: "finding.stencil-slot#removed",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR012");
+    expect(results[0].message.text).toContain('slot "header" removed');
+  });
+
+  test("should map breaking typescript-config to BNR013", () => {
+    const findings: Finding[] = [
+      {
+        type: "typescript-config",
+        kind: "typescript-config",
+        category: "config_env",
+        confidence: "high",
+        evidence: [{ file: "tsconfig.json", excerpt: '"strict": true' }],
+        file: "tsconfig.json",
+        status: "modified",
+        isBreaking: true,
+        changedOptions: {
+          added: ["strict"],
+          removed: [],
+          modified: [],
+        },
+        strictnessChanges: ["strict mode enabled"],
+        findingId: "finding.typescript-config#breaking",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR013");
+    expect(results[0].level).toBe("warning");
+    expect(results[0].message.text).toContain("Breaking TypeScript config");
+  });
+
+  test("should not map non-breaking typescript-config to SARIF", () => {
+    const findings: Finding[] = [
+      {
+        type: "typescript-config",
+        kind: "typescript-config",
+        category: "config_env",
+        confidence: "high",
+        evidence: [{ file: "tsconfig.json", excerpt: "" }],
+        file: "tsconfig.json",
+        status: "modified",
+        isBreaking: false,
+        changedOptions: {
+          added: [],
+          removed: [],
+          modified: ["target"],
+        },
+        strictnessChanges: [],
+        findingId: "finding.typescript-config#safe",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    expect(sarif.runs[0].results).toHaveLength(0);
+  });
+
+  test("should map destructive sql-risk to BNR014 with error level", () => {
+    const findings: Finding[] = [
+      {
+        type: "sql-risk",
+        kind: "sql-risk",
+        category: "database",
+        confidence: "high",
+        evidence: [
+          {
+            file: "migrations/drop_users.sql",
+            excerpt: "DROP TABLE users;",
+            line: 1,
+          },
+        ],
+        file: "migrations/drop_users.sql",
+        riskType: "destructive",
+        details: "DROP TABLE detected",
+        findingId: "finding.sql-risk#destructive",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR014");
+    expect(results[0].level).toBe("error");
+    expect(results[0].message.text).toContain("Destructive SQL");
+  });
+
+  test("should not map schema_change sql-risk to SARIF", () => {
+    const findings: Finding[] = [
+      {
+        type: "sql-risk",
+        kind: "sql-risk",
+        category: "database",
+        confidence: "high",
+        evidence: [{ file: "migrations/add_column.sql", excerpt: "" }],
+        file: "migrations/add_column.sql",
+        riskType: "schema_change",
+        details: "ALTER TABLE detected",
+        findingId: "finding.sql-risk#schema",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    expect(sarif.runs[0].results).toHaveLength(0);
+  });
+
+  test("should map infra-change to BNR015 with warning level", () => {
+    const findings: Finding[] = [
+      {
+        type: "infra-change",
+        kind: "infra-change",
+        category: "infra",
+        confidence: "high",
+        evidence: [{ file: "Dockerfile", excerpt: "FROM node:20" }],
+        infraType: "dockerfile",
+        files: ["Dockerfile"],
+        findingId: "finding.infra-change#docker",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR015");
+    expect(results[0].level).toBe("warning");
+    expect(results[0].message.text).toContain("Dockerfile");
+  });
+
+  test("should map terraform infra-change to BNR015", () => {
+    const findings: Finding[] = [
+      {
+        type: "infra-change",
+        kind: "infra-change",
+        category: "infra",
+        confidence: "high",
+        evidence: [{ file: "main.tf", excerpt: "" }],
+        infraType: "terraform",
+        files: ["main.tf", "variables.tf"],
+        findingId: "finding.infra-change#tf",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR015");
+    expect(results[0].message.text).toContain("Terraform");
+  });
+
+  test("should map k8s infra-change to BNR015", () => {
+    const findings: Finding[] = [
+      {
+        type: "infra-change",
+        kind: "infra-change",
+        category: "infra",
+        confidence: "high",
+        evidence: [{ file: "k8s/deployment.yaml", excerpt: "" }],
+        infraType: "k8s",
+        files: ["k8s/deployment.yaml"],
+        findingId: "finding.infra-change#k8s",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR015");
+    expect(results[0].message.text).toContain("Kubernetes");
+  });
+
+  test("should map test-gap to BNR016 with note level", () => {
+    const findings: Finding[] = [
+      {
+        type: "test-gap",
+        kind: "test-gap",
+        category: "tests",
+        confidence: "high",
+        evidence: [{ file: "src/utils.ts", excerpt: "" }],
+        prodFilesChanged: 5,
+        testFilesChanged: 0,
+        findingId: "finding.test-gap#gap",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR016");
+    expect(results[0].level).toBe("note");
+    expect(results[0].message.text).toContain("Test coverage gap");
+    expect(results[0].message.text).toContain("5 production files");
+  });
+
+  test("should map large-diff to BNR017 with note level", () => {
+    const findings: Finding[] = [
+      {
+        type: "large-diff",
+        kind: "large-diff",
+        category: "quality",
+        confidence: "high",
+        evidence: [{ file: "src/index.ts", excerpt: "" }],
+        filesChanged: 50,
+        linesChanged: 2500,
+        findingId: "finding.large-diff#large",
+      },
+    ];
+
+    const facts: FactsOutput = {
+      ...baseFactsOutput,
+      findings,
+    };
+
+    const changeSet = createTestChangeSet();
+    const sarif = renderSarif(facts, changeSet);
+
+    const results = sarif.runs[0].results;
+    expect(results).toHaveLength(1);
+    expect(results[0].ruleId).toBe("BNR017");
+    expect(results[0].level).toBe("note");
+    expect(results[0].message.text).toContain("Large diff");
+    expect(results[0].message.text).toContain("50 files");
+    expect(results[0].message.text).toContain("2500 lines");
+  });
 });
 
 describe("SARIF rules", () => {
@@ -559,6 +1285,17 @@ describe("SARIF rules", () => {
       "BNR004",
       "BNR005",
       "BNR006",
+      "BNR007",
+      "BNR008",
+      "BNR009",
+      "BNR010",
+      "BNR011",
+      "BNR012",
+      "BNR013",
+      "BNR014",
+      "BNR015",
+      "BNR016",
+      "BNR017",
     ]);
   });
 

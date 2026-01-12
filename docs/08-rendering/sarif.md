@@ -110,6 +110,100 @@ The SARIF renderer maps branch-narrator findings to stable rule IDs:
 - **Detects**: Added, modified, or deleted API routes in SvelteKit
 - **Example**: New `+server.ts` file with GET/POST handlers
 
+### BNR007: CI Workflow Permissions Broadened
+
+- **Level**: `error`
+- **Category**: Security
+- **Mapped from**: CI workflow findings with `riskType: "permissions_broadened"`
+- **Detects**: GitHub Actions workflows that have broadened permissions
+- **Example**: Adding `permissions: write-all` to a workflow
+
+### BNR008: CI Workflow Pull Request Target
+
+- **Level**: `error`
+- **Category**: Security
+- **Mapped from**: CI workflow findings with `riskType: "pull_request_target"`
+- **Detects**: Workflows using the `pull_request_target` trigger
+- **Example**:
+  ```yaml
+  on: pull_request_target
+  ```
+
+### BNR009: Security File Changed
+
+- **Level**: `warning`
+- **Category**: Security
+- **Mapped from**: Security file findings
+- **Detects**: Changes to authentication, authorization, or security-related files
+- **Example**: Modified `src/auth/middleware.ts`
+
+### BNR010: GraphQL Breaking Change
+
+- **Level**: `error`
+- **Category**: API
+- **Mapped from**: GraphQL change findings with `isBreaking: true`
+- **Detects**: Removed types, fields, or arguments in GraphQL schema
+- **Example**: Removing a field from a type
+
+### BNR011: Package Exports Breaking Change
+
+- **Level**: `error`
+- **Category**: API
+- **Mapped from**: Package exports findings with `isBreaking: true`
+- **Detects**: Removed exports or bin entries from package.json
+- **Example**: Removing `./utils` from the `exports` field
+
+### BNR012: Stencil API Breaking Change
+
+- **Level**: `warning`
+- **Category**: API
+- **Mapped from**: Stencil component/prop/event/method/slot changes with `change: "removed"`
+- **Detects**: Removed props, events, methods, slots, or entire components
+- **Example**: Removing `@Prop() disabled` from a component
+
+### BNR013: TypeScript Config Breaking
+
+- **Level**: `warning`
+- **Category**: Configuration
+- **Mapped from**: TypeScript config findings with `isBreaking: true`
+- **Detects**: Breaking strictness changes in tsconfig.json
+- **Example**: Enabling `strict` mode
+
+### BNR014: Destructive SQL
+
+- **Level**: `error`
+- **Category**: Database
+- **Mapped from**: SQL risk findings with `riskType: "destructive"`
+- **Detects**: DROP, TRUNCATE, DELETE without WHERE in SQL files
+- **Example**:
+  ```sql
+  DROP TABLE users;
+  ```
+
+### BNR015: Infrastructure Changed
+
+- **Level**: `warning`
+- **Category**: Infrastructure
+- **Mapped from**: Infrastructure change findings
+- **Detects**: Changes to Dockerfile, Terraform, or Kubernetes files
+- **Example**: Modified `Dockerfile` or `main.tf`
+
+### BNR016: Test Gap Detected
+
+- **Level**: `note`
+- **Category**: Quality
+- **Mapped from**: Test gap findings
+- **Detects**: Production code changes without corresponding test changes
+- **Example**: 5 production files changed, 0 test files changed
+
+### BNR017: Large Diff
+
+- **Level**: `note`
+- **Category**: Quality
+- **Mapped from**: Large diff findings
+- **Detects**: Changes with many files or lines modified
+- **Example**: 50 files changed, 2500 lines modified
+
 ## Line Number Tracking
 
 The SARIF renderer includes precise source locations when possible:
@@ -183,8 +277,14 @@ The following finding types are **not** mapped to SARIF rules in the current imp
 - File summary findings
 - File category findings
 - Test file changes (Vitest)
-- Security file changes
 - Route changes of type `page` or `layout` (only `endpoint` routes are mapped)
+- CI workflow changes with `riskType: "pipeline_changed"` or `"remote_script_download"`
+- SQL risk findings with `riskType: "schema_change"` or `"unscoped_modification"`
+- Non-breaking GraphQL, TypeScript config, or package exports changes
+- Stencil changes that are additions (only removals are breaking)
+- Tailwind config changes
+- Monorepo config changes
+- Impact analysis findings
 
 ### Line Number Accuracy
 

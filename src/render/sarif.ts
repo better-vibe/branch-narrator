@@ -9,13 +9,27 @@
 
 import type {
   ChangeSet,
+  CIWorkflowFinding,
   DbMigrationFinding,
   DependencyChangeFinding,
   EnvVarFinding,
   FactsOutput,
   Finding,
+  GraphQLChangeFinding,
+  InfraChangeFinding,
+  LargeDiffFinding,
+  PackageExportsFinding,
   RouteChangeFinding,
   CloudflareChangeFinding,
+  SecurityFileFinding,
+  SQLRiskFinding,
+  StencilComponentChangeFinding,
+  StencilEventChangeFinding,
+  StencilMethodChangeFinding,
+  StencilPropChangeFinding,
+  StencilSlotChangeFinding,
+  TestGapFinding,
+  TypeScriptConfigFinding,
 } from "../core/types.js";
 import { getAdditionsWithLineNumbers } from "../git/parser.js";
 import { getVersionSync } from "../core/version.js";
@@ -175,6 +189,105 @@ export const SARIF_RULES: Record<string, RuleMapping> = {
     defaultLevel: "note",
     category: "api",
   },
+  BNR007: {
+    id: "BNR007",
+    name: "CIWorkflowPermissionsBroadened",
+    shortDescription: "CI workflow permissions broadened",
+    fullDescription:
+      "GitHub Actions workflow has broadened permissions, which could allow unauthorized access to secrets or repository data. Review the permission changes carefully.",
+    defaultLevel: "error",
+    category: "security",
+  },
+  BNR008: {
+    id: "BNR008",
+    name: "CIWorkflowPullRequestTarget",
+    shortDescription: "CI workflow uses pull_request_target",
+    fullDescription:
+      "GitHub Actions workflow uses pull_request_target trigger, which runs with write permissions on the base repository. This can be exploited if the workflow checks out or runs code from the PR.",
+    defaultLevel: "error",
+    category: "security",
+  },
+  BNR009: {
+    id: "BNR009",
+    name: "SecurityFileChanged",
+    shortDescription: "Security-sensitive file changed",
+    fullDescription:
+      "A file related to authentication, authorization, or security configuration has been modified. Review these changes carefully for potential vulnerabilities.",
+    defaultLevel: "warning",
+    category: "security",
+  },
+  BNR010: {
+    id: "BNR010",
+    name: "GraphQLBreakingChange",
+    shortDescription: "Breaking change in GraphQL schema",
+    fullDescription:
+      "GraphQL schema contains breaking changes such as removed types, fields, or arguments. This may break existing clients consuming the API.",
+    defaultLevel: "error",
+    category: "api",
+  },
+  BNR011: {
+    id: "BNR011",
+    name: "PackageExportsBreakingChange",
+    shortDescription: "Breaking change in package exports",
+    fullDescription:
+      "Package exports have breaking changes such as removed exports or modified bin entries. This may break downstream consumers of this package.",
+    defaultLevel: "error",
+    category: "api",
+  },
+  BNR012: {
+    id: "BNR012",
+    name: "StencilAPIBreakingChange",
+    shortDescription: "Breaking change in Stencil component API",
+    fullDescription:
+      "Stencil web component has breaking API changes such as removed props, events, methods, or slots. This may break consumers of the component library.",
+    defaultLevel: "warning",
+    category: "api",
+  },
+  BNR013: {
+    id: "BNR013",
+    name: "TypeScriptConfigBreaking",
+    shortDescription: "Breaking TypeScript configuration change",
+    fullDescription:
+      "TypeScript configuration has breaking changes that may cause compilation errors in the codebase, such as stricter type checking options.",
+    defaultLevel: "warning",
+    category: "config_env",
+  },
+  BNR014: {
+    id: "BNR014",
+    name: "DestructiveSQL",
+    shortDescription: "Destructive SQL operation detected",
+    fullDescription:
+      "SQL file contains destructive operations (DROP, TRUNCATE, DELETE without WHERE) that could cause data loss. Review carefully before execution.",
+    defaultLevel: "error",
+    category: "database",
+  },
+  BNR015: {
+    id: "BNR015",
+    name: "InfrastructureChanged",
+    shortDescription: "Infrastructure configuration changed",
+    fullDescription:
+      "Infrastructure files (Dockerfile, Terraform, Kubernetes) have been modified. Review for security implications and deployment impact.",
+    defaultLevel: "warning",
+    category: "infra",
+  },
+  BNR016: {
+    id: "BNR016",
+    name: "TestGapDetected",
+    shortDescription: "Test coverage gap detected",
+    fullDescription:
+      "Production code was modified but no corresponding test files were changed. Consider adding tests to cover the new or modified functionality.",
+    defaultLevel: "note",
+    category: "quality",
+  },
+  BNR017: {
+    id: "BNR017",
+    name: "LargeDiff",
+    shortDescription: "Large diff detected",
+    fullDescription:
+      "This change has a large number of modified files or lines, which may indicate a refactoring or generated code. Consider breaking into smaller PRs for easier review.",
+    defaultLevel: "note",
+    category: "quality",
+  },
 };
 
 /**
@@ -329,8 +442,54 @@ function mapFindingToResult(
     case "route-change":
       return mapRouteChangeFinding(finding as RouteChangeFinding);
 
+    case "ci-workflow":
+      return mapCIWorkflowFinding(finding as CIWorkflowFinding);
+
+    case "security-file":
+      return mapSecurityFileFinding(finding as SecurityFileFinding);
+
+    case "graphql-change":
+      return mapGraphQLChangeFinding(finding as GraphQLChangeFinding);
+
+    case "package-exports":
+      return mapPackageExportsFinding(finding as PackageExportsFinding);
+
+    case "stencil-component-change":
+      return mapStencilComponentChangeFinding(
+        finding as StencilComponentChangeFinding
+      );
+
+    case "stencil-prop-change":
+      return mapStencilPropChangeFinding(finding as StencilPropChangeFinding);
+
+    case "stencil-event-change":
+      return mapStencilEventChangeFinding(finding as StencilEventChangeFinding);
+
+    case "stencil-method-change":
+      return mapStencilMethodChangeFinding(
+        finding as StencilMethodChangeFinding
+      );
+
+    case "stencil-slot-change":
+      return mapStencilSlotChangeFinding(finding as StencilSlotChangeFinding);
+
+    case "typescript-config":
+      return mapTypeScriptConfigFinding(finding as TypeScriptConfigFinding);
+
+    case "sql-risk":
+      return mapSQLRiskFinding(finding as SQLRiskFinding);
+
+    case "infra-change":
+      return mapInfraChangeFinding(finding as InfraChangeFinding);
+
+    case "test-gap":
+      return mapTestGapFinding(finding as TestGapFinding);
+
+    case "large-diff":
+      return mapLargeDiffFinding(finding as LargeDiffFinding);
+
     default:
-      // Other finding types are not mapped to SARIF rules in MVP
+      // Other finding types are not mapped to SARIF rules
       return null;
   }
 }
@@ -565,6 +724,617 @@ function mapRouteChangeFinding(finding: RouteChangeFinding): SarifResult {
       change: finding.change,
       routeType: finding.routeType,
       methods: finding.methods,
+    },
+  };
+}
+
+/**
+ * Map CI workflow finding to SARIF result.
+ * Only maps high-risk workflow changes (permissions_broadened, pull_request_target).
+ */
+function mapCIWorkflowFinding(finding: CIWorkflowFinding): SarifResult | null {
+  // Only map security-critical risk types
+  if (
+    finding.riskType !== "permissions_broadened" &&
+    finding.riskType !== "pull_request_target"
+  ) {
+    return null;
+  }
+
+  const ruleId =
+    finding.riskType === "permissions_broadened" ? "BNR007" : "BNR008";
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  const message =
+    finding.riskType === "permissions_broadened"
+      ? `CI workflow permissions broadened in ${finding.file}: ${finding.details}`
+      : `CI workflow uses pull_request_target in ${finding.file}: ${finding.details}`;
+
+  return {
+    ruleId,
+    level: "error",
+    message: { text: message },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      file: finding.file,
+      riskType: finding.riskType,
+      details: finding.details,
+    },
+  };
+}
+
+/**
+ * Map security file finding to SARIF result.
+ */
+function mapSecurityFileFinding(finding: SecurityFileFinding): SarifResult {
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR009",
+    level: "warning",
+    message: {
+      text: `Security-sensitive files changed: ${finding.files.join(", ")}. Reasons: ${finding.reasons.join(", ")}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      files: finding.files,
+      reasons: finding.reasons,
+    },
+  };
+}
+
+/**
+ * Map GraphQL change finding to SARIF result.
+ * Only maps breaking changes.
+ */
+function mapGraphQLChangeFinding(
+  finding: GraphQLChangeFinding
+): SarifResult | null {
+  if (!finding.isBreaking) {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR010",
+    level: "error",
+    message: {
+      text: `Breaking GraphQL schema changes in ${finding.file}: ${finding.breakingChanges.join(", ")}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      file: finding.file,
+      breakingChanges: finding.breakingChanges,
+      addedElements: finding.addedElements,
+    },
+  };
+}
+
+/**
+ * Map package exports finding to SARIF result.
+ * Only maps breaking changes.
+ */
+function mapPackageExportsFinding(
+  finding: PackageExportsFinding
+): SarifResult | null {
+  if (!finding.isBreaking) {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  const changes: string[] = [];
+  if (finding.removedExports.length > 0) {
+    changes.push(`removed exports: ${finding.removedExports.join(", ")}`);
+  }
+  if (finding.binChanges.removed.length > 0) {
+    changes.push(`removed bins: ${finding.binChanges.removed.join(", ")}`);
+  }
+
+  return {
+    ruleId: "BNR011",
+    level: "error",
+    message: {
+      text: `Breaking package exports changes: ${changes.join("; ")}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      removedExports: finding.removedExports,
+      addedExports: finding.addedExports,
+      binChanges: finding.binChanges,
+    },
+  };
+}
+
+/**
+ * Map Stencil component change finding to SARIF result.
+ * Only maps breaking changes (removed components).
+ */
+function mapStencilComponentChangeFinding(
+  finding: StencilComponentChangeFinding
+): SarifResult | null {
+  // Only "removed" is considered breaking for components
+  if (finding.change !== "removed") {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR012",
+    level: "warning",
+    message: {
+      text: `Stencil component removed: <${finding.tag}>`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      tag: finding.tag,
+      change: finding.change,
+      file: finding.file,
+    },
+  };
+}
+
+/**
+ * Map Stencil prop change finding to SARIF result.
+ * Only maps breaking changes (removed props).
+ */
+function mapStencilPropChangeFinding(
+  finding: StencilPropChangeFinding
+): SarifResult | null {
+  // Only "removed" is considered breaking for props
+  if (finding.change !== "removed") {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR012",
+    level: "warning",
+    message: {
+      text: `Stencil prop removed: <${finding.tag}> @Prop() ${finding.propName}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      tag: finding.tag,
+      propName: finding.propName,
+      change: finding.change,
+      file: finding.file,
+    },
+  };
+}
+
+/**
+ * Map Stencil event change finding to SARIF result.
+ * Only maps breaking changes (removed events).
+ */
+function mapStencilEventChangeFinding(
+  finding: StencilEventChangeFinding
+): SarifResult | null {
+  // Only "removed" is considered breaking for events
+  if (finding.change !== "removed") {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR012",
+    level: "warning",
+    message: {
+      text: `Stencil event removed: <${finding.tag}> @Event() ${finding.eventName}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      tag: finding.tag,
+      eventName: finding.eventName,
+      change: finding.change,
+      file: finding.file,
+    },
+  };
+}
+
+/**
+ * Map Stencil method change finding to SARIF result.
+ * Only maps breaking changes (removed methods).
+ */
+function mapStencilMethodChangeFinding(
+  finding: StencilMethodChangeFinding
+): SarifResult | null {
+  // Only "removed" is considered breaking for methods
+  if (finding.change !== "removed") {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR012",
+    level: "warning",
+    message: {
+      text: `Stencil method removed: <${finding.tag}> @Method() ${finding.methodName}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      tag: finding.tag,
+      methodName: finding.methodName,
+      change: finding.change,
+      file: finding.file,
+    },
+  };
+}
+
+/**
+ * Map Stencil slot change finding to SARIF result.
+ * Only maps breaking changes (removed slots).
+ */
+function mapStencilSlotChangeFinding(
+  finding: StencilSlotChangeFinding
+): SarifResult | null {
+  // Only "removed" is considered breaking for slots
+  if (finding.change !== "removed") {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  const slotDisplay =
+    finding.slotName === "default" ? "default slot" : `slot "${finding.slotName}"`;
+
+  return {
+    ruleId: "BNR012",
+    level: "warning",
+    message: {
+      text: `Stencil ${slotDisplay} removed from <${finding.tag}>`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      tag: finding.tag,
+      slotName: finding.slotName,
+      change: finding.change,
+      file: finding.file,
+    },
+  };
+}
+
+/**
+ * Map TypeScript config finding to SARIF result.
+ * Only maps breaking changes.
+ */
+function mapTypeScriptConfigFinding(
+  finding: TypeScriptConfigFinding
+): SarifResult | null {
+  if (!finding.isBreaking) {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  const changes: string[] = [];
+  if (finding.strictnessChanges.length > 0) {
+    changes.push(finding.strictnessChanges.join(", "));
+  }
+  if (finding.changedOptions.removed.length > 0) {
+    changes.push(`removed: ${finding.changedOptions.removed.join(", ")}`);
+  }
+
+  return {
+    ruleId: "BNR013",
+    level: "warning",
+    message: {
+      text: `Breaking TypeScript config changes in ${finding.file}: ${changes.join("; ")}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      file: finding.file,
+      changedOptions: finding.changedOptions,
+      strictnessChanges: finding.strictnessChanges,
+    },
+  };
+}
+
+/**
+ * Map SQL risk finding to SARIF result.
+ * Only maps destructive operations.
+ */
+function mapSQLRiskFinding(finding: SQLRiskFinding): SarifResult | null {
+  // Only map destructive SQL operations
+  if (finding.riskType !== "destructive") {
+    return null;
+  }
+
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR014",
+    level: "error",
+    message: {
+      text: `Destructive SQL operation in ${finding.file}: ${finding.details}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      file: finding.file,
+      riskType: finding.riskType,
+      details: finding.details,
+    },
+  };
+}
+
+/**
+ * Map infrastructure change finding to SARIF result.
+ */
+function mapInfraChangeFinding(finding: InfraChangeFinding): SarifResult {
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  const infraTypeDisplay = {
+    dockerfile: "Dockerfile",
+    terraform: "Terraform",
+    k8s: "Kubernetes",
+  }[finding.infraType];
+
+  return {
+    ruleId: "BNR015",
+    level: "warning",
+    message: {
+      text: `${infraTypeDisplay} configuration changed: ${finding.files.join(", ")}`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      infraType: finding.infraType,
+      files: finding.files,
+    },
+  };
+}
+
+/**
+ * Map test gap finding to SARIF result.
+ */
+function mapTestGapFinding(finding: TestGapFinding): SarifResult {
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR016",
+    level: "note",
+    message: {
+      text: `Test coverage gap: ${finding.prodFilesChanged} production files changed, ${finding.testFilesChanged} test files changed`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      prodFilesChanged: finding.prodFilesChanged,
+      testFilesChanged: finding.testFilesChanged,
+    },
+  };
+}
+
+/**
+ * Map large diff finding to SARIF result.
+ */
+function mapLargeDiffFinding(finding: LargeDiffFinding): SarifResult {
+  const locations = finding.evidence.map((ev) => ({
+    physicalLocation: {
+      artifactLocation: {
+        uri: ev.file,
+        uriBaseId: "SRCROOT",
+      },
+      region: ev.line
+        ? {
+            startLine: ev.line,
+          }
+        : undefined,
+    },
+  }));
+
+  return {
+    ruleId: "BNR017",
+    level: "note",
+    message: {
+      text: `Large diff detected: ${finding.filesChanged} files changed, ${finding.linesChanged} lines modified`,
+    },
+    locations,
+    partialFingerprints: {
+      findingId: finding.findingId || "",
+    },
+    properties: {
+      filesChanged: finding.filesChanged,
+      linesChanged: finding.linesChanged,
     },
   };
 }
