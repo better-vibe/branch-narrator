@@ -171,35 +171,38 @@ export function aggregateCategories(
   }
 
   // Convert to array and select top 3 evidence by information score
+  // Filter out categories with no findings (count: 0) to avoid noise like "unknown: 0"
   const categories: CategoryAggregate[] = Array.from(
     categoryMap.entries()
-  ).map(([id, data]) => {
-    // Sort evidence by score (descending), then by file path (ascending) for determinism
-    const sortedEvidence = [...data.evidence].sort((a, b) => {
-      const scoreA = scoreEvidence(a);
-      const scoreB = scoreEvidence(b);
-      if (scoreB !== scoreA) return scoreB - scoreA; // Higher score first
-      return a.file.localeCompare(b.file); // Alphabetical for ties
-    });
+  )
+    .filter(([_id, data]) => data.count > 0)
+    .map(([id, data]) => {
+      // Sort evidence by score (descending), then by file path (ascending) for determinism
+      const sortedEvidence = [...data.evidence].sort((a, b) => {
+        const scoreA = scoreEvidence(a);
+        const scoreB = scoreEvidence(b);
+        if (scoreB !== scoreA) return scoreB - scoreA; // Higher score first
+        return a.file.localeCompare(b.file); // Alphabetical for ties
+      });
     
-    // Dedupe by file to avoid repetition
-    const seen = new Set<string>();
-    const deduped: Evidence[] = [];
-    for (const ev of sortedEvidence) {
-      if (!seen.has(ev.file)) {
-        seen.add(ev.file);
-        deduped.push(ev);
+      // Dedupe by file to avoid repetition
+      const seen = new Set<string>();
+      const deduped: Evidence[] = [];
+      for (const ev of sortedEvidence) {
+        if (!seen.has(ev.file)) {
+          seen.add(ev.file);
+          deduped.push(ev);
+        }
+        if (deduped.length >= 3) break;
       }
-      if (deduped.length >= 3) break;
-    }
     
-    return {
-      id,
-      count: data.count,
-      riskWeight: data.riskWeight,
-      topEvidence: deduped,
-    };
-  });
+      return {
+        id,
+        count: data.count,
+        riskWeight: data.riskWeight,
+        topEvidence: deduped,
+      };
+    });
 
   // Sort: riskWeight desc, count desc, id asc
   categories.sort((a, b) => {

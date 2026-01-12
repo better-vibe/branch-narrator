@@ -14,6 +14,7 @@ import type {
   EnvVarFinding,
   Finding,
   ProfileName,
+  TestChangeFinding,
 } from "../../core/types.js";
 
 /**
@@ -56,12 +57,16 @@ export function deriveActions(
   }
 
   // Test execution
-  const testFindings = findings.filter(f => f.type === "test-change");
+  const testFindings = findings.filter(
+    (f): f is TestChangeFinding => f.type === "test-change"
+  );
   const hasTestChanges = testFindings.length > 0;
   if (hasTestChanges || findings.length > 0) {
     const triggers: string[] = [];
     if (hasTestChanges) {
-      triggers.push(`${testFindings.length} test file(s) changed`);
+      // Count actual test files, not just findings
+      const testFileCount = testFindings.reduce((sum, f) => sum + f.files.length, 0);
+      triggers.push(`${testFileCount} test file(s) changed`);
     }
     if (findings.length > 0 && !hasTestChanges) {
       triggers.push("Source files changed without corresponding test changes");
