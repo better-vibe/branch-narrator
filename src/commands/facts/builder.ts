@@ -280,11 +280,59 @@ function buildHighlights(findings: Finding[]): string[] {
     highlights.push(`${totalUntested} modified file(s) lack test coverage`);
   }
 
-  // Impact analysis (high blast radius)
+  // Impact analysis (high and medium blast radius)
   const impactFindings = findings.filter(f => f.type === "impact-analysis");
   const highImpact = impactFindings.filter(i => i.blastRadius === "high");
+  const mediumImpact = impactFindings.filter(i => i.blastRadius === "medium");
   if (highImpact.length > 0) {
     highlights.push(`${highImpact.length} file(s) with high blast radius`);
+  } else if (mediumImpact.length > 0) {
+    // Only show medium if no high (to avoid noise)
+    highlights.push(`${mediumImpact.length} file(s) with medium blast radius`);
+  }
+
+  // TypeScript config changes
+  const tsConfigChanges = findings.filter(f => f.type === "typescript-config");
+  if (tsConfigChanges.length > 0) {
+    const breaking = tsConfigChanges.some(c => c.isBreaking);
+    highlights.push(breaking ? "TypeScript config changed (breaking)" : "TypeScript config modified");
+  }
+
+  // Tailwind config changes
+  const tailwindChanges = findings.filter(f => f.type === "tailwind-config");
+  if (tailwindChanges.length > 0) {
+    const breaking = tailwindChanges.some(c => c.isBreaking);
+    highlights.push(breaking ? "Tailwind config changed (breaking)" : "Tailwind config modified");
+  }
+
+  // Monorepo config changes
+  const monorepoChanges = findings.filter(f => f.type === "monorepo-config");
+  if (monorepoChanges.length > 0) {
+    const tools = [...new Set(monorepoChanges.map(m => m.tool))];
+    highlights.push(`Monorepo config changed: ${tools.join(", ")}`);
+  }
+
+  // GraphQL schema changes
+  const graphqlChanges = findings.filter(f => f.type === "graphql-change");
+  if (graphqlChanges.length > 0) {
+    const breaking = graphqlChanges.some(g => g.isBreaking);
+    highlights.push(breaking ? "GraphQL schema changed (breaking)" : "GraphQL schema modified");
+  }
+
+  // Package exports changes
+  const packageExports = findings.filter(f => f.type === "package-exports");
+  if (packageExports.length > 0) {
+    const breaking = packageExports.some(p => p.isBreaking);
+    if (breaking) {
+      highlights.push("Package exports changed (breaking)");
+    } else {
+      const binChanges = packageExports.filter(p => 
+        p.binChanges && (p.binChanges.added.length > 0 || p.binChanges.removed.length > 0)
+      );
+      if (binChanges.length > 0) {
+        highlights.push("Package bin/exports modified");
+      }
+    }
   }
 
   // Stencil component changes (group all Stencil findings)
@@ -305,6 +353,31 @@ function buildHighlights(findings: Finding[]): string[] {
   const highRiskFlags = riskFlags.filter(r => r.risk === "high");
   if (highRiskFlags.length > 0) {
     highlights.push(`${highRiskFlags.length} high-risk condition(s) detected`);
+  }
+
+  // Fallback: if we have findings but no highlights, show a generic summary
+  // This ensures users always get some context
+  if (highlights.length === 0 && findings.length > 0) {
+    // Check for file summary findings to get file counts
+    const fileSummary = findings.find(f => f.type === "file-summary");
+    if (fileSummary) {
+      const total = fileSummary.added.length + fileSummary.modified.length + 
+                    fileSummary.deleted.length + fileSummary.renamed.length;
+      if (total > 0) {
+        highlights.push(`${total} ${fileSummary.category} file(s) changed`);
+      }
+    }
+    
+    // If still empty and we have impact findings, mention them
+    if (highlights.length === 0 && impactFindings.length > 0) {
+      const totalAffected = impactFindings.reduce((sum, f) => sum + f.affectedFiles.length, 0);
+      highlights.push(`${impactFindings.length} file(s) analyzed, ${totalAffected} dependent file(s)`);
+    }
+    
+    // Last resort: mention the number of findings
+    if (highlights.length === 0) {
+      highlights.push(`${findings.length} finding(s) detected`);
+    }
   }
 
   return highlights;

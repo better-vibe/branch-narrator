@@ -23,4 +23,11 @@ export * from "./infra.js";
 export * from "./api-contracts.js";
 export { stencilAnalyzer } from "./stencil.js";
 export { nextRoutesAnalyzer } from "./next-routes.js";
+export { graphqlAnalyzer } from "./graphql.js";
+export { typescriptConfigAnalyzer } from "./typescript-config.js";
+export { tailwindAnalyzer } from "./tailwind.js";
+export { monorepoAnalyzer } from "./monorepo.js";
+export { packageExportsAnalyzer } from "./package-exports.js";
+export { vueRoutesAnalyzer } from "./vue-routes.js";
+export { astroRoutesAnalyzer } from "./astro-routes.js";
 

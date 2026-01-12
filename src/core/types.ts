@@ -462,6 +462,124 @@ export interface StencilSlotChangeFinding {
   findingId?: string;
 }
 
+// ============================================================================
+// GraphQL Finding Types
+// ============================================================================
+
+export interface GraphQLChangeFinding {
+  type: "graphql-change";
+  kind: "graphql-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  breakingChanges: string[];
+  addedElements: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// TypeScript Config Finding Types
+// ============================================================================
+
+export interface TypeScriptConfigFinding {
+  type: "typescript-config";
+  kind: "typescript-config";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  changedOptions: {
+    added: string[];
+    removed: string[];
+    modified: string[];
+  };
+  strictnessChanges: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Tailwind Config Finding Types
+// ============================================================================
+
+export type TailwindConfigType = "tailwind" | "postcss";
+
+export interface TailwindConfigFinding {
+  type: "tailwind-config";
+  kind: "tailwind-config";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  configType: TailwindConfigType;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Monorepo Config Finding Types
+// ============================================================================
+
+export type MonorepoTool =
+  | "turborepo"
+  | "pnpm"
+  | "lerna"
+  | "nx"
+  | "yarn"
+  | "npm"
+  | "changesets";
+
+export interface MonorepoConfigFinding {
+  type: "monorepo-config";
+  kind: "monorepo-config";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  tool: MonorepoTool;
+  affectedFields: string[];
+  impacts: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Package Exports Finding Types
+// ============================================================================
+
+export interface PackageExportsFinding {
+  type: "package-exports";
+  kind: "package-exports";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  isBreaking: boolean;
+  addedExports: string[];
+  removedExports: string[];
+  legacyFieldChanges: Array<{
+    field: string;
+    from?: string;
+    to?: string;
+  }>;
+  binChanges: {
+    added: string[];
+    removed: string[];
+  };
+  tags?: string[];
+  findingId?: string;
+}
+
 export type RiskyPackageCategory =
   | "auth"
   | "database"
@@ -493,7 +611,12 @@ export type Finding =
   | StencilPropChangeFinding
   | StencilEventChangeFinding
   | StencilMethodChangeFinding
-  | StencilSlotChangeFinding;
+  | StencilSlotChangeFinding
+  | GraphQLChangeFinding
+  | TypeScriptConfigFinding
+  | TailwindConfigFinding
+  | MonorepoConfigFinding
+  | PackageExportsFinding;
 
 // ============================================================================
 // Risk Score
@@ -546,7 +669,7 @@ export interface Analyzer {
 // Profile
 // ============================================================================
 
-export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next";
+export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | "vue" | "astro" | "library";
 
 export interface Profile {
   name: ProfileName;

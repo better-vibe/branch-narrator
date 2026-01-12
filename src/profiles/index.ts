@@ -10,6 +10,9 @@ import { sveltekitProfile } from "./sveltekit.js";
 import { reactProfile } from "./react.js";
 import { stencilProfile } from "./stencil.js";
 import { nextProfile } from "./next.js";
+import { vueProfile } from "./vue.js";
+import { astroProfile } from "./astro.js";
+import { libraryProfile } from "./library.js";
 
 /**
  * Result of profile detection with reasons.
@@ -145,6 +148,95 @@ export function isNextAppDir(cwd: string = process.cwd()): boolean {
 }
 
 /**
+ * Check if package.json contains Vue.js dependencies.
+ */
+export function hasVueDependency(
+  packageJson: Record<string, unknown> | undefined
+): boolean {
+  if (!packageJson) return false;
+
+  const deps = packageJson.dependencies as Record<string, string> | undefined;
+  const devDeps = packageJson.devDependencies as
+    | Record<string, string>
+    | undefined;
+
+  return Boolean(deps?.["vue"] || devDeps?.["vue"]);
+}
+
+/**
+ * Check if package.json contains Nuxt dependency.
+ */
+export function hasNuxtDependency(
+  packageJson: Record<string, unknown> | undefined
+): boolean {
+  if (!packageJson) return false;
+
+  const deps = packageJson.dependencies as Record<string, string> | undefined;
+  const devDeps = packageJson.devDependencies as
+    | Record<string, string>
+    | undefined;
+
+  return Boolean(deps?.["nuxt"] || devDeps?.["nuxt"]);
+}
+
+/**
+ * Check if project has Nuxt pages directory.
+ */
+export function isNuxtProject(cwd: string = process.cwd()): boolean {
+  return existsSync(join(cwd, "pages")) || existsSync(join(cwd, "src", "pages"));
+}
+
+/**
+ * Check if package.json contains Astro dependency.
+ */
+export function hasAstroDependency(
+  packageJson: Record<string, unknown> | undefined
+): boolean {
+  if (!packageJson) return false;
+
+  const deps = packageJson.dependencies as Record<string, string> | undefined;
+  const devDeps = packageJson.devDependencies as
+    | Record<string, string>
+    | undefined;
+
+  return Boolean(deps?.["astro"] || devDeps?.["astro"]);
+}
+
+/**
+ * Check if project has Astro config.
+ */
+export function hasAstroConfig(cwd: string = process.cwd()): boolean {
+  return (
+    existsSync(join(cwd, "astro.config.mjs")) ||
+    existsSync(join(cwd, "astro.config.ts")) ||
+    existsSync(join(cwd, "astro.config.js"))
+  );
+}
+
+/**
+ * Check if project is a library/package (has exports or publishConfig).
+ */
+export function isLibraryProject(
+  packageJson: Record<string, unknown> | undefined
+): boolean {
+  if (!packageJson) return false;
+
+  // Has exports field (modern package entry points)
+  if (packageJson.exports) return true;
+
+  // Has publishConfig (intended for publishing)
+  if (packageJson.publishConfig) return true;
+
+  // Has private: false (explicitly public)
+  if (packageJson.private === false) return true;
+
+  // Has bin field (CLI tool)
+  if (packageJson.bin) return true;
+
+  return false;
+}
+
+/**
  * Detect the appropriate profile for a project with reasons.
  */
 export function detectProfileWithReasons(
@@ -226,6 +318,78 @@ export function detectProfileWithReasons(
     };
   }
 
+  // Check for Vue/Nuxt
+  const hasVue = hasVueDependency(changeSet.headPackageJson);
+  const hasNuxt = hasNuxtDependency(changeSet.headPackageJson);
+  const isNuxt = isNuxtProject(cwd);
+
+  if (hasNuxt || (hasVue && isNuxt)) {
+    if (hasNuxt) {
+      reasons.push("Found nuxt in package.json dependencies");
+    }
+    if (hasVue) {
+      reasons.push("Found vue in package.json dependencies");
+    }
+    if (isNuxt) {
+      reasons.push("Found pages/ directory (Nuxt file-based routing)");
+    }
+    return {
+      profile: "vue",
+      confidence: "high",
+      reasons,
+    };
+  }
+
+  if (hasVue) {
+    reasons.push("Found vue in package.json dependencies");
+    return {
+      profile: "vue",
+      confidence: "medium",
+      reasons,
+    };
+  }
+
+  // Check for Astro
+  const hasAstro = hasAstroDependency(changeSet.headPackageJson);
+  const hasAstroConf = hasAstroConfig(cwd);
+
+  if (hasAstro || hasAstroConf) {
+    if (hasAstro) {
+      reasons.push("Found astro in package.json dependencies");
+    }
+    if (hasAstroConf) {
+      reasons.push("Found astro.config.{mjs,ts,js}");
+    }
+    return {
+      profile: "astro",
+      confidence: hasAstro && hasAstroConf ? "high" : "medium",
+      reasons,
+    };
+  }
+
+  // Check for Library project (should be last before default)
+  const isLibrary = isLibraryProject(changeSet.headPackageJson);
+
+  if (isLibrary) {
+    if (changeSet.headPackageJson?.exports) {
+      reasons.push("Found exports field in package.json");
+    }
+    if (changeSet.headPackageJson?.publishConfig) {
+      reasons.push("Found publishConfig in package.json");
+    }
+    if (changeSet.headPackageJson?.bin) {
+      reasons.push("Found bin field in package.json (CLI tool)");
+    }
+    if (changeSet.headPackageJson?.private === false) {
+      reasons.push("Package marked as public (private: false)");
+    }
+    return {
+      profile: "library",
+      confidence: "medium",
+      reasons,
+    };
+  }
+
   // Default profile
   reasons.push("No framework-specific markers detected, using default analyzers");
   return {
@@ -259,6 +423,12 @@ export function getProfile(name: ProfileName): Profile {
       return stencilProfile;
     case "next":
       return nextProfile;
+    case "vue":
+      return vueProfile;
+    case "astro":
+      return astroProfile;
+    case "library":
+      return libraryProfile;
     case "auto":
       return defaultProfile;
     default:
@@ -280,5 +450,5 @@ export function resolveProfileName(
   return name;
 }
 
-export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile };
+export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile, vueProfile, astroProfile, libraryProfile };
 

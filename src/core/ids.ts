@@ -229,6 +229,49 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "graphql-change": {
+      // Fingerprint: type + file + isBreaking + sorted(breakingChanges) + sorted(addedElements)
+      const file = normalizePathForHash(finding.file);
+      const breaking = sortForHash(finding.breakingChanges).join(",");
+      const added = sortForHash(finding.addedElements).join(",");
+      fingerprint = `graphql-change:${file}:${finding.isBreaking}:${breaking}:${added}`;
+      break;
+    }
+
+    case "typescript-config": {
+      // Fingerprint: type + file + isBreaking + sorted(changedOptions)
+      const file = normalizePathForHash(finding.file);
+      const added = sortForHash(finding.changedOptions.added).join(",");
+      const removed = sortForHash(finding.changedOptions.removed).join(",");
+      const modified = sortForHash(finding.changedOptions.modified).join(",");
+      fingerprint = `typescript-config:${file}:${finding.isBreaking}:a=${added}:r=${removed}:m=${modified}`;
+      break;
+    }
+
+    case "tailwind-config": {
+      // Fingerprint: type + file + configType + isBreaking + sorted(affectedSections)
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `tailwind-config:${file}:${finding.configType}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
+    case "monorepo-config": {
+      // Fingerprint: type + file + tool + sorted(affectedFields)
+      const file = normalizePathForHash(finding.file);
+      const fields = sortForHash(finding.affectedFields).join(",");
+      fingerprint = `monorepo-config:${file}:${finding.tool}:${fields}`;
+      break;
+    }
+
+    case "package-exports": {
+      // Fingerprint: type + isBreaking + sorted(addedExports) + sorted(removedExports)
+      const added = sortForHash(finding.addedExports).join(",");
+      const removed = sortForHash(finding.removedExports).join(",");
+      fingerprint = `package-exports:${finding.isBreaking}:a=${added}:r=${removed}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;
