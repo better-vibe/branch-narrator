@@ -223,6 +223,38 @@ Actions focus on **what** needs attention and **why**, not **how** to do it. AI 
 
 ---
 
+## Summary
+
+High-level summary of the changeset for quick understanding.
+
+```typescript
+interface Summary {
+  byArea: Record<string, number>; // Finding counts grouped by area
+  highlights: string[];           // Priority-ordered summary bullets
+}
+```
+
+### Highlights
+
+The `highlights` array contains human-readable summary bullets about the most important changes. Highlights are **priority-ordered** (impact-first):
+
+| Priority | Category | Examples |
+|----------|----------|----------|
+| Highest | Blast radius | "2 file(s) with high blast radius" |
+| High | Breaking changes | "TypeScript config changed (breaking)" |
+| High | Risk/security | "Destructive SQL detected", "CI workflow security changes" |
+| Medium | Dependency warnings | "Lockfile mismatch: package.json changed but lockfile not updated" |
+| Medium | General changes | "Infrastructure changes: docker, terraform", "3 route(s) changed" |
+| Lower | API surface | "2 Stencil component(s) with API changes", "3 new environment variable(s)" |
+| Lowest | Test coverage | "5 test file(s) modified", "2 modified file(s) lack test coverage" |
+
+**Ordering guarantees:**
+- Items are sorted by priority (higher impact first)
+- Items with the same priority maintain stable insertion order
+- Output is deterministic across runs
+
+---
+
 ## FactsOutput
 
 The complete output of the `facts` command.
