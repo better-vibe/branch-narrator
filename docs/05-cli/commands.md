@@ -585,7 +585,7 @@ When `--since <path>` is provided, the output is a **delta** instead of the full
 - Removed flags (by ID)
 - Changed flags (before/after objects)
 
-**Note:** In v1, `--since` only supports JSON format. Using `--format md` or `--format text` with `--since` will result in an error.
+**Note:** `--since` only supports JSON format. Using `--format md` or `--format text` with `--since` will result in an error.
 
 #### Delta Output Schema
 
@@ -599,10 +599,10 @@ When `--since <path>` is provided, the output is a **delta** instead of the full
   },
   "since": {
     "path": ".ai/prev-risk.json",
-    "schemaVersion": "1.0"
+    "schemaVersion": "2.0"
   },
   "current": {
-    "schemaVersion": "1.0"
+    "schemaVersion": "2.0"
   },
   "scope": {
     "mode": "unstaged",
@@ -618,11 +618,11 @@ When `--since <path>` is provided, the output is a **delta** instead of the full
       "delta": -22
     },
     "flags": {
-      "added": ["flag.ci.workflow_permissions_widened#abc123"],
-      "removed": ["flag.db.destructive_migration#def456"],
+      "added": ["flag.ci.pipeline_changed#abc123"],
+      "removed": ["flag.db.destructive_sql#def456"],
       "changed": [
         {
-          "flagId": "flag.deps.major_bump#789xyz",
+          "flagId": "flag.deps.major_version_bump#789xyz",
           "before": { "...": "previous flag object..." },
           "after": { "...": "current flag object..." }
         }

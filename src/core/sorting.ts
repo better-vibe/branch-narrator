@@ -23,7 +23,7 @@ export function comparePaths(a: string, b: string): number {
 
 /**
  * Sort risk flags deterministically.
- * Order: category asc, effectiveScore desc, id asc
+ * Order: category asc, effectiveScore desc, ruleKey asc, flagId asc
  */
 export function sortRiskFlags(flags: RiskFlag[]): RiskFlag[] {
   return [...flags].sort((a, b) => {
@@ -35,8 +35,12 @@ export function sortRiskFlags(flags: RiskFlag[]): RiskFlag[] {
     const scoreCompare = b.effectiveScore - a.effectiveScore;
     if (scoreCompare !== 0) return scoreCompare;
 
-    // ID ascending
-    return a.id.localeCompare(b.id);
+    // Rule key ascending
+    const ruleCompare = a.ruleKey.localeCompare(b.ruleKey);
+    if (ruleCompare !== 0) return ruleCompare;
+
+    // Flag instance ID ascending
+    return a.flagId.localeCompare(b.flagId);
   });
 }
 

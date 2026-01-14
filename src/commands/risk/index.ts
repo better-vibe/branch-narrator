@@ -129,7 +129,6 @@ export async function executeRiskReport(
   return await generateRiskReport(changeSet, options);
 }
 
-export * from "./detectors/index.js";
 export * from "./exclusions.js";
 export * from "./redaction.js";
 export * from "./scoring.js";

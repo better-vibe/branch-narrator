@@ -18,7 +18,7 @@ import type {
 } from "../../core/types.js";
 import { BranchNarratorError } from "../../core/errors.js";
 import { getProfile, resolveProfileName } from "../../profiles/index.js";
-import { assignFindingId, assignFlagId } from "../../core/ids.js";
+import { assignFindingId } from "../../core/ids.js";
 import { generateRiskReport } from "../risk/index.js";
 import { redactSecrets } from "../../core/evidence.js";
 
@@ -162,11 +162,8 @@ async function executeZoomFlag(
     noTimestamp: options.noTimestamp,
   });
 
-  // Assign flag IDs to all flags
-  const flags = report.flags.map(assignFlagId);
-
   // Find the requested flag
-  const flag = flags.find((f) => f.flagId === flagId);
+  const flag = report.flags.find((f) => f.flagId === flagId);
 
   if (!flag) {
     throw new BranchNarratorError(
@@ -175,13 +172,8 @@ async function executeZoomFlag(
     );
   }
 
-  // Get related findings if we have relatedFindingIds (using already computed findings)
-  let relatedFindings: Finding[] | undefined;
-  if (flag.relatedFindingIds && flag.relatedFindingIds.length > 0) {
-    relatedFindings = allFindings.filter((f) =>
-      flag.relatedFindingIds!.includes(f.findingId!)
-    );
-  }
+  // Get related findings (using already computed findings)
+  const relatedFindings = allFindings.filter((f) => flag.relatedFindingIds.includes(f.findingId));
 
   // Optionally fetch patch context from evidence files
   let patchContext: PatchContext[] | undefined;

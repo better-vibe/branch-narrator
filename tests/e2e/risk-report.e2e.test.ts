@@ -46,7 +46,7 @@ describe("risk-report command - JSON output schema", () => {
 
     const output: RiskReport = JSON.parse(stdout);
 
-    expect(output.schemaVersion).toBe("1.0");
+    expect(output.schemaVersion).toBe("2.0");
     expect(output.range).toBeDefined();
     expect(output.riskScore).toBeDefined();
     expect(output.riskLevel).toBeDefined();
@@ -188,7 +188,9 @@ describe("risk-report command - flags", () => {
 
     if (output.flags.length > 0) {
       const flag = output.flags[0];
-      expect(flag.id).toBeDefined();
+      expect(flag.ruleKey).toBeDefined();
+      expect(flag.flagId).toBeDefined();
+      expect(flag.relatedFindingIds).toBeDefined();
       expect(flag.category).toBeDefined();
       expect(flag.score).toBeDefined();
       expect(flag.confidence).toBeDefined();

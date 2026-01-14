@@ -6,7 +6,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { Finding, RiskFlag } from "./types.js";
+import type { Finding } from "./types.js";
 
 /**
  * Normalize a file path to POSIX format for deterministic hashing.
@@ -305,14 +305,4 @@ export function buildFlagId(ruleKey: string, relatedFindingIds: string[]): strin
 export function assignFindingId<T extends Finding>(finding: T): T & { findingId: string } {
   const findingId = buildFindingId(finding);
   return { ...finding, findingId };
-}
-
-/**
- * Assign flagId to a risk flag (immutable - returns new flag).
- */
-export function assignFlagId(flag: RiskFlag): RiskFlag & { flagId: string } {
-  const ruleKey = flag.id; // Current 'id' becomes 'ruleKey'
-  const relatedFindingIds = (flag as any).relatedFindingIds || [];
-  const flagId = buildFlagId(ruleKey, relatedFindingIds);
-  return { ...flag, flagId, ruleKey };
 }

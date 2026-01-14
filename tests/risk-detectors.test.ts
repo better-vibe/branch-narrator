@@ -1,415 +1,249 @@
 /**
- * Detector tests for risk-report.
+ * Findings-to-flags tests for risk-report.
+ *
+ * Note: legacy `src/commands/risk/detectors/*` have been removed. The canonical
+ * behavior is now: findings (with findingId) -> findingsToFlags() -> RiskFlag[].
  */
 
 import { describe, expect, it } from "bun:test";
-import { createChangeSet } from "./fixtures/index.js";
-import {
-  detectWorkflowPermissionsBroadened,
-  detectPullRequestTarget,
-  detectRemoteScriptDownload,
-  detectCIPipelineChanged,
-} from "../src/commands/risk/detectors/security-ci.js";
-import {
-  detectNewProdDependency,
-  detectMajorBump,
-  detectLockfileWithoutManifest,
-} from "../src/commands/risk/detectors/deps.js";
-import {
-  detectMigrationsChanged,
-  detectDestructiveSQL,
-  detectRiskySchemaChange,
-  detectUnscopedDataModification,
-} from "../src/commands/risk/detectors/database.js";
-import { detectLargeDiff } from "../src/commands/risk/detectors/churn.js";
-import { detectPossibleTestGap } from "../src/commands/risk/detectors/tests.js";
+import { createEvidence } from "../src/core/evidence.js";
+import { assignFindingId, buildFlagId } from "../src/core/ids.js";
+import { findingsToFlags } from "../src/commands/risk/findings-to-flags.js";
+import type {
+  APIContractChangeFinding,
+  CIWorkflowFinding,
+  DbMigrationFinding,
+  DependencyChangeFinding,
+  InfraChangeFinding,
+  LargeDiffFinding,
+  LockfileFinding,
+  SQLRiskFinding,
+  TestChangeFinding,
+  TestGapFinding,
+  TestParityViolationFinding,
+} from "../src/core/types.js";
 
-describe("Security/CI Detectors", () => {
-  it("should detect workflow permissions broadened", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: ".github/workflows/ci.yml", status: "modified" }],
-      diffs: [
-        {
-          path: ".github/workflows/ci.yml",
-          status: "modified",
-          hunks: [
-            {
-              oldStart: 10,
-              oldLines: 3,
-              newStart: 10,
-              newLines: 5,
-              content: `@@ -10,3 +10,5 @@
- jobs:
-+  permissions:
-+    contents: write
-   build:`,
-              additions: ["  permissions:", "    contents: write"],
-              deletions: [],
-            },
-          ],
-        },
-      ],
-    });
+describe("findingsToFlags", () => {
+  it("should convert ci-workflow findings to security/ci flags with deterministic IDs", () => {
+    const f1: CIWorkflowFinding = {
+      type: "ci-workflow",
+      kind: "ci-workflow",
+      category: "ci",
+      confidence: "high",
+      evidence: [createEvidence(".github/workflows/ci.yml", "permissions: contents: write")],
+      file: ".github/workflows/ci.yml",
+      riskType: "permissions_broadened",
+      details: "Workflow has broadened permissions (write access)",
+    };
 
-    const flags = detectWorkflowPermissionsBroadened(changeSet);
+    const fWithId = assignFindingId(f1);
+    const flags = findingsToFlags([fWithId]);
 
     expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("security.workflow_permissions_broadened");
-    expect(flags[0].score).toBe(35);
-    expect(flags[0].confidence).toBe(0.9);
-    expect(flags[0].effectiveScore).toBe(32); // round(35 * 0.9) = round(31.5) = 32
+    expect(flags[0]!.ruleKey).toBe("security.workflow_permissions_broadened");
+    expect(flags[0]!.relatedFindingIds).toEqual([fWithId.findingId]);
+    expect(flags[0]!.flagId).toBe(buildFlagId(flags[0]!.ruleKey, [fWithId.findingId]));
   });
 
-  it("should detect pull_request_target", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: ".github/workflows/pr.yml", status: "modified" }],
-      diffs: [
-        {
-          path: ".github/workflows/pr.yml",
-          status: "modified",
-          hunks: [
-            {
-              oldStart: 1,
-              oldLines: 1,
-              newStart: 1,
-              newLines: 2,
-              content: "+on: pull_request_target",
-              additions: ["on: pull_request_target"],
-              deletions: [],
-            },
-          ],
-        },
-      ],
-    });
+  it("should convert sql-risk findings to db flags", () => {
+    const f1: SQLRiskFinding = {
+      type: "sql-risk",
+      kind: "sql-risk",
+      category: "database",
+      confidence: "high",
+      evidence: [createEvidence("migrations/001.sql", "DROP TABLE users;")],
+      file: "migrations/001.sql",
+      riskType: "destructive",
+      details: "Contains DROP TABLE/COLUMN or TRUNCATE",
+    };
 
-    const flags = detectPullRequestTarget(changeSet);
+    const fWithId = assignFindingId(f1);
+    const flags = findingsToFlags([fWithId]);
 
     expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("security.workflow_uses_pull_request_target");
-    expect(flags[0].score).toBe(40);
+    expect(flags[0]!.ruleKey).toBe("db.destructive_sql");
+    expect(flags[0]!.relatedFindingIds).toEqual([fWithId.findingId]);
   });
 
-  it("should detect remote script download", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: ".github/workflows/deploy.yml", status: "modified" }],
-      diffs: [
-        {
-          path: ".github/workflows/deploy.yml",
-          status: "modified",
-          hunks: [
-            {
-              oldStart: 20,
-              oldLines: 1,
-              newStart: 20,
-              newLines: 2,
-              content: "+  run: curl https://install.sh | bash",
-              additions: ["  run: curl https://install.sh | bash"],
-              deletions: [],
-            },
-          ],
-        },
-      ],
-    });
+  it("should convert infra-change findings to infra flags", () => {
+    const f1: InfraChangeFinding = {
+      type: "infra-change",
+      kind: "infra-change",
+      category: "infra",
+      confidence: "high",
+      evidence: [],
+      infraType: "dockerfile",
+      files: ["Dockerfile"],
+    };
 
-    const flags = detectRemoteScriptDownload(changeSet);
+    const fWithId = assignFindingId(f1);
+    const flags = findingsToFlags([fWithId]);
 
     expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("security.workflow_downloads_remote_script");
-    expect(flags[0].score).toBe(45);
+    expect(flags[0]!.ruleKey).toBe("infra.dockerfile_changed");
+    expect(flags[0]!.relatedFindingIds).toEqual([fWithId.findingId]);
   });
 
-  it("should detect CI pipeline changed", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [
-        { path: ".github/workflows/ci.yml", status: "modified" },
-        { path: ".gitlab-ci.yml", status: "modified" },
-      ],
-      diffs: [],
-    });
+  it("should aggregate API contract findings into a single api.contract_changed flag", () => {
+    const f1: APIContractChangeFinding = {
+      type: "api-contract-change",
+      kind: "api-contract-change",
+      category: "api",
+      confidence: "high",
+      evidence: [],
+      files: ["openapi.yaml"],
+    };
+    const f2: APIContractChangeFinding = {
+      ...f1,
+      files: ["proto/service.proto"],
+    };
 
-    const flags = detectCIPipelineChanged(changeSet);
+    const a = assignFindingId(f1);
+    const b = assignFindingId(f2);
+    const flags = findingsToFlags([a, b]);
 
     expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("ci.pipeline_changed");
-    expect(flags[0].category).toBe("ci");
+    expect(flags[0]!.ruleKey).toBe("api.contract_changed");
+    expect(flags[0]!.relatedFindingIds.sort()).toEqual([a.findingId, b.findingId].sort());
+    expect(flags[0]!.flagId).toBe(buildFlagId("api.contract_changed", [a.findingId, b.findingId]));
+  });
+
+  it("should convert dependency-change findings into deps flags and link all related finding IDs", () => {
+    const newDep: DependencyChangeFinding = {
+      type: "dependency-change",
+      kind: "dependency-change",
+      category: "dependencies",
+      confidence: "high",
+      evidence: [createEvidence("package.json", "\"lodash\": \"^4.17.21\"")],
+      name: "lodash",
+      section: "dependencies",
+      to: "^4.17.21",
+      impact: "new",
+      riskCategory: null,
+    };
+
+    const majorBump: DependencyChangeFinding = {
+      type: "dependency-change",
+      kind: "dependency-change",
+      category: "dependencies",
+      confidence: "high",
+      evidence: [createEvidence("package.json", "\"react\": \"^17\" -> \"^18\"")],
+      name: "react",
+      section: "dependencies",
+      from: "^17.0.0",
+      to: "^18.0.0",
+      impact: "major",
+      riskCategory: null,
+    };
+
+    const a = assignFindingId(newDep);
+    const b = assignFindingId(majorBump);
+    const flags = findingsToFlags([a, b]);
+
+    const newProd = flags.find((f) => f.ruleKey === "deps.new_prod_dependency");
+    expect(newProd).toBeDefined();
+    expect(newProd!.relatedFindingIds).toEqual([a.findingId]);
+
+    const major = flags.find((f) => f.ruleKey === "deps.major_version_bump");
+    expect(major).toBeDefined();
+    expect(major!.relatedFindingIds).toEqual([b.findingId]);
+  });
+
+  it("should convert db-migration and test-change findings into db/tests flags", () => {
+    const mig: DbMigrationFinding = {
+      type: "db-migration",
+      kind: "db-migration",
+      category: "database",
+      confidence: "high",
+      evidence: [],
+      tool: "supabase",
+      files: ["supabase/migrations/001.sql"],
+      risk: "medium",
+      reasons: ["Migration files changed"],
+    };
+
+    const testChange: TestChangeFinding = {
+      type: "test-change",
+      kind: "test-change",
+      category: "tests",
+      confidence: "high",
+      evidence: [],
+      framework: "vitest",
+      files: ["tests/foo.test.ts"],
+    };
+
+    const a = assignFindingId(mig);
+    const b = assignFindingId(testChange);
+    const flags = findingsToFlags([a, b]);
+
+    expect(flags.find((f) => f.ruleKey === "db.migrations_changed")?.relatedFindingIds).toEqual([a.findingId]);
+    expect(flags.find((f) => f.ruleKey === "tests.changed")?.relatedFindingIds).toEqual([b.findingId]);
+  });
+
+  it("should convert test-gap and test-parity-violation findings into tests flags", () => {
+    const gap: TestGapFinding = {
+      type: "test-gap",
+      kind: "test-gap",
+      category: "quality",
+      confidence: "medium",
+      evidence: [createEvidence("src/a.ts", "No corresponding test changes")],
+      prodFilesChanged: 3,
+      testFilesChanged: 0,
+    };
+
+    const parity: TestParityViolationFinding = {
+      type: "test-parity-violation",
+      kind: "test-parity-violation",
+      category: "tests",
+      confidence: "high",
+      evidence: [createEvidence("src/a.ts", "No test file found")],
+      sourceFile: "src/a.ts",
+      expectedTestLocations: ["tests/a.test.ts"],
+    };
+
+    const a = assignFindingId(gap);
+    const b = assignFindingId(parity);
+    const flags = findingsToFlags([a, b]);
+
+    expect(flags.find((f) => f.ruleKey === "tests.possible_gap")?.relatedFindingIds).toEqual([a.findingId]);
+    expect(flags.find((f) => f.ruleKey === "tests.missing_parity")?.relatedFindingIds).toEqual([b.findingId]);
+  });
+
+  it("should ensure all emitted flags have ruleKey/flagId and non-empty relatedFindingIds", () => {
+    const f1 = assignFindingId({
+      type: "large-diff",
+      kind: "large-diff",
+      category: "unknown",
+      confidence: "high",
+      evidence: [],
+      filesChanged: 60,
+      linesChanged: 2000,
+    } satisfies LargeDiffFinding);
+
+    const f2 = assignFindingId({
+      type: "lockfile-mismatch",
+      kind: "lockfile-mismatch",
+      category: "dependencies",
+      confidence: "high",
+      evidence: [],
+      manifestChanged: false,
+      lockfileChanged: true,
+    } satisfies LockfileFinding);
+
+    const flags = findingsToFlags([f1, f2]);
+    expect(flags.length).toBeGreaterThan(0);
+
+    for (const flag of flags) {
+      expect(typeof flag.ruleKey).toBe("string");
+      expect(flag.ruleKey.length).toBeGreaterThan(0);
+      expect(typeof flag.flagId).toBe("string");
+      expect(flag.flagId).toMatch(/^flag\.[a-z0-9_.-]+#[a-f0-9]{12}$/);
+      expect(Array.isArray(flag.relatedFindingIds)).toBe(true);
+      expect(flag.relatedFindingIds.length).toBeGreaterThan(0);
+      for (const id of flag.relatedFindingIds) {
+        expect(id).toMatch(/^finding\.[a-z0-9-]+#[a-f0-9]{12}$/);
+      }
+    }
   });
 });
 
-describe("Dependency Detectors", () => {
-  it("should detect new production dependency", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: "package.json", status: "modified" }],
-      diffs: [],
-      basePackageJson: {
-        dependencies: {},
-      },
-      headPackageJson: {
-        dependencies: {
-          "lodash": "^4.17.21",
-          "axios": "^1.0.0",
-        },
-      },
-    });
-
-    const flags = detectNewProdDependency(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("deps.new_prod_dependency");
-    expect(flags[0].summary).toContain("2 new production dependencies");
-  });
-
-  it("should detect major version bump", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: "package.json", status: "modified" }],
-      diffs: [],
-      basePackageJson: {
-        dependencies: {
-          "react": "^17.0.0",
-        },
-        devDependencies: {
-          "typescript": "^4.0.0",
-        },
-      },
-      headPackageJson: {
-        dependencies: {
-          "react": "^18.0.0",
-        },
-        devDependencies: {
-          "typescript": "^5.0.0",
-        },
-      },
-    });
-
-    const flags = detectMajorBump(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("deps.major_bump");
-    expect(flags[0].summary).toContain("2 major version bumps");
-    expect(flags[0].score).toBe(25); // Has runtime bumps
-  });
-
-  it("should detect lockfile changed without manifest", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [
-        { path: "package-lock.json", status: "modified" },
-      ],
-      diffs: [],
-    });
-
-    const flags = detectLockfileWithoutManifest(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("deps.lockfile_changed_without_manifest");
-  });
-});
-
-describe("Database Detectors", () => {
-  it("should detect migrations changed", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [
-        { path: "migrations/001_create_users.sql", status: "added" },
-      ],
-      diffs: [],
-    });
-
-    const flags = detectMigrationsChanged(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("db.migrations_changed");
-  });
-
-  it("should detect destructive SQL", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: "migrations/002_cleanup.sql", status: "added" }],
-      diffs: [
-        {
-          path: "migrations/002_cleanup.sql",
-          status: "added",
-          hunks: [
-            {
-              oldStart: 0,
-              oldLines: 0,
-              newStart: 1,
-              newLines: 2,
-              content: "+DROP TABLE old_users;\n+TRUNCATE sessions;",
-              additions: ["DROP TABLE old_users;", "TRUNCATE sessions;"],
-              deletions: [],
-            },
-          ],
-        },
-      ],
-    });
-
-    const flags = detectDestructiveSQL(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("db.destructive_sql");
-    expect(flags[0].score).toBe(45);
-  });
-
-  it("should detect risky schema changes", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: "migrations/003_alter.sql", status: "added" }],
-      diffs: [
-        {
-          path: "migrations/003_alter.sql",
-          status: "added",
-          hunks: [
-            {
-              oldStart: 0,
-              oldLines: 0,
-              newStart: 1,
-              newLines: 1,
-              content: "+ALTER TABLE users ALTER COLUMN email TYPE varchar(500);",
-              additions: ["ALTER TABLE users ALTER COLUMN email TYPE varchar(500);"],
-              deletions: [],
-            },
-          ],
-        },
-      ],
-    });
-
-    const flags = detectRiskySchemaChange(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("db.schema_change_risky");
-  });
-
-  it("should detect unscoped data modification", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: "migrations/004_update.sql", status: "added" }],
-      diffs: [
-        {
-          path: "migrations/004_update.sql",
-          status: "added",
-          hunks: [
-            {
-              oldStart: 0,
-              oldLines: 0,
-              newStart: 1,
-              newLines: 1,
-              content: "+DELETE FROM sessions;",
-              additions: ["DELETE FROM sessions;"],
-              deletions: [],
-            },
-          ],
-        },
-      ],
-    });
-
-    const flags = detectUnscopedDataModification(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("db.data_modification_unscoped");
-  });
-});
-
-describe("Churn Detector", () => {
-  it("should detect large diff by file count", () => {
-    const files = Array.from({ length: 60 }, (_, i) => ({
-      path: `src/file${i}.ts`,
-      status: "modified" as const,
-    }));
-
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files,
-      diffs: [],
-    });
-
-    const flags = detectLargeDiff(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("churn.large_diff");
-    expect(flags[0].summary).toContain("60 files");
-  });
-
-  it("should detect large diff by line count", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [{ path: "src/big.ts", status: "modified" }],
-      diffs: [
-        {
-          path: "src/big.ts",
-          status: "modified",
-          hunks: [
-            {
-              oldStart: 1,
-              oldLines: 1000,
-              newStart: 1,
-              newLines: 1000,
-              content: "...",
-              additions: Array(1000).fill("+ line"),
-              deletions: Array(600).fill("- line"),
-            },
-          ],
-        },
-      ],
-    });
-
-    const flags = detectLargeDiff(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].summary).toContain("1600 lines");
-  });
-});
-
-describe("Test Detector", () => {
-  it("should detect possible test gap", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [
-        { path: "lib/utils.ts", status: "modified" },
-        { path: "app/api.ts", status: "modified" },
-      ],
-      diffs: [],
-    });
-
-    const flags = detectPossibleTestGap(changeSet);
-
-    expect(flags).toHaveLength(1);
-    expect(flags[0].id).toBe("tests.possible_gap");
-    expect(flags[0].summary).toContain("2 code files changed");
-  });
-
-  it("should not flag test gap when tests are changed", () => {
-    const changeSet = createChangeSet({
-      base: "main",
-      head: "HEAD",
-      files: [
-        { path: "lib/utils.ts", status: "modified" },
-        { path: "tests/utils.test.ts", status: "modified" },
-      ],
-      diffs: [],
-    });
-
-    const flags = detectPossibleTestGap(changeSet);
-
-    expect(flags).toHaveLength(0);
-  });
-});

@@ -62,7 +62,8 @@ export function renderRiskReportMarkdown(report: RiskReport): string {
       for (const flag of flags) {
         lines.push(`#### ${flag.title}`);
         lines.push("");
-        lines.push(`**ID:** \`${flag.id}\``);
+        lines.push(`**Rule:** \`${flag.ruleKey}\``);
+        lines.push(`**Flag ID:** \`${flag.flagId}\``);
         lines.push(`**Score:** ${flag.effectiveScore}/100 (base: ${flag.score}, confidence: ${flag.confidence})`);
         lines.push("");
         lines.push(flag.summary);
@@ -171,7 +172,7 @@ export function renderRiskReportText(report: RiskReport): string {
 
     for (const flag of report.flags) {
       lines.push("");
-      lines.push(`[${flag.id}] ${flag.title}`);
+      lines.push(`[${flag.ruleKey}] ${flag.title}`);
       lines.push(`  Score: ${flag.effectiveScore}/100`);
       lines.push(`  ${flag.summary}`);
       

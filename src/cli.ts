@@ -195,7 +195,7 @@ program
       };
 
       console.log(renderTerminal(renderContext));
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -274,7 +274,7 @@ program
       };
 
       console.log(renderMarkdown(renderContext));
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -490,7 +490,7 @@ program
       } else {
         console.log(outputText);
       }
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -615,7 +615,7 @@ program
         noTimestamp: options.timestamp === false,
       });
 
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -765,10 +765,11 @@ program
       // Check fail-on-score threshold (use current score regardless of delta mode)
       if (failOnScore !== undefined && report.riskScore >= failOnScore) {
         logError(`Risk score ${report.riskScore} >= threshold ${failOnScore}`);
-        process.exit(2);
+        process.exitCode = 2;
+        return;
       }
 
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -888,7 +889,7 @@ program
         console.log(output);
       }
 
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -910,7 +911,7 @@ program
         force: options.force,
       });
 
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -940,7 +941,7 @@ snap
         info(`Snapshot ${result.snapshotId} saved to ${options.out}`);
       }
 
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -955,7 +956,7 @@ snap
       const { executeSnapList, renderSnapListJSON } = await import("./commands/snap/index.js");
       const index = await executeSnapList();
       console.log(renderSnapListJSON(index, options.pretty));
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -970,7 +971,7 @@ snap
       const { executeSnapShow, renderSnapShowJSON } = await import("./commands/snap/index.js");
       const snapshot = await executeSnapShow(snapshotId);
       console.log(renderSnapShowJSON(snapshot, options.pretty));
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -985,7 +986,7 @@ snap
       const { executeSnapDiff, renderSnapDiffJSON } = await import("./commands/snap/index.js");
       const delta = await executeSnapDiff(idA, idB);
       console.log(renderSnapDiffJSON(delta, options.pretty));
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -1008,7 +1009,7 @@ snap
         warn("Verification: patch hashes differ (this may be expected for empty patches)");
       }
 
-      process.exit(0);
+      return;
     } catch (error) {
       handleError(error);
     }
@@ -1035,4 +1036,4 @@ function handleError(error: unknown): never {
   process.exit(1);
 }
 
-program.parse();
+await program.parseAsync();

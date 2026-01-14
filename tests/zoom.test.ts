@@ -322,7 +322,6 @@ describe("Zoom Command", () => {
   describe("Flag zoom output", () => {
     it("should render flag output as JSON", () => {
       const flag: RiskFlag = {
-        id: "security.workflow_permissions_broadened",
         ruleKey: "security.workflow_permissions_broadened",
         flagId: "flag.security.workflow_permissions_broadened#abc123def456",
         relatedFindingIds: ["finding.ci-workflow#123456789abc"],
@@ -361,10 +360,9 @@ describe("Zoom Command", () => {
 
     it("should render flag output as Markdown", () => {
       const flag: RiskFlag = {
-        id: "db.destructive_sql",
         ruleKey: "db.destructive_sql",
         flagId: "flag.db.destructive_sql#def456789abc",
-        relatedFindingIds: [],
+        relatedFindingIds: ["finding.sql-risk#123456789abc"],
         category: "db",
         score: 50,
         confidence: 0.95,
@@ -397,10 +395,9 @@ describe("Zoom Command", () => {
 
     it("should render flag output as text", () => {
       const flag: RiskFlag = {
-        id: "tests.test_gap",
         ruleKey: "tests.test_gap",
         flagId: "flag.tests.test_gap#abc987654321",
-        relatedFindingIds: [],
+        relatedFindingIds: ["finding.test-gap#abc987654321"],
         category: "tests",
         score: 20,
         confidence: 0.8,

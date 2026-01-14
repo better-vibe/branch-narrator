@@ -8,6 +8,46 @@
  * - relatedFindingIds (links back to findings)
  * - Score and confidence
  * - Evidence and suggested checks
+ *
+ * ## Canonical mapping (legacy detectors → analyzers/findings → rule keys)
+ *
+ * `risk-report` is derived from analyzer findings (single analysis pipeline).
+ * The legacy detector system in `src/commands/risk/detectors/*` duplicated this
+ * logic and used some inconsistent rule keys and thresholds.
+ *
+ * The rule keys in this module are the canonical identifiers:
+ *
+ * - Security / CI:
+ *   - `detectWorkflowPermissionsBroadened` → `CIWorkflowFinding(riskType=permissions_broadened)` → `security.workflow_permissions_broadened`
+ *   - `detectPullRequestTarget` → `CIWorkflowFinding(riskType=pull_request_target)` → `security.workflow_uses_pull_request_target`
+ *   - `detectRemoteScriptDownload` → `CIWorkflowFinding(riskType=remote_script_download)` → `security.workflow_downloads_remote_script`
+ *   - `detectCIPipelineChanged` → `CIWorkflowFinding(riskType=pipeline_changed)` → `ci.pipeline_changed`
+ *
+ * - Database:
+ *   - `detectDestructiveSQL` → `SQLRiskFinding(riskType=destructive)` → `db.destructive_sql`
+ *   - `detectRiskySchemaChange` → `SQLRiskFinding(riskType=schema_change)` → `db.schema_change_risky`
+ *   - `detectUnscopedDataModification` → `SQLRiskFinding(riskType=unscoped_modification)` → `db.unscoped_data_modification`
+ *   - `detectMigrationsChanged` → `DbMigrationFinding` → `db.migrations_changed`
+ *
+ * - Dependencies:
+ *   - `detectNewProdDependency` → `DependencyChangeFinding(impact=new, section=dependencies)` → `deps.new_prod_dependency`
+ *   - `detectMajorBump` (legacy id `deps.major_bump`) → `DependencyChangeFinding(impact=major)` → `deps.major_version_bump`
+ *   - `detectLockfileWithoutManifest` (legacy id `deps.lockfile_changed_without_manifest`) → `LockfileFinding` → `deps.lockfile_without_manifest`
+ *
+ * - Infrastructure:
+ *   - `detectDockerfileChanged` → `InfraChangeFinding(infraType=dockerfile)` → `infra.dockerfile_changed`
+ *   - `detectTerraformChanged` → `InfraChangeFinding(infraType=terraform)` → `infra.terraform_changed`
+ *   - `detectK8sManifestChanged` (legacy id `infra.k8s_manifest_changed`) → `InfraChangeFinding(infraType=k8s)` → `infra.k8s_changed`
+ *
+ * - API:
+ *   - `detectAPIContractChanged` → `APIContractChangeFinding` → `api.contract_changed`
+ *
+ * - Tests:
+ *   - `detectTestsChanged` → `TestChangeFinding` → `tests.changed`
+ *   - `detectPossibleTestGap` → `TestGapFinding` → `tests.possible_gap`
+ *
+ * - Churn:
+ *   - `detectLargeDiff` → `LargeDiffFinding` → `churn.large_diff`
  */
 
 import type {
@@ -47,17 +87,16 @@ function convertEvidence(finding: Finding): RiskFlagEvidence[] {
 /**
  * Convert CI workflow findings to flags.
  */
-function ciWorkflowToFlags(findings: CIWorkflowFinding[]): RiskFlag[] {
+function ciWorkflowToFlags(findings: Array<CIWorkflowFinding & { findingId: string }>): RiskFlag[] {
   const flags: RiskFlag[] = [];
   
   for (const finding of findings) {
-    const relatedFindingIds = finding.findingId ? [finding.findingId] : [];
+    const relatedFindingIds = [finding.findingId];
     
     switch (finding.riskType) {
       case "permissions_broadened": {
         const ruleKey = "security.workflow_permissions_broadened";
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -80,7 +119,6 @@ function ciWorkflowToFlags(findings: CIWorkflowFinding[]): RiskFlag[] {
       case "pull_request_target": {
         const ruleKey = "security.workflow_uses_pull_request_target";
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -103,7 +141,6 @@ function ciWorkflowToFlags(findings: CIWorkflowFinding[]): RiskFlag[] {
       case "remote_script_download": {
         const ruleKey = "security.workflow_downloads_remote_script";
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -126,7 +163,6 @@ function ciWorkflowToFlags(findings: CIWorkflowFinding[]): RiskFlag[] {
       case "pipeline_changed": {
         const ruleKey = "ci.pipeline_changed";
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -153,17 +189,16 @@ function ciWorkflowToFlags(findings: CIWorkflowFinding[]): RiskFlag[] {
 /**
  * Convert SQL risk findings to flags.
  */
-function sqlRiskToFlags(findings: SQLRiskFinding[]): RiskFlag[] {
+function sqlRiskToFlags(findings: Array<SQLRiskFinding & { findingId: string }>): RiskFlag[] {
   const flags: RiskFlag[] = [];
   
   for (const finding of findings) {
-    const relatedFindingIds = finding.findingId ? [finding.findingId] : [];
+    const relatedFindingIds = [finding.findingId];
     
     switch (finding.riskType) {
       case "destructive": {
         const ruleKey = "db.destructive_sql";
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -187,7 +222,6 @@ function sqlRiskToFlags(findings: SQLRiskFinding[]): RiskFlag[] {
       case "schema_change": {
         const ruleKey = "db.schema_change_risky";
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -210,7 +244,6 @@ function sqlRiskToFlags(findings: SQLRiskFinding[]): RiskFlag[] {
       case "unscoped_modification": {
         const ruleKey = "db.unscoped_data_modification";
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -238,22 +271,21 @@ function sqlRiskToFlags(findings: SQLRiskFinding[]): RiskFlag[] {
 /**
  * Convert Stencil findings to flags.
  */
-function stencilToFlags(findings: Finding[]): RiskFlag[] {
+function stencilToFlags(findings: Array<Finding & { findingId: string }>): RiskFlag[] {
   const flags: RiskFlag[] = [];
 
-  const componentFindings = findings.filter(f => f.type === "stencil-component-change") as StencilComponentChangeFinding[];
-  const propFindings = findings.filter(f => f.type === "stencil-prop-change") as StencilPropChangeFinding[];
-  const eventFindings = findings.filter(f => f.type === "stencil-event-change") as StencilEventChangeFinding[];
-  const methodFindings = findings.filter(f => f.type === "stencil-method-change") as StencilMethodChangeFinding[];
-  const slotFindings = findings.filter(f => f.type === "stencil-slot-change") as StencilSlotChangeFinding[];
+  const componentFindings = findings.filter(f => f.type === "stencil-component-change") as Array<StencilComponentChangeFinding & { findingId: string }>;
+  const propFindings = findings.filter(f => f.type === "stencil-prop-change") as Array<StencilPropChangeFinding & { findingId: string }>;
+  const eventFindings = findings.filter(f => f.type === "stencil-event-change") as Array<StencilEventChangeFinding & { findingId: string }>;
+  const methodFindings = findings.filter(f => f.type === "stencil-method-change") as Array<StencilMethodChangeFinding & { findingId: string }>;
+  const slotFindings = findings.filter(f => f.type === "stencil-slot-change") as Array<StencilSlotChangeFinding & { findingId: string }>;
 
   // High severity: Tag changed
   for (const f of componentFindings) {
     if (f.change === "tag-changed") {
       const ruleKey = "stencil.tag_changed";
-      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      const relatedFindingIds = [f.findingId];
       flags.push({
-        id: ruleKey,
         ruleKey,
         flagId: buildFlagId(ruleKey, relatedFindingIds),
         relatedFindingIds,
@@ -273,9 +305,8 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
 
     if (f.change === "shadow-changed") {
       const ruleKey = "stencil.shadow_changed";
-      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      const relatedFindingIds = [f.findingId];
       flags.push({
-        id: ruleKey,
         ruleKey,
         flagId: buildFlagId(ruleKey, relatedFindingIds),
         relatedFindingIds,
@@ -297,9 +328,8 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
   for (const f of propFindings) {
     if (f.change === "removed") {
       const ruleKey = "stencil.prop_removed";
-      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      const relatedFindingIds = [f.findingId];
       flags.push({
-        id: ruleKey,
         ruleKey,
         flagId: buildFlagId(ruleKey, relatedFindingIds),
         relatedFindingIds,
@@ -317,9 +347,8 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
       });
     } else if (f.change === "changed") {
       const ruleKey = "stencil.prop_changed";
-      const relatedFindingIds = f.findingId ? [f.findingId] : [];
+      const relatedFindingIds = [f.findingId];
       flags.push({
-        id: ruleKey,
         ruleKey,
         flagId: buildFlagId(ruleKey, relatedFindingIds),
         relatedFindingIds,
@@ -341,9 +370,8 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
   for (const f of eventFindings) {
       if (f.change === "removed") {
         const ruleKey = "stencil.event_removed";
-        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        const relatedFindingIds = [f.findingId];
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -361,9 +389,8 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
         });
       } else if (f.change === "changed") {
         const ruleKey = "stencil.event_changed";
-        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        const relatedFindingIds = [f.findingId];
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -385,9 +412,8 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
   for (const f of methodFindings) {
       if (f.change === "removed") {
         const ruleKey = "stencil.method_removed";
-        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        const relatedFindingIds = [f.findingId];
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -414,9 +440,8 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
   for (const f of slotFindings) {
       if (f.change === "removed") {
         const ruleKey = "stencil.slot_removed";
-        const relatedFindingIds = f.findingId ? [f.findingId] : [];
+        const relatedFindingIds = [f.findingId];
         flags.push({
-          id: ruleKey,
           ruleKey,
           flagId: buildFlagId(ruleKey, relatedFindingIds),
           relatedFindingIds,
@@ -440,20 +465,20 @@ function stencilToFlags(findings: Finding[]): RiskFlag[] {
 /**
  * Convert findings to risk flags using rules.
  */
-export function findingsToFlags(findings: Finding[]): RiskFlag[] {
+export function findingsToFlags(findings: Array<Finding & { findingId: string }>): RiskFlag[] {
   const flags: RiskFlag[] = [];
   
   // Group findings by type
-  const ciWorkflowFindings = findings.filter(f => f.type === "ci-workflow") as CIWorkflowFinding[];
-  const sqlRiskFindings = findings.filter(f => f.type === "sql-risk") as SQLRiskFinding[];
-  const infraFindings = findings.filter(f => f.type === "infra-change") as InfraChangeFinding[];
-  const apiContractFindings = findings.filter(f => f.type === "api-contract-change") as APIContractChangeFinding[];
-  const largeDiffFindings = findings.filter(f => f.type === "large-diff") as LargeDiffFinding[];
-  const lockfileFindings = findings.filter(f => f.type === "lockfile-mismatch") as LockfileFinding[];
-  const testGapFindings = findings.filter(f => f.type === "test-gap") as TestGapFinding[];
-  const depChanges = findings.filter(f => f.type === "dependency-change") as DependencyChangeFinding[];
-  const dbMigrations = findings.filter(f => f.type === "db-migration") as DbMigrationFinding[];
-  const testChanges = findings.filter(f => f.type === "test-change") as TestChangeFinding[];
+  const ciWorkflowFindings = findings.filter(f => f.type === "ci-workflow") as Array<CIWorkflowFinding & { findingId: string }>;
+  const sqlRiskFindings = findings.filter(f => f.type === "sql-risk") as Array<SQLRiskFinding & { findingId: string }>;
+  const infraFindings = findings.filter(f => f.type === "infra-change") as Array<InfraChangeFinding & { findingId: string }>;
+  const apiContractFindings = findings.filter(f => f.type === "api-contract-change") as Array<APIContractChangeFinding & { findingId: string }>;
+  const largeDiffFindings = findings.filter(f => f.type === "large-diff") as Array<LargeDiffFinding & { findingId: string }>;
+  const lockfileFindings = findings.filter(f => f.type === "lockfile-mismatch") as Array<LockfileFinding & { findingId: string }>;
+  const testGapFindings = findings.filter(f => f.type === "test-gap") as Array<TestGapFinding & { findingId: string }>;
+  const depChanges = findings.filter(f => f.type === "dependency-change") as Array<DependencyChangeFinding & { findingId: string }>;
+  const dbMigrations = findings.filter(f => f.type === "db-migration") as Array<DbMigrationFinding & { findingId: string }>;
+  const testChanges = findings.filter(f => f.type === "test-change") as Array<TestChangeFinding & { findingId: string }>;
   
   // Apply conversion rules
   flags.push(...ciWorkflowToFlags(ciWorkflowFindings));
@@ -462,7 +487,7 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   
   // Infrastructure changes
   for (const finding of infraFindings) {
-    const relatedFindingIds = finding.findingId ? [finding.findingId] : [];
+    const relatedFindingIds = [finding.findingId];
     const ruleKey = `infra.${finding.infraType}_changed`;
     const titles: Record<typeof finding.infraType, string> = {
       dockerfile: "Dockerfile changed",
@@ -471,7 +496,6 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
     };
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -493,16 +517,13 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   // API contract changes
   if (apiContractFindings.length > 0) {
     // Collect all findingIds from all API contract findings
-    const relatedFindingIds = apiContractFindings
-      .map(f => f.findingId)
-      .filter((id): id is string => !!id);
+    const relatedFindingIds = apiContractFindings.map(f => f.findingId);
     const ruleKey = "api.contract_changed";
     
     // Collect all changed files across all findings
     const allFiles = apiContractFindings.flatMap(f => f.files);
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -524,11 +545,10 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   // Large diff
   if (largeDiffFindings.length > 0) {
     const finding = largeDiffFindings[0];
-    const relatedFindingIds = finding.findingId ? [finding.findingId] : [];
+    const relatedFindingIds = [finding.findingId];
     const ruleKey = "churn.large_diff";
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -549,11 +569,10 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   
   // Lockfile mismatch
   for (const finding of lockfileFindings) {
-    const relatedFindingIds = finding.findingId ? [finding.findingId] : [];
+    const relatedFindingIds = [finding.findingId];
     const ruleKey = "deps.lockfile_without_manifest";
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -575,11 +594,10 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   
   // Test gap
   for (const finding of testGapFindings) {
-    const relatedFindingIds = finding.findingId ? [finding.findingId] : [];
+    const relatedFindingIds = [finding.findingId];
     const ruleKey = "tests.possible_gap";
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -600,11 +618,10 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   // New production dependencies
   const newProdDeps = depChanges.filter(d => d.section === "dependencies" && !d.from);
   if (newProdDeps.length > 0) {
-    const relatedFindingIds = newProdDeps.map(f => f.findingId).filter((id): id is string => !!id);
+    const relatedFindingIds = newProdDeps.map(f => f.findingId);
     const ruleKey = "deps.new_prod_dependency";
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -630,11 +647,10 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   // Major version bumps
   const majorBumps = depChanges.filter(d => d.impact === "major");
   if (majorBumps.length > 0) {
-    const relatedFindingIds = majorBumps.map(f => f.findingId).filter((id): id is string => !!id);
+    const relatedFindingIds = majorBumps.map(f => f.findingId);
     const ruleKey = "deps.major_version_bump";
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -659,11 +675,10 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   
   // Database migrations
   if (dbMigrations.length > 0) {
-    const relatedFindingIds = dbMigrations.map(f => f.findingId).filter((id): id is string => !!id);
+    const relatedFindingIds = dbMigrations.map(f => f.findingId);
     const ruleKey = "db.migrations_changed";
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -687,11 +702,10 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   
   // Test changes
   if (testChanges.length > 0) {
-    const relatedFindingIds = testChanges.map(f => f.findingId).filter((id): id is string => !!id);
+    const relatedFindingIds = testChanges.map(f => f.findingId);
     const ruleKey = "tests.changed";
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,
@@ -713,9 +727,9 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
   }
   
   // Test parity violations (opt-in analyzer)
-  const testParityViolations = findings.filter(f => f.type === "test-parity-violation") as TestParityViolationFinding[];
+  const testParityViolations = findings.filter(f => f.type === "test-parity-violation") as Array<TestParityViolationFinding & { findingId: string }>;
   if (testParityViolations.length > 0) {
-    const relatedFindingIds = testParityViolations.map(f => f.findingId).filter((id): id is string => !!id);
+    const relatedFindingIds = testParityViolations.map(f => f.findingId);
     const ruleKey = "tests.missing_parity";
     
     // Score based on confidence distribution
@@ -730,7 +744,6 @@ export function findingsToFlags(findings: Finding[]): RiskFlag[] {
     const avgConfidence = highConfidenceCount > mediumConfidenceCount ? 0.85 : 0.7;
     
     flags.push({
-      id: ruleKey,
       ruleKey,
       flagId: buildFlagId(ruleKey, relatedFindingIds),
       relatedFindingIds,

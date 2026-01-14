@@ -17,7 +17,7 @@ describe("generateRiskReport", () => {
 
     const report = await generateRiskReport(changeSet);
 
-    expect(report.schemaVersion).toBe("1.0");
+    expect(report.schemaVersion).toBe("2.0");
     expect(report.riskScore).toBe(0);
     expect(report.riskLevel).toBe("low");
     expect(report.flags).toEqual([]);
@@ -59,7 +59,7 @@ describe("generateRiskReport", () => {
     expect(report.riskScore).toBeGreaterThan(0);
     
     // Check that security flag was detected
-    const securityFlag = report.flags.find(f => f.id === "security.workflow_permissions_broadened");
+    const securityFlag = report.flags.find(f => f.ruleKey === "security.workflow_permissions_broadened");
     expect(securityFlag).toBeDefined();
     expect(securityFlag?.score).toBe(35);
     expect(securityFlag?.confidence).toBe(0.9);

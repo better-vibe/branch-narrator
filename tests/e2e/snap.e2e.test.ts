@@ -180,7 +180,7 @@ describe("snap save", () => {
     expect(snapshot.analysis.facts).toBeDefined();
     expect(snapshot.analysis.facts.schemaVersion).toBeDefined();
     expect(snapshot.analysis.riskReport).toBeDefined();
-    expect(snapshot.analysis.riskReport.schemaVersion).toBe("1.0");
+    expect(snapshot.analysis.riskReport.schemaVersion).toBe("2.0");
   });
 });
 

@@ -5,7 +5,7 @@
 
 import path from "node:path";
 import fs from "node:fs/promises";
-import { execa } from "execa";
+import { execa as execaDefault } from "execa";
 import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
@@ -47,7 +47,8 @@ const CODE_FILE_PATTERN = /\.(js|jsx|ts|tsx|mjs|cjs|mts|cts|vue|svelte)$/i;
  */
 async function findDependentsBatch(
   targets: Array<{ path: string; baseName: string }>,
-  cwd: string = process.cwd()
+  cwd: string = process.cwd(),
+  exec: typeof execaDefault = execaDefault
 ): Promise<Map<string, string[]>> {
   const results = new Map<string, string[]>();
   targets.forEach((t) => results.set(t.path, []));
@@ -81,7 +82,7 @@ async function findDependentsBatch(
     }
 
     try {
-      const { stdout } = await execa("git", args, {
+      const { stdout } = await exec("git", args, {
         cwd,
         maxBuffer: 1024 * 1024 * 20, // Increase buffer for large outputs
         reject: false // git grep returns 1 if no matches found
@@ -137,10 +138,11 @@ async function findDependentsBatch(
 async function analyzeDependency(
   dependentPath: string,
   sourcePath: string,
-  cwd: string = process.cwd()
+  cwd: string = process.cwd(),
+  readFile: typeof fs.readFile = fs.readFile
 ): Promise<{ importedSymbols: string[]; usageContext: string } | null> {
   try {
-    const content = await fs.readFile(path.join(cwd, dependentPath), "utf-8");
+    const content = await readFile(path.join(cwd, dependentPath), "utf-8");
     const sourceBaseName = path.basename(sourcePath, path.extname(sourcePath));
     const lines = content.split("\n");
 
@@ -209,10 +211,19 @@ async function analyzeDependency(
   }
 }
 
-export const impactAnalyzer: Analyzer = {
-  name: "impact",
+export function createImpactAnalyzer(options?: {
+  cwd?: string;
+  exec?: typeof execaDefault;
+  readFile?: typeof fs.readFile;
+}): Analyzer {
+  const cwd = options?.cwd ?? process.cwd();
+  const exec = options?.exec ?? execaDefault;
+  const readFile = options?.readFile ?? fs.readFile;
 
-  async analyze(changeSet: ChangeSet): Promise<Finding[]> {
+  return {
+    name: "impact",
+
+    async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];
 
     // Filter relevant source files - only code files that can be imported
@@ -236,7 +247,7 @@ export const impactAnalyzer: Analyzer = {
     });
 
     // Run batch search
-    const dependentsMap = await findDependentsBatch(targets);
+    const dependentsMap = await findDependentsBatch(targets, cwd, exec);
 
     for (const source of sourceFiles) {
       const dependents = dependentsMap.get(source.path) || [];
@@ -250,7 +261,7 @@ export const impactAnalyzer: Analyzer = {
             // Or maybe we analyze all? Let's analyze all for now, assuming typical impact < 100 files.
             // If massive, we might want to limit.
             if (impactedFilesInfo.length < 20) {
-                 const details = await analyzeDependency(dep, source.path);
+                 const details = await analyzeDependency(dep, source.path, cwd, readFile);
                  if (details) {
                      impactedFilesInfo.push({ file: dep, details });
                  } else {
@@ -296,5 +307,8 @@ export const impactAnalyzer: Analyzer = {
     }
 
     return findings;
-  },
-};
+    },
+  };
+}
+
+export const impactAnalyzer: Analyzer = createImpactAnalyzer();

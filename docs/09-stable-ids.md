@@ -168,10 +168,9 @@ ciWorkflowFindings.forEach(finding => {
 3. **RiskFlag type has new fields**
    ```typescript
    interface RiskFlag {
-     id: string; // legacy - now duplicated as ruleKey
-     ruleKey?: string; // NEW
-     flagId?: string; // NEW
-     relatedFindingIds?: string[]; // NEW
+     ruleKey: string; // Stable rule identifier, e.g. "db.destructive_sql"
+     flagId: string; // Stable instance ID, format: "flag.<ruleKey>#<hash>"
+     relatedFindingIds: string[]; // Links to findings that triggered this flag
      // ... existing fields
    }
    ```

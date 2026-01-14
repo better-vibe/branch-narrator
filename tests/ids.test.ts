@@ -8,7 +8,6 @@ import {
   buildFindingId,
   buildFlagId,
   assignFindingId,
-  assignFlagId,
 } from "../src/core/ids.js";
 import type { EnvVarFinding, DependencyChangeFinding, RouteChangeFinding } from "../src/core/types.js";
 
@@ -324,44 +323,4 @@ describe("assignFindingId", () => {
   });
 });
 
-describe("assignFlagId", () => {
-  it("should add flagId and ruleKey to flag", () => {
-    const flag: any = {
-      id: "security.workflow_permissions_broadened",
-      category: "security",
-      score: 35,
-      confidence: 0.9,
-      title: "Test",
-      summary: "Test",
-      evidence: [],
-      suggestedChecks: [],
-      effectiveScore: 32,
-      relatedFindingIds: ["finding.env-var#abc123"],
-    };
-
-    const withId = assignFlagId(flag);
-
-    expect(withId.flagId).toBeDefined();
-    expect(withId.flagId).toMatch(/^flag\.security\.workflow_permissions_broadened#[0-9a-f]{12}$/);
-    expect(withId.ruleKey).toBe("security.workflow_permissions_broadened");
-  });
-
-  it("should handle flags without relatedFindingIds", () => {
-    const flag: any = {
-      id: "security.workflow_permissions_broadened",
-      category: "security",
-      score: 35,
-      confidence: 0.9,
-      title: "Test",
-      summary: "Test",
-      evidence: [],
-      suggestedChecks: [],
-      effectiveScore: 32,
-    };
-
-    const withId = assignFlagId(flag);
-
-    expect(withId.flagId).toBeDefined();
-    expect(withId.ruleKey).toBe("security.workflow_permissions_broadened");
-  });
-});
+// assignFlagId was removed when RiskFlag schema v2 made flagId/ruleKey required.

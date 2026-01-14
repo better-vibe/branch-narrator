@@ -1,130 +1,83 @@
-# Risk Scoring
+# Risk Scoring (risk-report)
 
-Risk score computation with evidence-based explanations.
+This document describes the `risk-report` scoring model and its relationship to the findings system.
 
-## Entry Point
+## Single analysis pipeline
 
-```typescript
-function computeRiskScore(findings: Finding[]): RiskScore;
-```
-
-## Output
+`risk-report` does **not** run its own detection pass. It derives flags from analyzer findings:
 
 ```typescript
-interface RiskFactor {
-  kind: string;            // e.g., "risk-high", "db-migration", "route-deleted"
-  weight: number;          // Points contributed to score
-  explanation: string;     // Human-readable description
-  evidence: Evidence[];    // Source evidence
-}
+// 1) profile analyzers
+const findings = runAnalyzers(changeSet, profile).map(assignFindingId);
 
-interface RiskScore {
-  score: number;           // 0-100
-  level: RiskLevel;        // "low" | "medium" | "high"
-  factors: RiskFactor[];   // Detailed breakdown of risk factors
-  evidenceBullets?: string[]; // Legacy field for compatibility
-}
+// 2) findings -> flags
+const flags = findingsToFlags(findings);
+
+// 3) flags -> report (score + level + breakdown)
+const report = computeRiskReport(base, head, flags, skippedFiles, options);
 ```
 
-## Score Thresholds
+## RiskReport schema version
 
-```mermaid
-graph LR
-    A["Score: 0-19"] --> B["Level: LOW 🟢"]
-    C["Score: 20-49"] --> D["Level: MEDIUM 🟡"]
-    E["Score: 50-100"] --> F["Level: HIGH 🔴"]
-```
+Current `risk-report` output uses **`schemaVersion: "2.0"`** (see `src/core/types.ts`).
 
-## Scoring Rules
+## Flags and traceability
 
-### Positive Points (Increase Risk)
+Every emitted flag is traceable back to the finding(s) that produced it:
 
-| Finding Type | Condition | Points |
-|-------------|-----------|--------|
-| `risk-flag` | risk = "high" | +40 |
-| `risk-flag` | risk = "medium" | +20 |
-| `risk-flag` | risk = "low" | +5 |
-| `db-migration` | risk = "high" | +30 |
-| `db-migration` | risk = "medium" | +15 |
-| `route-change` | change = "added" | +5 |
-| `route-change` | change = "deleted" | +10 |
-| `dependency-change` | impact = "major" | +15 |
-| `dependency-change` | impact = "minor" | +5 |
-| `dependency-change` | riskCategory + new | +10 |
-| `env-var` | change = "added" | +5 |
-| `security-file` | any | +15 |
+- **ruleKey**: Stable rule identifier (e.g. `db.destructive_sql`)
+- **flagId**: Stable instance ID computed from `ruleKey` + sorted `relatedFindingIds`
+- **relatedFindingIds**: Finding IDs that triggered the flag
 
-### Negative Points (Reduce Risk)
-
-| Condition | Points |
-|-----------|--------|
-| Only docs changed | -15 |
-| Only tests changed | -10 |
-| Only config changed | -5 |
-| Only docs/tests/config changed | -10 |
-
-## Evidence Bullets
-
-Each scoring action adds an evidence bullet:
-
-| Emoji | Meaning | Example |
-|-------|---------|---------|
-| ⚠️ | High-risk item | `⚠️ Major version bump: @sveltejs/kit ^1.0.0 → ^2.0.0` |
-| ⚡ | Medium-risk item | `⚡ Security-sensitive files changed (Authentication): 2 file(s)` |
-| ℹ️ | Low-risk / Info | `ℹ️ New env var: PUBLIC_API_URL` |
-| ✅ | Risk reduction | `✅ Changes are only in docs (lower risk)` |
-
-## Low-Risk Detection
-
-```mermaid
-flowchart TD
-    A[Check file categories] --> B{Any high-risk category?}
-    B -->|Yes| C[Normal scoring]
-    B -->|No| D{Which low-risk?}
-
-    D -->|docs only| E["-15 points"]
-    D -->|tests only| F["-10 points"]
-    D -->|config only| G["-5 points"]
-    D -->|mixed| H["-10 points"]
-```
-
-**High-risk categories:** product, infra, ci, dependencies
-**Low-risk categories:** docs, tests, config
-
-## Example Calculation
+This enables drill-down and deterministic deltas:
 
 ```
-Findings:
-- risk-flag (high): Major version bump      +40
-- security-file: 2 auth files               +15
-- risk-flag (medium): Security files        +20
-- env-var (added): PUBLIC_API_URL           +5
-- dependency-change (major): @sveltejs/kit  +15
-                                           ----
-                                    Total:  95
-
-Capped at 100.
-Level: HIGH
+flagId -> relatedFindingIds -> findingId -> evidence
 ```
 
-## Score Bounds
+## Category scores
 
-- Minimum: 0 (floor applied)
-- Maximum: 100 (ceiling applied)
+Each flag has:
+
+- `score` (0..100): base severity
+- `confidence` (0..1): confidence multiplier
+- `effectiveScore = round(score * confidence)`
+
+Category totals are computed by summing `effectiveScore` for each category and capping at 100:
 
 ```typescript
-score = Math.max(0, Math.min(score, 100));
+categoryScores[flag.category] += flag.effectiveScore;
+categoryScores[category] = Math.min(100, categoryScores[category]);
 ```
 
-## Rendered Output
+## Overall risk score
 
-```markdown
-## Risks / Notes
+The overall `riskScore` (0..100) is computed from category scores:
 
-**Overall Risk:** 🟡 MEDIUM (score: 45/100)
+- `maxCat = max(categoryScores)`
+- `top3Avg = average(top 3 category scores, padded with zeros)`
 
-- ⚠️ Major version bump: @sveltejs/kit ^1.0.0 → ^2.0.0
-- ⚡ Security-sensitive files changed (Authentication): 2 file(s)
-- ℹ️ New env var: PUBLIC_API_URL
+```typescript
+riskScore = round(0.6 * maxCat + 0.4 * top3Avg);
 ```
+
+## Risk level thresholds
+
+Risk levels are derived from `riskScore`:
+
+- `critical`: 81..100
+- `high`: 61..80
+- `elevated`: 41..60
+- `moderate`: 21..40
+- `low`: 0..20
+
+## Determinism requirements
+
+`risk-report` output is deterministic across runs, except for `generatedAt`, which is omitted with `--no-timestamp`.
+
+Determinism includes:
+
+- Stable `findingId` and `flagId` generation
+- Sorted flag output (see `sortRiskFlags()`)
+- Sorted evidence entries per flag (see `sortRiskFlagEvidence()`)
 

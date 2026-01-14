@@ -48,7 +48,9 @@ describe("Sorting Utilities", () => {
     it("should sort by category ascending", () => {
       const flags: RiskFlag[] = [
         {
-          id: "test-1",
+          ruleKey: "test-1",
+          flagId: "flag.test-1#000000000000",
+          relatedFindingIds: ["finding.test#000000000000"],
           category: "security",
           title: "Test 1",
           summary: "Summary 1",
@@ -59,7 +61,9 @@ describe("Sorting Utilities", () => {
           suggestedChecks: [],
         },
         {
-          id: "test-2",
+          ruleKey: "test-2",
+          flagId: "flag.test-2#000000000000",
+          relatedFindingIds: ["finding.test#000000000000"],
           category: "deps",
           title: "Test 2",
           summary: "Summary 2",
@@ -79,7 +83,9 @@ describe("Sorting Utilities", () => {
     it("should sort by effectiveScore descending within same category", () => {
       const flags: RiskFlag[] = [
         {
-          id: "test-1",
+          ruleKey: "test-1",
+          flagId: "flag.test-1#000000000000",
+          relatedFindingIds: ["finding.test#000000000000"],
           category: "security",
           title: "Test 1",
           summary: "Summary 1",
@@ -90,7 +96,9 @@ describe("Sorting Utilities", () => {
           suggestedChecks: [],
         },
         {
-          id: "test-2",
+          ruleKey: "test-2",
+          flagId: "flag.test-2#000000000000",
+          relatedFindingIds: ["finding.test#000000000000"],
           category: "security",
           title: "Test 2",
           summary: "Summary 2",
@@ -107,10 +115,12 @@ describe("Sorting Utilities", () => {
       expect(sorted[1]!.effectiveScore).toBe(25);
     });
 
-    it("should sort by id ascending as final tiebreaker", () => {
+    it("should sort by ruleKey ascending as final tiebreaker", () => {
       const flags: RiskFlag[] = [
         {
-          id: "test-z",
+          ruleKey: "test-z",
+          flagId: "flag.test-z#000000000000",
+          relatedFindingIds: ["finding.test#000000000000"],
           category: "security",
           title: "Test Z",
           summary: "Summary Z",
@@ -121,7 +131,9 @@ describe("Sorting Utilities", () => {
           suggestedChecks: [],
         },
         {
-          id: "test-a",
+          ruleKey: "test-a",
+          flagId: "flag.test-a#000000000000",
+          relatedFindingIds: ["finding.test#000000000000"],
           category: "security",
           title: "Test A",
           summary: "Summary A",
@@ -134,8 +146,8 @@ describe("Sorting Utilities", () => {
       ];
 
       const sorted = sortRiskFlags(flags);
-      expect(sorted[0]!.id).toBe("test-a");
-      expect(sorted[1]!.id).toBe("test-z");
+      expect(sorted[0]!.ruleKey).toBe("test-a");
+      expect(sorted[1]!.ruleKey).toBe("test-z");
     });
   });
 

@@ -7,7 +7,7 @@
  */
 
 import path from "node:path";
-import { execa } from "execa";
+import { execa as execaDefault } from "execa";
 import { createEvidence } from "../core/evidence.js";
 import type {
   Analyzer,
@@ -75,7 +75,10 @@ export function _resetCacheForTesting(): void {
  * Get files in specific directories using git ls-files.
  * More efficient than loading entire repo for targeted lookups.
  */
-async function getFilesInDirectories(directories: string[]): Promise<Set<string>> {
+async function getFilesInDirectories(
+  directories: string[],
+  exec: typeof execaDefault
+): Promise<Set<string>> {
   // Check cache first
   const cachedResults = new Set<string>();
   const uncachedDirs: string[] = [];
@@ -98,7 +101,7 @@ async function getFilesInDirectories(directories: string[]): Promise<Set<string>
 
   try {
     // Query git for uncached directories
-    const { stdout } = await execa(
+    const { stdout } = await exec(
       "git",
       ["ls-files", "--cached", "--others", "--exclude-standard", "--", ...uncachedDirs],
       { reject: false }
@@ -128,7 +131,7 @@ async function getFilesInDirectories(directories: string[]): Promise<Set<string>
     return cachedResults;
   } catch {
     // Fallback to full file list if targeted query fails
-    return getAllFiles();
+    return getAllFiles(exec);
   }
 }
 
@@ -137,11 +140,11 @@ async function getFilesInDirectories(directories: string[]): Promise<Set<string>
  * Returns a Set for O(1) lookups.
  * This is the fallback when targeted queries aren't possible.
  */
-async function getAllFiles(): Promise<Set<string>> {
+async function getAllFiles(exec: typeof execaDefault): Promise<Set<string>> {
   if (cachedFullFileList) return cachedFullFileList;
 
   try {
-    const { stdout } = await execa(
+    const { stdout } = await exec(
       "git",
       ["ls-files", "--cached", "--others", "--exclude-standard"],
       { reject: false }
@@ -303,8 +306,12 @@ function hasNewTestInChangeset(sourcePath: string, changeSet: ChangeSet): boolea
 /**
  * Create a test parity analyzer with optional configuration.
  */
-export function createTestParityAnalyzer(config?: TestParityConfig): Analyzer {
+export function createTestParityAnalyzer(
+  config?: TestParityConfig,
+  options?: { exec?: typeof execaDefault }
+): Analyzer {
   const mergedConfig = mergeConfig(config);
+  const exec = options?.exec ?? execaDefault;
 
   return {
     name: "test-parity",
@@ -331,7 +338,7 @@ export function createTestParityAnalyzer(config?: TestParityConfig): Analyzer {
       }
 
       // Get files from relevant directories only (optimized)
-      const allFiles = await getFilesInDirectories([...dirsToCheck]);
+      const allFiles = await getFilesInDirectories([...dirsToCheck], exec);
 
       // Also ensure we have changeset files in our set (they may not be committed yet)
       for (const file of changeSet.files) {

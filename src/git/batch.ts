@@ -2,7 +2,7 @@
  * Batch git operations.
  */
 
-import { execa } from "execa";
+import { execa as execaDefault } from "execa";
 
 /**
  * Fetch content for multiple file:ref pairs using git cat-file --batch.
@@ -12,7 +12,8 @@ import { execa } from "execa";
  */
 export async function batchGetFileContent(
   items: Array<{ ref: string; path: string }>,
-  cwd: string = process.cwd()
+  cwd: string = process.cwd(),
+  exec: typeof execaDefault = execaDefault
 ): Promise<Map<string, string>> {
   if (items.length === 0) return new Map();
 
@@ -24,15 +25,18 @@ export async function batchGetFileContent(
   const inputString = inputs.join("\n") + "\n";
 
   try {
-    const subprocess = execa("git", ["cat-file", "--batch"], {
+    const subprocess = exec("git", ["cat-file", "--batch"], {
       cwd,
       input: inputString,
-      encoding: "buffer", // We need buffer to handle byte offsets correctly
+      // NOTE: We intentionally do NOT use execa's `encoding: "buffer"` here.
+      // In Bun, execa's buffer mode can throw (attempting to write to readonly streams).
+      // We parse using byte offsets by converting the UTF-8 string output to a Buffer.
     });
 
     const { stdout: stdoutRaw } = await subprocess;
-    // explicit cast to Buffer to avoid type errors with Uint8Array
-    const stdout = Buffer.from(stdoutRaw);
+    const stdout = Buffer.isBuffer(stdoutRaw)
+      ? stdoutRaw
+      : Buffer.from(String(stdoutRaw), "utf-8");
 
     let currentIndex = 0;
     for (const inputKey of inputs) {

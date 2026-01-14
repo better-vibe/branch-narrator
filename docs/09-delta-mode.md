@@ -142,10 +142,10 @@ Both work correctly with `--since`.
   },
   "since": {
     "path": ".ai/prev-risk.json",
-    "schemaVersion": "1.0"
+    "schemaVersion": "2.0"
   },
   "current": {
-    "schemaVersion": "1.0"
+    "schemaVersion": "2.0"
   },
   "scope": {
     "mode": "unstaged",
@@ -161,11 +161,11 @@ Both work correctly with `--since`.
       "delta": -22
     },
     "flags": {
-      "added": ["flag.ci.workflow_permissions#abc123"],
+      "added": ["flag.ci.pipeline_changed#abc123"],
       "removed": ["flag.db.destructive_sql#def456"],
       "changed": [
         {
-          "flagId": "flag.deps.major_bump#ghi789",
+          "flagId": "flag.deps.major_version_bump#ghi789",
           "before": { "title": "Major bump: express", "score": 40, "..." },
           "after": { "title": "Major bump: express", "score": 50, "..." }
         }

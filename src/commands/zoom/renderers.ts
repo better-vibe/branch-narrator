@@ -108,7 +108,7 @@ function renderFlagMarkdown(output: ZoomFlagOutput): string {
   lines.push("");
 
   // Metadata
-  lines.push(`**Rule:** ${output.flag.ruleKey || output.flag.id}`);
+  lines.push(`**Rule:** ${output.flag.ruleKey}`);
   lines.push(`**Category:** ${output.flag.category}`);
   lines.push(`**Score:** ${output.flag.effectiveScore} (base: ${output.flag.score}, confidence: ${output.flag.confidence})`);
   lines.push("");
@@ -272,7 +272,7 @@ function renderFlagText(output: ZoomFlagOutput): string {
   lines.push("");
 
   // Metadata
-  lines.push(`Rule: ${output.flag.ruleKey || output.flag.id}`);
+  lines.push(`Rule: ${output.flag.ruleKey}`);
   lines.push(`Category: ${output.flag.category}`);
   lines.push(`Score: ${output.flag.effectiveScore} (base: ${output.flag.score}, confidence: ${output.flag.confidence})`);
   lines.push(`Range: ${output.range.base}..${output.range.head}`);

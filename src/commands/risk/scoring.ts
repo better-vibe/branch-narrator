@@ -147,7 +147,7 @@ export function computeRiskReport(
   const riskLevel = computeRiskLevel(riskScore);
 
   const report: RiskReport = {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     range: { base, head, mode: options?.mode },
     riskScore,
     riskLevel,

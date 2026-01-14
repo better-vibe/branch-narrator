@@ -884,10 +884,12 @@ export interface RiskFlagEvidence {
 }
 
 export interface RiskFlag {
-  id: string; // Legacy field - now duplicated as ruleKey
-  ruleKey?: string; // Stable rule identifier, e.g. "db.destructive_sql"
-  flagId?: string; // Stable instance ID, format: "flag.<ruleKey>#<hash>"
-  relatedFindingIds?: string[]; // Links to findings that triggered this flag
+  /** Stable rule identifier, e.g. "db.destructive_sql" */
+  ruleKey: string;
+  /** Stable instance ID, format: "flag.<ruleKey>#<hash>" */
+  flagId: string;
+  /** Links to findings that triggered this flag (must be non-empty) */
+  relatedFindingIds: string[];
   category: RiskCategory;
   score: number; // 0..100 (base score for this flag)
   confidence: number; // 0..1
@@ -911,7 +913,7 @@ export interface RiskReportFilters {
 }
 
 export interface RiskReport {
-  schemaVersion: "1.0";
+  schemaVersion: "2.0";
   generatedAt?: string; // ISO timestamp, omitted when --no-timestamp
   range: { base: string; head: string; mode?: DiffMode };
   riskScore: number; // 0..100
