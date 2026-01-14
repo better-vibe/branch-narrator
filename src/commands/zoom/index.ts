@@ -18,6 +18,7 @@ import type {
 } from "../../core/types.js";
 import { BranchNarratorError } from "../../core/errors.js";
 import { getProfile, resolveProfileName } from "../../profiles/index.js";
+import { runAnalyzersInParallel } from "../../core/analyzer-runner.js";
 import { assignFindingId } from "../../core/ids.js";
 import { generateRiskReport } from "../risk/index.js";
 import { redactSecrets } from "../../core/evidence.js";
@@ -82,11 +83,8 @@ async function executeZoomFinding(
   const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
   const profile = getProfile(profileName);
 
-  const rawFindings: Finding[] = [];
-  for (const analyzer of profile.analyzers) {
-    const analyzerFindings = await analyzer.analyze(changeSet);
-    rawFindings.push(...analyzerFindings);
-  }
+  // Run analyzers in parallel for better performance
+  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
 
   // Assign IDs to all findings
   const findings = rawFindings.map(assignFindingId);
@@ -145,11 +143,8 @@ async function executeZoomFlag(
   const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
   const profile = getProfile(profileName);
 
-  const rawFindings: Finding[] = [];
-  for (const analyzer of profile.analyzers) {
-    const analyzerFindings = await analyzer.analyze(changeSet);
-    rawFindings.push(...analyzerFindings);
-  }
+  // Run analyzers in parallel for better performance
+  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
 
   // Assign findingIds to all findings
   const allFindings = rawFindings.map(assignFindingId);

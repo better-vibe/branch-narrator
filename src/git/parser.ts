@@ -64,9 +64,14 @@ export function getDeletions(diff: FileDiff): string[] {
 
 /**
  * Get all changes (additions + deletions) from a FileDiff.
+ * Optimized to iterate hunks once instead of twice.
  */
 export function getAllChanges(diff: FileDiff): string[] {
-  return [...getAdditions(diff), ...getDeletions(diff)];
+  const changes: string[] = [];
+  for (const hunk of diff.hunks) {
+    changes.push(...hunk.additions, ...hunk.deletions);
+  }
+  return changes;
 }
 
 /**

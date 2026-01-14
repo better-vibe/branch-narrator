@@ -364,19 +364,30 @@ async function createUntrackedDiffs(
 }
 
 /**
+ * Set of binary file extensions for O(1) lookup.
+ * Pre-compiled at module load time for maximum performance.
+ */
+const BINARY_EXTENSIONS = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg",
+  ".woff", ".woff2", ".ttf", ".eot", ".otf",
+  ".zip", ".tar", ".gz", ".tgz", ".rar",
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+  ".exe", ".dll", ".so", ".dylib",
+  ".mp3", ".mp4", ".wav", ".avi", ".mov",
+  ".lockb", // bun.lockb is binary
+]);
+
+/**
  * Check if a file is likely binary based on extension.
+ * Uses Set lookup for O(1) performance.
  */
 function isBinaryFile(path: string): boolean {
-  const binaryExtensions = [
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg",
-    ".woff", ".woff2", ".ttf", ".eot", ".otf",
-    ".zip", ".tar", ".gz", ".tgz", ".rar",
-    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-    ".exe", ".dll", ".so", ".dylib",
-    ".mp3", ".mp4", ".wav", ".avi", ".mov",
-    ".lockb", // bun.lockb is binary
-  ];
-  return binaryExtensions.some((ext) => path.toLowerCase().endsWith(ext));
+  const lowerPath = path.toLowerCase();
+  // Find the last dot to extract extension
+  const lastDot = lowerPath.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = lowerPath.slice(lastDot);
+  return BINARY_EXTENSIONS.has(ext);
 }
 
 /**
