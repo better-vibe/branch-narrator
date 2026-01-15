@@ -25,109 +25,61 @@ const CRITICAL_PACKAGES = ["@sveltejs/kit", "svelte", "vite"];
 // Risky package categories
 type RiskyCategory = "auth" | "database" | "native" | "payment";
 
-const RISKY_PACKAGES: Record<RiskyCategory, string[]> = {
-  auth: [
-    "passport",
-    "jsonwebtoken",
-    "bcrypt",
-    "bcryptjs",
-    "oauth",
-    "auth0",
-    "@auth0/auth0-spa-js",
-    "clerk",
-    "@clerk/clerk-sdk-node",
-    "@clerk/nextjs",
-    "next-auth",
-    "@auth/core",
-    "@auth/sveltekit",
-    "lucia",
-    "lucia-auth",
-    "arctic",
-    "oslo",
-    "express-session",
-    "cookie-session",
-    "passport-local",
-    "passport-jwt",
-    "passport-oauth2",
-    "jose",
-    "jwks-rsa",
-    "supertokens-node",
-    "@supabase/auth-helpers-sveltekit",
-    "@supabase/ssr",
-  ],
-  database: [
-    "prisma",
-    "@prisma/client",
-    "drizzle-orm",
-    "typeorm",
-    "sequelize",
-    "knex",
-    "mongoose",
-    "pg",
-    "mysql",
-    "mysql2",
-    "sqlite3",
-    "better-sqlite3",
-    "mongodb",
-    "redis",
-    "ioredis",
-    "@neondatabase/serverless",
-    "@planetscale/database",
-    "@libsql/client",
-    "kysely",
-  ],
-  native: [
-    "sharp",
-    "canvas",
-    "node-gyp",
-    "node-pre-gyp",
-    "node-addon-api",
-    "nan",
-    "ffi-napi",
-    "ref-napi",
-    "bcrypt",
-    "argon2",
-    "libsodium-wrappers",
-    "sodium-native",
-    "cpu-features",
-    "usb",
-    "serialport",
-  ],
-  payment: [
-    "stripe",
-    "@stripe/stripe-js",
-    "paypal-rest-sdk",
-    "@paypal/checkout-server-sdk",
-    "braintree",
-    "square",
-    "@square/web-sdk",
-    "adyen-api-library",
-    "razorpay",
-    "mollie-api-node",
-    "lemon-squeezy",
-    "@polar-sh/sdk",
-    "polar-sdk",
-  ],
-};
+/**
+ * Pre-built Map for O(1) risky package category lookup.
+ * Built at module load time for maximum performance.
+ */
+const RISKY_PACKAGE_MAP: Map<string, RiskyCategory> = new Map([
+  // auth packages
+  ...["passport", "jsonwebtoken", "bcrypt", "bcryptjs", "oauth", "auth0",
+    "@auth0/auth0-spa-js", "clerk", "@clerk/clerk-sdk-node", "@clerk/nextjs",
+    "next-auth", "@auth/core", "@auth/sveltekit", "lucia", "lucia-auth",
+    "arctic", "oslo", "express-session", "cookie-session", "passport-local",
+    "passport-jwt", "passport-oauth2", "jose", "jwks-rsa", "supertokens-node",
+    "@supabase/auth-helpers-sveltekit", "@supabase/ssr"
+  ].map(pkg => [pkg, "auth" as RiskyCategory] as const),
+
+  // database packages
+  ...["prisma", "@prisma/client", "drizzle-orm", "typeorm", "sequelize",
+    "knex", "mongoose", "pg", "mysql", "mysql2", "sqlite3", "better-sqlite3",
+    "mongodb", "redis", "ioredis", "@neondatabase/serverless",
+    "@planetscale/database", "@libsql/client", "kysely"
+  ].map(pkg => [pkg, "database" as RiskyCategory] as const),
+
+  // native packages (note: bcrypt appears in both auth and native)
+  ...["sharp", "canvas", "node-gyp", "node-pre-gyp", "node-addon-api",
+    "nan", "ffi-napi", "ref-napi", "argon2", "libsodium-wrappers",
+    "sodium-native", "cpu-features", "usb", "serialport"
+  ].map(pkg => [pkg, "native" as RiskyCategory] as const),
+
+  // payment packages
+  ...["stripe", "@stripe/stripe-js", "paypal-rest-sdk",
+    "@paypal/checkout-server-sdk", "braintree", "square", "@square/web-sdk",
+    "adyen-api-library", "razorpay", "mollie-api-node", "lemon-squeezy",
+    "@polar-sh/sdk", "polar-sdk"
+  ].map(pkg => [pkg, "payment" as RiskyCategory] as const),
+]);
 
 /**
  * Check if a package is in a risky category.
+ * Uses Map lookup for O(1) performance.
  */
 function getRiskyCategory(packageName: string): RiskyCategory | undefined {
-  for (const [category, packages] of Object.entries(RISKY_PACKAGES)) {
-    if (packages.includes(packageName)) {
-      return category as RiskyCategory;
-    }
-  }
-  return undefined;
+  return RISKY_PACKAGE_MAP.get(packageName);
 }
+
+/**
+ * Pre-compiled regex for version string cleaning.
+ * Compiled once at module load time for performance.
+ */
+const VERSION_PREFIX_REGEX = /^[\^~>=<]+/;
 
 /**
  * Clean version string for semver parsing.
  */
 function cleanVersion(version: string): string {
   // Remove common prefixes: ^, ~, >=, etc.
-  return version.replace(/^[\^~>=<]+/, "").trim();
+  return version.replace(VERSION_PREFIX_REGEX, "").trim();
 }
 
 /**

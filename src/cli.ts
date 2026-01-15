@@ -10,6 +10,7 @@ import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
 import { getVersion } from "./core/version.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
+import { runAnalyzersInParallel } from "./core/analyzer-runner.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
 import { getProfile, resolveProfileName, detectProfileWithReasons } from "./profiles/index.js";
@@ -131,12 +132,8 @@ async function runAnalysisWithMode(options: {
     spinner.text = `Running analyzers (${profile.analyzers.length})...`;
   }
 
-  // Run analyzers
-  const findings: Finding[] = [];
-  for (const analyzer of profile.analyzers) {
-    const analyzerFindings = await analyzer.analyze(changeSet);
-    findings.push(...analyzerFindings);
-  }
+  // Run analyzers in parallel for better performance
+  const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
 
   if (spinner) {
     spinner.succeed(
@@ -397,12 +394,8 @@ program
 
       const profile = getProfile(detectedProfile);
 
-      // Run analyzers
-      const findings: Finding[] = [];
-      for (const analyzer of profile.analyzers) {
-        const analyzerFindings = await analyzer.analyze(changeSet);
-        findings.push(...analyzerFindings);
-      }
+      // Run analyzers in parallel for better performance
+      const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
 
       // Run test parity analyzer if explicitly enabled (opt-in)
       if (options.testParity) {

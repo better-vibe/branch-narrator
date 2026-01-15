@@ -2,7 +2,7 @@
  * Risk report command.
  */
 
-import type { ChangeSet, DiffMode, Finding, ProfileName, RiskFlag, RiskReport } from "../../core/types.js";
+import type { ChangeSet, DiffMode, ProfileName, RiskFlag, RiskReport } from "../../core/types.js";
 import { shouldSkipFile } from "./exclusions.js";
 import { redactLines } from "./redaction.js";
 import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
@@ -10,6 +10,7 @@ import { sortRiskFlagEvidence } from "../../core/sorting.js";
 import { getProfile, resolveProfileName } from "../../profiles/index.js";
 import { assignFindingId } from "../../core/ids.js";
 import { findingsToFlags } from "./findings-to-flags.js";
+import { runAnalyzersInParallel } from "../../core/analyzer-runner.js";
 
 /**
  * Options for generating risk report.
@@ -67,11 +68,8 @@ export async function generateRiskReport(
   const profileName = resolveProfileName(requestedProfile, changeSet, cwd);
   const profile = getProfile(profileName);
 
-  const rawFindings: Finding[] = [];
-  for (const analyzer of profile.analyzers) {
-    const analyzerFindings = await analyzer.analyze(changeSet);
-    rawFindings.push(...analyzerFindings);
-  }
+  // Run analyzers in parallel for better performance
+  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
 
   // Run test parity analyzer if explicitly enabled (opt-in)
   if (testParity) {
