@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 2.0.2
+
+### Patch Changes
+
+- ef9c7b9: Improve time efficiency of core functiones
+
 ## 2.0.1
 
 ### Patch Changes
