@@ -1,5 +1,5 @@
 ---
-"branch-narrator": patch
+"@better-vibe/branch-narrator": patch
 ---
 
 Improve highlights system with priority-based ordering and lockfile mismatch coverage
