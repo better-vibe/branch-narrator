@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://better-vibe.dev/sitemap.xml
