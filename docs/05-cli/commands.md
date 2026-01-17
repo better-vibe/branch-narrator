@@ -842,11 +842,26 @@ Plain text output optimized for terminal display, similar to Markdown but withou
 
 ## integrate
 
-Generate provider-specific rules for AI coding assistants (e.g., Cursor, Jules).
+Generate provider-specific rules for AI coding assistants. If no target is
+provided, the command auto-detects existing agent guides and integrates all
+matches.
 
 ```bash
-branch-narrator integrate <target> [options]
+branch-narrator integrate [target] [options]
 ```
+
+### Auto-detect behavior
+
+When `target` is omitted, `integrate` scans for existing guide locations:
+
+- `.cursor/rules/`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `.jules/`
+- `OPENCODE.md`, `opencode.md`
+- `.opencode/`
+
+If none are found, the command logs a message with the available targets.
 
 ### Options
 
@@ -860,13 +875,25 @@ branch-narrator integrate <target> [options]
 | Target | Description |
 |--------|-------------|
 | `cursor` | Generates `.cursor/rules/branch-narrator.md` and `.cursor/rules/pr-description.md` |
-| `jules` | Generates `.jules/rules/branch-narrator.md` |
+| `jules` | Appends a Branch Narrator section to `AGENTS.md` |
+| `claude` | Appends a Branch Narrator section to `CLAUDE.md` |
+| `jules-rules` | Generates `.jules/rules/branch-narrator.md` |
+| `opencode` | Appends a Branch Narrator section to `OPENCODE.md` (or `opencode.md`); uses `.opencode/branch-narrator.md` if `.opencode/` exists |
 
 ### Examples
 
 ```bash
+# Auto-detect existing guides
+branch-narrator integrate
+
 # Generate Cursor rules
 branch-narrator integrate cursor
+
+# Add to CLAUDE.md
+branch-narrator integrate claude
+
+# Add to OPENCODE.md
+branch-narrator integrate opencode
 
 # Preview without writing
 branch-narrator integrate cursor --dry-run

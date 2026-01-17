@@ -159,6 +159,94 @@ describe("integrate jules command", () => {
 });
 
 // ============================================================================
+// Claude Integration Tests
+// ============================================================================
+
+describe("integrate claude command", () => {
+  it("should create CLAUDE.md file", async () => {
+    const { exitCode } = await runCli(["integrate", "claude"], tempDir);
+
+    expect(exitCode).toBe(0);
+
+    const content = await readFile(join(tempDir, "CLAUDE.md"), "utf-8");
+    expect(content).toContain("Branch Narrator Usage");
+  });
+});
+
+// ============================================================================
+// Jules Rules Integration Tests
+// ============================================================================
+
+describe("integrate jules-rules command", () => {
+  it("should create .jules/rules/branch-narrator.md", async () => {
+    const { exitCode } = await runCli(["integrate", "jules-rules"], tempDir);
+
+    expect(exitCode).toBe(0);
+
+    const content = await readFile(
+      join(tempDir, ".jules", "rules", "branch-narrator.md"),
+      "utf-8"
+    );
+    expect(content).toContain("branch-narrator");
+  });
+});
+
+// ============================================================================
+// Opencode Integration Tests
+// ============================================================================
+
+describe("integrate opencode command", () => {
+  it("should create OPENCODE.md file", async () => {
+    const { exitCode } = await runCli(["integrate", "opencode"], tempDir);
+
+    expect(exitCode).toBe(0);
+
+    const content = await readFile(join(tempDir, "OPENCODE.md"), "utf-8");
+    expect(content).toContain("Branch Narrator Usage");
+  });
+});
+
+// ============================================================================
+// Auto Detect Integration Tests
+// ============================================================================
+
+describe("integrate auto-detect command", () => {
+  it("should integrate all detected guides", async () => {
+    await mkdir(join(tempDir, ".cursor", "rules"), { recursive: true });
+    await mkdir(join(tempDir, ".jules"), { recursive: true });
+    await mkdir(join(tempDir, ".opencode"), { recursive: true });
+    await writeFile(join(tempDir, "AGENTS.md"), "# Agents\n");
+    await writeFile(join(tempDir, "CLAUDE.md"), "# Claude\n");
+
+    const { exitCode, stdout } = await runCli(["integrate"], tempDir);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Auto-detected guides");
+
+    const cursorRule = await readFile(
+      join(tempDir, ".cursor", "rules", "branch-narrator.md"),
+      "utf-8"
+    );
+    const agentsRule = await readFile(join(tempDir, "AGENTS.md"), "utf-8");
+    const claudeRule = await readFile(join(tempDir, "CLAUDE.md"), "utf-8");
+    const julesRule = await readFile(
+      join(tempDir, ".jules", "rules", "branch-narrator.md"),
+      "utf-8"
+    );
+    const opencodeRule = await readFile(
+      join(tempDir, ".opencode", "branch-narrator.md"),
+      "utf-8"
+    );
+
+    expect(cursorRule).toContain("branch-narrator");
+    expect(agentsRule).toContain("Branch Narrator Usage");
+    expect(claudeRule).toContain("Branch Narrator Usage");
+    expect(julesRule).toContain("branch-narrator");
+    expect(opencodeRule).toContain("branch-narrator");
+  });
+});
+
+// ============================================================================
 // Dry Run Tests
 // ============================================================================
 

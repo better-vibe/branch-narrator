@@ -7,8 +7,11 @@ import { mkdir, writeFile, access, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { BranchNarratorError } from "../core/errors.js";
 import type { IntegrateOptions, Provider, FileOperation } from "./integrate/types.js";
+import { claudeProvider } from "./integrate/providers/claude.js";
 import { cursorProvider } from "./integrate/providers/cursor.js";
+import { julesRulesProvider } from "./integrate/providers/jules-rules.js";
 import { julesProvider } from "./integrate/providers/jules.js";
+import { opencodeProvider } from "./integrate/providers/opencode.js";
 
 // ============================================================================
 // Registry
@@ -17,6 +20,9 @@ import { julesProvider } from "./integrate/providers/jules.js";
 const providers: Record<string, Provider> = {
   cursor: cursorProvider,
   jules: julesProvider,
+  claude: claudeProvider,
+  "jules-rules": julesRulesProvider,
+  opencode: opencodeProvider,
 };
 
 export { generateCursorRules } from "./integrate/commands/legacy_stub.js"; // For backward compatibility if needed, or remove
@@ -72,30 +78,13 @@ async function writeRuleFiles(
   }
 }
 
-// ============================================================================
-// Command Handler
-// ============================================================================
-
-/**
- * Execute the integrate command.
- */
-export async function executeIntegrate(options: IntegrateOptions): Promise<void> {
-  const cwd = options.cwd ?? process.cwd();
-  const provider = providers[options.target];
-
-  // Validate target
-  if (!provider) {
-    throw new BranchNarratorError(
-      `Unknown integration target: ${options.target}\n` +
-        `Supported targets: ${Object.keys(providers).join(", ")}`,
-      1
-    );
-  }
-
-  // Generate file operations
+async function runIntegration(
+  provider: Provider,
+  options: IntegrateOptions,
+  cwd: string
+): Promise<void> {
   const operations = await provider.generate(cwd);
 
-  // Dry run mode
   if (options.dryRun) {
     console.log("=".repeat(80));
     console.log(`DRY RUN: Integration for ${provider.name}`);
@@ -112,7 +101,72 @@ export async function executeIntegrate(options: IntegrateOptions): Promise<void>
     return;
   }
 
-  // Write files
   console.log(`Integration for ${provider.name}:`);
   await writeRuleFiles(operations, cwd, options.force);
+}
+
+async function detectTargets(cwd: string): Promise<string[]> {
+  const detected: string[] = [];
+
+  for (const [target, provider] of Object.entries(providers)) {
+    if (!provider.detect) {
+      continue;
+    }
+
+    try {
+      if (await provider.detect(cwd)) {
+        detected.push(target);
+      }
+    } catch {
+      // Ignore detection failures and keep scanning.
+    }
+  }
+
+  return detected;
+}
+
+// ============================================================================
+// Command Handler
+// ============================================================================
+
+/**
+ * Execute the integrate command.
+ */
+export async function executeIntegrate(options: IntegrateOptions): Promise<void> {
+  const cwd = options.cwd ?? process.cwd();
+  const supportedTargets = Object.keys(providers);
+
+  if (!options.target) {
+    const detectedTargets = await detectTargets(cwd);
+
+    if (detectedTargets.length === 0) {
+      console.log("No supported agent guide files detected in this repo.");
+      console.log(
+        `Run "branch-narrator integrate <target>" with one of: ${supportedTargets.join(", ")}`
+      );
+      return;
+    }
+
+    console.log(`Auto-detected guides: ${detectedTargets.join(", ")}`);
+
+    for (const target of detectedTargets) {
+      const provider = providers[target];
+      await runIntegration(provider, options, cwd);
+    }
+
+    return;
+  }
+
+  const provider = providers[options.target];
+
+  // Validate target
+  if (!provider) {
+    throw new BranchNarratorError(
+      `Unknown integration target: ${options.target}\n` +
+        `Supported targets: ${supportedTargets.join(", ")}`,
+      1
+    );
+  }
+
+  await runIntegration(provider, options, cwd);
 }

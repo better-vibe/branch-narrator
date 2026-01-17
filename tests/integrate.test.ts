@@ -314,6 +314,143 @@ describe("executeIntegrate - Jules", () => {
 });
 
 // ============================================================================
+// executeIntegrate - Claude
+// ============================================================================
+
+describe("executeIntegrate - Claude", () => {
+  it("should create CLAUDE.md if missing", async () => {
+    const options: IntegrateOptions = {
+      target: "claude",
+      dryRun: false,
+      force: false,
+      cwd: tempDir,
+    };
+
+    await executeIntegrate(options);
+
+    const claudeFile = join(tempDir, "CLAUDE.md");
+    const content = await readFile(claudeFile, "utf-8");
+
+    expect(content).toContain("Branch Narrator Usage");
+    expect(content).toContain("branch-narrator");
+  });
+});
+
+// ============================================================================
+// executeIntegrate - Jules Rules
+// ============================================================================
+
+describe("executeIntegrate - Jules rules", () => {
+  it("should create .jules/rules/branch-narrator.md", async () => {
+    const options: IntegrateOptions = {
+      target: "jules-rules",
+      dryRun: false,
+      force: false,
+      cwd: tempDir,
+    };
+
+    await executeIntegrate(options);
+
+    const rulesFile = join(tempDir, ".jules", "rules", "branch-narrator.md");
+    const content = await readFile(rulesFile, "utf-8");
+
+    expect(content).toContain("branch-narrator CLI Reference");
+  });
+});
+
+// ============================================================================
+// executeIntegrate - Opencode
+// ============================================================================
+
+describe("executeIntegrate - Opencode", () => {
+  it("should create OPENCODE.md by default", async () => {
+    const options: IntegrateOptions = {
+      target: "opencode",
+      dryRun: false,
+      force: false,
+      cwd: tempDir,
+    };
+
+    await executeIntegrate(options);
+
+    const opencodeFile = join(tempDir, "OPENCODE.md");
+    const content = await readFile(opencodeFile, "utf-8");
+
+    expect(content).toContain("Branch Narrator Usage");
+    expect(content).toContain("branch-narrator");
+  });
+});
+
+// ============================================================================
+// executeIntegrate - Auto Detect
+// ============================================================================
+
+describe("executeIntegrate - auto detect", () => {
+  it("should integrate all detected guides", async () => {
+    await mkdir(join(tempDir, ".cursor", "rules"), { recursive: true });
+    await mkdir(join(tempDir, ".jules"), { recursive: true });
+    await mkdir(join(tempDir, ".opencode"), { recursive: true });
+    await writeFile(join(tempDir, "AGENTS.md"), "# Agents\n");
+    await writeFile(join(tempDir, "CLAUDE.md"), "# Claude\n");
+
+    const options: IntegrateOptions = {
+      dryRun: false,
+      force: false,
+      cwd: tempDir,
+    };
+
+    await executeIntegrate(options);
+
+    const cursorFile = join(tempDir, ".cursor", "rules", "branch-narrator.md");
+    const agentsFile = join(tempDir, "AGENTS.md");
+    const claudeFile = join(tempDir, "CLAUDE.md");
+    const julesRulesFile = join(
+      tempDir,
+      ".jules",
+      "rules",
+      "branch-narrator.md"
+    );
+    const opencodeFile = join(
+      tempDir,
+      ".opencode",
+      "branch-narrator.md"
+    );
+
+    expect(await readFile(cursorFile, "utf-8")).toContain("branch-narrator");
+    expect(await readFile(agentsFile, "utf-8")).toContain("Branch Narrator Usage");
+    expect(await readFile(claudeFile, "utf-8")).toContain("Branch Narrator Usage");
+    expect(await readFile(julesRulesFile, "utf-8")).toContain(
+      "branch-narrator"
+    );
+    expect(await readFile(opencodeFile, "utf-8")).toContain("branch-narrator");
+  });
+
+  it("should log when no guides are detected", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    };
+
+    try {
+      const options: IntegrateOptions = {
+        dryRun: false,
+        force: false,
+        cwd: tempDir,
+      };
+
+      await executeIntegrate(options);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = logs.join("\n");
+    expect(output).toContain("No supported agent guide files detected");
+    expect(output).toContain("branch-narrator integrate <target>");
+  });
+});
+
+// ============================================================================
 // executeIntegrate - Error Handling
 // ============================================================================
 

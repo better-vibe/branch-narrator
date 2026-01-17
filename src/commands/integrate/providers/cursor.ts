@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Provider } from "../types.js";
 import { BRANCH_NARRATOR_USAGE, PR_DESCRIPTION_TEMPLATE } from "../shared.js";
+import { isDirectory } from "../fs.js";
 
 /**
  * Detect whether to use .mdc or .md format based on existing rules.
@@ -33,6 +34,7 @@ ${content}`;
 export const cursorProvider: Provider = {
   name: "cursor",
   description: "Generate Cursor rules (.cursor/rules/*.md or *.mdc)",
+  detect: async (cwd: string) => isDirectory(join(cwd, ".cursor", "rules")),
   generate: async (cwd: string) => {
     const format = await detectCursorFormat(cwd);
     const extension = format === "mdc" ? ".mdc" : ".md";

@@ -890,8 +890,8 @@ program
 
 // integrate command - generate provider rules (Cursor, Jules, etc.)
 program
-  .command("integrate <target>")
-  .description("Generate provider-specific rules")
+  .command("integrate [target]")
+  .description("Generate provider-specific rules (auto-detects when omitted)")
   .option("--dry-run", "Preview what would be written without creating files", false)
   .option("--force", "Overwrite existing files", false)
   .action(async (target, options) => {

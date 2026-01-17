@@ -25,6 +25,7 @@
 - [x] Package manager detection for actions (bun/pnpm/yarn/npm)
 - [x] `bun.lock` lockfile detection
 - [x] Improved test file detection (src/tests/ paths)
+- [x] Integrate auto-detects agent guides and supports multiple targets
 
 ---
 
