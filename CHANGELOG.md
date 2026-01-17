@@ -1,20 +1,10 @@
 # @better-vibe/branch-narrator
 
-## 2.1.0
-
-### Minor Changes
+## 0.9.0
 
 - d7db090: Add integrate auto-detection for existing agent guides and new targets (Claude, opencode, Jules rules).
 
-## 2.0.2
-
-### Patch Changes
-
 - ef9c7b9: Improve time efficiency of core functiones
-
-## 2.0.1
-
-### Patch Changes
 
 - 221ed3e: Improve highlights system with priority-based ordering and lockfile mismatch coverage
 
@@ -23,9 +13,7 @@
   - Highlights now show both high and medium blast radius findings (previously only showed one)
   - Ordering is deterministic and stable across runs
 
-## 2.0.0
 
-### Major Changes
 
 - 1fcd2cc: BREAKING: risk-report schema v2 (derived flags, deterministic traceability)
 
@@ -33,9 +21,8 @@
   - `RiskFlag` now requires `ruleKey`, `flagId`, and non-empty `relatedFindingIds` (legacy `id` field removed).
   - Legacy risk detector implementation under `src/commands/risk/detectors/` has been removed; flags are derived from analyzer findings via `findingsToFlags()`.
 
-## 1.7.0
 
-### Minor Changes
+
 
 - d399dfd: Add new analyzers and profiles for enhanced framework detection
 
@@ -100,15 +87,7 @@
   - Added clear evidence showing which production files changed without tests
   - Prevents confusion between actual test changes and test coverage warnings
 
-## 1.6.1
-
-### Patch Changes
-
 - 8aebcc9: improve file-summary for changeDescription
-
-## 1.6.0
-
-### Minor Changes
 
 - a8a7710: Add SARIF 2.1.0 output format for GitHub Code Scanning integration
 
@@ -137,21 +116,9 @@
   - Stable ordering of rules and results for reproducibility
   - Full SARIF 2.1.0 compliance with tool metadata and location tracking
 
-## 1.5.2
-
-### Patch Changes
-
 - 12ad85d: add snapshot command feature
 
-## 1.5.1
-
-### Patch Changes
-
 - 4fb6570: fix --no-timestamp flag
-
-## 1.5.0
-
-### Minor Changes
 
 - 43b3677: Add Next.js profile with App Router support
 
@@ -162,19 +129,9 @@
   - Support for route groups `(name)` and dynamic segments `[slug]`, `[...slug]`, `[[...slug]]`
   - Auto-detection based on `next` dependency and `app/` directory presence
 
-## 1.4.3
-
-### Patch Changes
-
 - 8ecb5d0: refactor actions array
 
-## 1.4.2
-
-### Patch Changes
-
-- 3750c0e: ## Breaking Changes
-
-  ### Schema Version 2.0: Restructured `facts` output
+- 3750c0e:
 
   Meta-findings are no longer in the `findings` array. They now appear in a new `changeset` structure:
 
@@ -218,20 +175,10 @@
 
   The `findings` array now only contains domain-specific findings with meaningful `category` values.
 
-  ## Other Changes
-
   - Add 'artifacts' file category for build outputs (.tgz, .tar.gz, .zip, .wasm, .exe, etc.)
   - Improve profile detection reasons to explain WHY a profile was detected
 
-## 1.4.1
-
-### Patch Changes
-
 - 55d20d2: Add 'artifacts' file category for build outputs like .tgz, .tar.gz, .zip, .wasm, .exe, and other binary/archive files. These are now categorized as "Build Artifacts" instead of "other".
-
-## 1.4.0
-
-### Minor Changes
 
 - bacbd62: Add `stencil` profile for StencilJS support
 
@@ -251,15 +198,7 @@
 
   To exclude untracked files, use `--mode staged` or pass `--no-untracked` (where available).
 
-## 1.3.1
-
-### Patch Changes
-
 - 51dfc4a: fix --version flag
-
-## 1.3.0
-
-### Minor Changes
 
 - a38794e: Improve detection coverage and package manager support:
 
@@ -268,10 +207,6 @@
   - **Smart package manager detection**: Suggested actions (test, check) now detect and use the correct package manager (bun/pnpm/yarn/npm) based on lockfiles in the changeset
   - **Improved test file detection**: Test files under `src/tests/` and similar nested paths are now correctly categorized
   - **Archive files excluded by default**: `.tgz`, `.tar.gz`, and `.zip` files are now excluded from analysis by default
-
-## 1.2.0
-
-### Minor Changes
 
 - ca7fa34: Add `--since` flag for iteration-friendly delta comparison in `facts` and `risk-report` commands
 
@@ -303,15 +238,7 @@
   branch-narrator risk-report --since .ai/prev-risk.json
   ```
 
-## 1.1.0
-
-### Minor Changes
-
 - 0f01789: Add zoom command for targeted drill-down by findingId or flagId
-
-## 1.0.0
-
-### Major Changes
 
 - e1039f1: BREAKING: Add stable IDs to findings and risk flags for deterministic references
 
@@ -320,19 +247,9 @@
   - New finding types added to support risk detection patterns
   - Facts builder automatically assigns findingIds to all findings
 
-### Minor Changes
-
 - c9e6d1e: feat: change default mode to unstaged and add branch auto-detection
 
-## 0.15.2
-
-### Patch Changes
-
 - a62a306: Optimize facts command performance by reducing git subprocess calls and avoiding unnecessary evidence processing
-
-## 0.15.1
-
-### Patch Changes
 
 - 4b7c6e9: Improve dump-diff performance by reducing git calls and batching work
 
@@ -342,10 +259,6 @@
   - Add diff splitting utility to parse full diff into per-file chunks
   - Add concurrency limiting utility for parallel operations
   - Maintain identical output for all existing modes (full, --name-only, --stat, --patch-for)
-
-## 0.15.0
-
-### Minor Changes
 
 - 5d617b7: Add deterministic benchmarks with configurable temporary git repositories
 
@@ -393,21 +306,9 @@
   - Access skipped files via `skippedFiles` instead of `skipped`
   - Access counts via `summary` instead of `stats`
 
-## 0.14.1
-
-### Patch Changes
-
 - d2aa296: add babel-parser as dependency
 
-## 0.14.0
-
-### Minor Changes
-
 - 400b16d: Add modular benchmarking workflow for performance testing
-
-## 0.13.0
-
-### Minor Changes
 
 - b4bad62: Add agent-grade structured output to dump-diff command
 
@@ -423,10 +324,6 @@
   - **Agent-friendly**: JSON-only stdout in JSON mode, all metadata included
 
   This enables AI agents to efficiently retrieve diffs in stages: first get the file list, then fetch only relevant diffs.
-
-## 0.12.0
-
-### Minor Changes
 
 - 89af6eb: Implement agent-facing reliability guarantees for JSON output and CLI behavior
 
@@ -461,67 +358,27 @@
 
   These changes ensure that AI coding agents can safely parse and cache CLI output without encountering JSON parsing errors or output churn.
 
-## 0.11.0
-
-### Minor Changes
-
 - 11ff7fe: Migrate test suite from Vitest to bun test for improved performance and compatibility
 
-## 0.10.0
-
-### Minor Changes
-
 - 7839c77: Enhance impact analysis with symbol-level tracking and test detection.
-
-## 0.9.0
-
-### Minor Changes
 
 - 9ccbb1f: Added two new analyzers for enhanced verification:
   - `TestParityAnalyzer`: Enforces that modified source files have corresponding test files.
   - `ImpactAnalyzer`: Calculates the dependency "blast radius" of changes.
 
-## 0.8.0
-
-### Minor Changes
-
 - f8d3d97: Added `branch-narrator integrate` command with support for `cursor` and `jules` providers.
   Refactored integration logic to use a provider registry and support appending to existing files by default.
 
-## 0.7.1
-
-### Patch Changes
-
 - 527e35f: Performance: Optimized `findAdditionMatches` by hoisting RegExp creation out of loops, improving performance for large diffs.
-
-## 0.7.0
-
-### Minor Changes
 
 - fe8510e: Add React profile with React Router route detection and enhanced env var support for Vite and React App
 
-## 0.6.0
-
-### Minor Changes
-
 - 6c15af3: Add `integrate cursor` command to generate Cursor AI rules that instruct Cursor on how to use branch-narrator for PR descriptions
-
-## 0.5.0
-
-### Minor Changes
 
 - ae1186b: Add mode support to facts and risk-report commands
 
   Both commands now support `--mode` option with `branch|unstaged|staged|all` modes, enabling analysis of working tree changes in addition to branch comparisons. The `--base` and `--head` options are now only used in branch mode.
 
-## 0.4.0
-
-### Minor Changes
-
 - d6b06f8: Add risk-report command for framework-agnostic security and quality analysis
-
-## 0.3.0
-
-### Minor Changes
 
 - f18b443: Add dump-diff command
