@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.0.0
+
+### Major Changes
+
+- 274c841: first public version
+
 ## 0.9.0
 
 - d7db090: Add integrate auto-detection for existing agent guides and new targets (Claude, opencode, Jules rules).
@@ -13,16 +19,11 @@
   - Highlights now show both high and medium blast radius findings (previously only showed one)
   - Ordering is deterministic and stable across runs
 
-
-
 - 1fcd2cc: BREAKING: risk-report schema v2 (derived flags, deterministic traceability)
 
   - `risk-report` now outputs `schemaVersion: "2.0"` and all flags include deterministic `flagId` plus `relatedFindingIds` links to the triggering findings.
   - `RiskFlag` now requires `ruleKey`, `flagId`, and non-empty `relatedFindingIds` (legacy `id` field removed).
   - Legacy risk detector implementation under `src/commands/risk/detectors/` has been removed; flags are derived from analyzer findings via `findingsToFlags()`.
-
-
-
 
 - d399dfd: Add new analyzers and profiles for enhanced framework detection
 
@@ -363,6 +364,7 @@
 - 7839c77: Enhance impact analysis with symbol-level tracking and test detection.
 
 - 9ccbb1f: Added two new analyzers for enhanced verification:
+
   - `TestParityAnalyzer`: Enforces that modified source files have corresponding test files.
   - `ImpactAnalyzer`: Calculates the dependency "blast radius" of changes.
 
