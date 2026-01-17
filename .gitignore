@@ -29,3 +29,6 @@ coverage/
 .test-data/
 test-delta-manual.js
 
+# Website build output
+website/dist/
+

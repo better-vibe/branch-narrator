@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Better Vibe - Building developer tools that understand your code. Home of Branch Narrator and more.">
+  <meta name="theme-color" content="#0a0a0a">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Better Vibe - Developer Tools That Understand">
+  <meta property="og:description" content="Building intelligent developer tools. Meet Branch Narrator - your AI-free PR companion.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/og-image.png">
+
+  <title>Better Vibe - Developer Tools That Understand</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◆</text></svg>">
+</head>
+<body>
+  <!-- Noise overlay -->
+  <div class="noise"></div>
+
+  <!-- Cursor follower -->
+  <div class="cursor-glow" id="cursorGlow"></div>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">better-vibe</span>
+      </a>
+      <div class="nav-links">
+        <a href="#products" class="nav-link">Products</a>
+        <a href="#about" class="nav-link">About</a>
+        <a href="https://github.com/better-vibe" class="nav-link" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <button class="nav-cta">Get Started</button>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero" id="hero">
+    <div class="hero-bg">
+      <div class="hero-gradient"></div>
+      <div class="hero-grid"></div>
+    </div>
+    <div class="hero-content">
+      <div class="hero-badge reveal">
+        <span class="badge-dot"></span>
+        <span>Now shipping v2.0</span>
+      </div>
+      <h1 class="hero-title">
+        <span class="reveal">Developer tools</span>
+        <span class="reveal delay-1">that <em>understand</em></span>
+        <span class="reveal delay-2">your code.</span>
+      </h1>
+      <p class="hero-subtitle reveal delay-3">
+        We build intelligent, deterministic tools that analyze your codebase
+        without AI hallucinations. Local-first. Privacy-focused. Lightning fast.
+      </p>
+      <div class="hero-actions reveal delay-4">
+        <a href="#products" class="btn btn-primary">
+          <span>Explore Products</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+        <a href="https://github.com/better-vibe" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          <span>View on GitHub</span>
+        </a>
+      </div>
+    </div>
+    <div class="hero-scroll">
+      <span>Scroll to explore</span>
+      <div class="scroll-indicator">
+        <div class="scroll-dot"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Marquee -->
+  <div class="marquee">
+    <div class="marquee-track">
+      <span class="marquee-item">Deterministic Analysis</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">No AI Hallucinations</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Local-First</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Privacy Focused</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Open Source</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Lightning Fast</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Deterministic Analysis</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">No AI Hallucinations</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Local-First</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Privacy Focused</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Open Source</span>
+      <span class="marquee-divider">◆</span>
+      <span class="marquee-item">Lightning Fast</span>
+      <span class="marquee-divider">◆</span>
+    </div>
+  </div>
+
+  <!-- Products Section -->
+  <section class="products" id="products">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag reveal">Products</span>
+        <h2 class="section-title reveal">
+          Tools built for<br>
+          <span class="gradient-text">modern developers</span>
+        </h2>
+      </div>
+
+      <!-- Branch Narrator - Featured Product -->
+      <div class="product-featured reveal">
+        <div class="product-featured-content">
+          <div class="product-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M6 3v12"/>
+              <circle cx="18" cy="6" r="3"/>
+              <circle cx="6" cy="18" r="3"/>
+              <path d="M18 9a9 9 0 0 1-9 9"/>
+            </svg>
+          </div>
+          <div class="product-badge">Flagship</div>
+          <h3 class="product-title">Branch Narrator</h3>
+          <p class="product-version">v2.0.2</p>
+          <p class="product-description">
+            A local-first CLI that reads your git diff and generates structured PR descriptions.
+            28 specialized analyzers. 8 framework profiles. Zero network calls.
+            Pure, deterministic code analysis.
+          </p>
+          <div class="product-stats">
+            <div class="stat">
+              <span class="stat-value">28</span>
+              <span class="stat-label">Analyzers</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">8</span>
+              <span class="stat-label">Profiles</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">0</span>
+              <span class="stat-label">Network Calls</span>
+            </div>
+          </div>
+          <div class="product-actions">
+            <a href="https://github.com/better-vibe/branch-narrator" class="btn btn-primary" target="_blank" rel="noopener">
+              <span>View on GitHub</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 17L17 7M17 7H7M17 7v10"/>
+              </svg>
+            </a>
+            <a href="#branch-narrator" class="btn btn-ghost">Learn More</a>
+          </div>
+        </div>
+        <div class="product-featured-visual">
+          <div class="terminal">
+            <div class="terminal-header">
+              <div class="terminal-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <span class="terminal-title">Terminal</span>
+            </div>
+            <div class="terminal-body">
+              <div class="terminal-line">
+                <span class="terminal-prompt">$</span>
+                <span class="terminal-command">npx branch-narrator integrate</span>
+              </div>
+              <div class="terminal-output">
+                <span class="terminal-muted">Analyzing changes...</span>
+              </div>
+              <div class="terminal-output">
+                <span class="terminal-success">✓</span> Detected <span class="terminal-highlight">SvelteKit</span> profile
+              </div>
+              <div class="terminal-output">
+                <span class="terminal-success">✓</span> Found <span class="terminal-number">12</span> route changes
+              </div>
+              <div class="terminal-output">
+                <span class="terminal-success">✓</span> Identified <span class="terminal-number">3</span> breaking changes
+              </div>
+              <div class="terminal-output">
+                <span class="terminal-success">✓</span> Generated PR description
+              </div>
+              <div class="terminal-line">
+                <span class="terminal-prompt">$</span>
+                <span class="terminal-cursor"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- More products coming -->
+      <div class="products-grid">
+        <div class="product-card reveal">
+          <div class="product-card-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 9h6M9 12h6M9 15h4"/>
+            </svg>
+          </div>
+          <h4 class="product-card-title">More Tools</h4>
+          <p class="product-card-description">
+            We're building more developer tools. Stay tuned for announcements.
+          </p>
+          <span class="product-card-status">Coming Soon</span>
+        </div>
+        <div class="product-card product-card-cta reveal">
+          <div class="product-card-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </div>
+          <h4 class="product-card-title">Have an Idea?</h4>
+          <p class="product-card-description">
+            We're open to collaboration. Let's build something great together.
+          </p>
+          <a href="https://github.com/better-vibe" class="product-card-link" target="_blank" rel="noopener">
+            Get in touch
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M7 17L17 7M17 7H7M17 7v10"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Branch Narrator Deep Dive -->
+  <section class="deep-dive" id="branch-narrator">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag reveal">Deep Dive</span>
+        <h2 class="section-title reveal">
+          Why <span class="gradient-text">Branch Narrator</span>?
+        </h2>
+        <p class="section-subtitle reveal">
+          Traditional PR descriptions are either empty or hallucinated by AI.
+          Branch Narrator takes a different approach.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <h4 class="feature-title">No AI. No Hallucinations.</h4>
+          <p class="feature-description">
+            Pure heuristic analysis. Every finding is based on actual code changes,
+            not probabilistic guessing. What you see is what changed.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <path d="M8 21h8M12 17v4"/>
+            </svg>
+          </div>
+          <h4 class="feature-title">100% Local</h4>
+          <p class="feature-description">
+            Zero network calls. Your code never leaves your machine.
+            Works offline, in air-gapped environments, anywhere.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <h4 class="feature-title">Lightning Fast</h4>
+          <p class="feature-description">
+            Analyze thousands of lines in milliseconds. No API latency,
+            no rate limits, no waiting. Just instant results.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </div>
+          <h4 class="feature-title">Framework Aware</h4>
+          <p class="feature-description">
+            Specialized profiles for SvelteKit, Next.js, React, Vue, Astro,
+            and more. Each with tailored analyzers.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+          </div>
+          <h4 class="feature-title">28 Analyzers</h4>
+          <p class="feature-description">
+            From route detection to security analysis, dependency tracking
+            to test coverage gaps. Comprehensive code understanding.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </div>
+          <h4 class="feature-title">Evidence-Based</h4>
+          <p class="feature-description">
+            Never invents reasons. Every finding includes file paths,
+            line numbers, and concrete evidence of what changed.
+          </p>
+        </div>
+      </div>
+
+      <!-- Code example -->
+      <div class="code-showcase reveal">
+        <div class="code-tabs">
+          <button class="code-tab active" data-tab="output">Output</button>
+          <button class="code-tab" data-tab="json">JSON</button>
+          <button class="code-tab" data-tab="risk">Risk Report</button>
+        </div>
+        <div class="code-panels">
+          <div class="code-panel active" id="panel-output">
+            <pre><code><span class="code-comment">## Summary</span>
+
+This PR modifies <span class="code-number">12</span> files across <span class="code-number">3</span> categories.
+
+<span class="code-comment">### Route Changes</span>
+<span class="code-keyword">+</span> Added: <span class="code-string">/dashboard/settings</span>
+<span class="code-keyword">+</span> Added: <span class="code-string">/api/v2/users</span>
+<span class="code-deleted">-</span> Removed: <span class="code-string">/api/legacy/auth</span>
+
+<span class="code-comment">### Breaking Changes</span>
+<span class="code-warning">⚠</span> API endpoint removed: <span class="code-string">POST /api/legacy/auth</span>
+<span class="code-warning">⚠</span> Environment variable renamed: <span class="code-string">API_KEY → AUTH_TOKEN</span>
+
+<span class="code-comment">### Risk Assessment</span>
+Score: <span class="code-number">67</span>/100 (Medium)
+Flags: <span class="code-keyword">breaking-api</span>, <span class="code-keyword">env-change</span></code></pre>
+          </div>
+          <div class="code-panel" id="panel-json">
+            <pre><code>{
+  <span class="code-string">"highlights"</span>: [
+    <span class="code-string">"Breaking API change: legacy auth endpoint removed"</span>,
+    <span class="code-string">"New dashboard settings route added"</span>,
+    <span class="code-string">"Environment variable migration required"</span>
+  ],
+  <span class="code-string">"findings"</span>: [...],
+  <span class="code-string">"riskScore"</span>: {
+    <span class="code-string">"score"</span>: <span class="code-number">67</span>,
+    <span class="code-string">"level"</span>: <span class="code-string">"medium"</span>,
+    <span class="code-string">"flags"</span>: [<span class="code-string">"breaking-api"</span>, <span class="code-string">"env-change"</span>]
+  }
+}</code></pre>
+          </div>
+          <div class="code-panel" id="panel-risk">
+            <pre><code><span class="code-comment">╭──────────────────────────────────────────────╮</span>
+<span class="code-comment">│</span>           <span class="code-warning">RISK REPORT</span>                       <span class="code-comment">│</span>
+<span class="code-comment">├──────────────────────────────────────────────┤</span>
+<span class="code-comment">│</span> Score: <span class="code-number">67</span>/100                                <span class="code-comment">│</span>
+<span class="code-comment">│</span> Level: <span class="code-warning">MEDIUM</span>                               <span class="code-comment">│</span>
+<span class="code-comment">├──────────────────────────────────────────────┤</span>
+<span class="code-comment">│</span> <span class="code-keyword">Flags:</span>                                       <span class="code-comment">│</span>
+<span class="code-comment">│</span>   • breaking-api (weight: 20)                <span class="code-comment">│</span>
+<span class="code-comment">│</span>   • env-change (weight: 15)                  <span class="code-comment">│</span>
+<span class="code-comment">│</span>   • route-removal (weight: 10)               <span class="code-comment">│</span>
+<span class="code-comment">╰──────────────────────────────────────────────╯</span></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section class="about" id="about">
+    <div class="container">
+      <div class="about-content">
+        <div class="about-text reveal">
+          <span class="section-tag">About</span>
+          <h2 class="section-title">
+            We believe in<br>
+            <span class="gradient-text">deterministic tooling</span>
+          </h2>
+          <p>
+            Better Vibe is building developer tools that prioritize accuracy over convenience,
+            evidence over speculation, and privacy over cloud dependencies.
+          </p>
+          <p>
+            Our tools are designed to be fast, reliable, and transparent.
+            No black boxes, no mysterious AI decisions—just clear, verifiable analysis
+            that you can trust and understand.
+          </p>
+          <div class="about-principles">
+            <div class="principle">
+              <span class="principle-icon">01</span>
+              <span class="principle-text">Local-first architecture</span>
+            </div>
+            <div class="principle">
+              <span class="principle-icon">02</span>
+              <span class="principle-text">Open source everything</span>
+            </div>
+            <div class="principle">
+              <span class="principle-icon">03</span>
+              <span class="principle-text">Evidence-based analysis</span>
+            </div>
+            <div class="principle">
+              <span class="principle-icon">04</span>
+              <span class="principle-text">Developer experience first</span>
+            </div>
+          </div>
+        </div>
+        <div class="about-visual reveal">
+          <div class="about-card">
+            <div class="about-card-glow"></div>
+            <div class="about-card-content">
+              <div class="about-logo">◆</div>
+              <span class="about-tagline">Better tools. Better vibes.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta">
+    <div class="cta-bg">
+      <div class="cta-gradient"></div>
+    </div>
+    <div class="container">
+      <div class="cta-content reveal">
+        <h2 class="cta-title">Ready to get started?</h2>
+        <p class="cta-subtitle">
+          Install Branch Narrator and transform how you write PR descriptions.
+        </p>
+        <div class="cta-install">
+          <div class="install-box">
+            <code>npx @better-vibe/branch-narrator integrate</code>
+            <button class="copy-btn" data-copy="npx @better-vibe/branch-narrator integrate">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="cta-links">
+          <a href="https://github.com/better-vibe/branch-narrator" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            <span>Star on GitHub</span>
+          </a>
+          <a href="https://github.com/better-vibe/branch-narrator#readme" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">
+            Read Documentation
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <a href="#" class="footer-logo">
+            <span class="logo-icon">◆</span>
+            <span class="logo-text">better-vibe</span>
+          </a>
+          <p class="footer-tagline">Building developer tools that understand your code.</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h5>Products</h5>
+            <a href="#branch-narrator">Branch Narrator</a>
+          </div>
+          <div class="footer-col">
+            <h5>Resources</h5>
+            <a href="https://github.com/better-vibe/branch-narrator#readme" target="_blank" rel="noopener">Documentation</a>
+            <a href="https://github.com/better-vibe/branch-narrator/releases" target="_blank" rel="noopener">Changelog</a>
+          </div>
+          <div class="footer-col">
+            <h5>Connect</h5>
+            <a href="https://github.com/better-vibe" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 Better Vibe. Open source under MIT License.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="scripts/main.js"></script>
+</body>
+</html>
