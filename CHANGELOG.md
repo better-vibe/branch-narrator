@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 2.1.0
+
+### Minor Changes
+
+- d7db090: Add integrate auto-detection for existing agent guides and new targets (Claude, opencode, Jules rules).
+
 ## 2.0.2
 
 ### Patch Changes
