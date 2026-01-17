@@ -1,13 +1,10 @@
 {
   "name": "@better-vibe/branch-narrator",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "version": "1.0.0",
   "description": "A local-first CLI that reads git diff and generates structured PR descriptions",
   "type": "module",
   "bin": {
-    "branch-narrator": "./dist/cli.js"
+    "branch-narrator": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
