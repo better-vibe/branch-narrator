@@ -1,7 +1,7 @@
 # branch-narrator
 
 [![npm version](https://img.shields.io/npm/v/@better-vibe/branch-narrator)](https://www.npmjs.com/package/@better-vibe/branch-narrator)
-[![CI](https://github.com/nicosantux/branch-narrator/actions/workflows/ci.yml/badge.svg)](https://github.com/nicosantux/branch-narrator/actions/workflows/ci.yml)
+[![CI](https://github.com/@better-vibe/branch-narrator/actions/workflows/ci.yml/badge.svg)](https://github.com/@better-vibe/branch-narrator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A local-first, deterministic CLI that analyzes `git diff` and provides
