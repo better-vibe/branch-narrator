@@ -44,7 +44,11 @@ branch-narrator automates PR description generation by:
 | Framework | Status | Features |
 |-----------|--------|----------|
 | SvelteKit | ✅ Full | Routes, layouts, endpoints, methods |
-| Generic | ✅ Full | Dependencies, env vars, tests |
-| Next.js | 🔮 Planned | App router, API routes |
-| Astro | 🔮 Planned | Islands, content collections |
+| Next.js | ✅ Full | App Router, API routes, middleware |
+| React | ✅ Full | React Router route detection |
+| Vue/Nuxt | ✅ Full | Pages, layouts, API routes |
+| Astro | ✅ Full | Pages, API routes, integrations |
+| Stencil | ✅ Full | Components, props, events, methods |
+| Library | ✅ Full | Package exports, bin entries, breaking changes |
+| Generic | ✅ Full | Dependencies, env vars, tests, CI workflows |
 

@@ -680,7 +680,7 @@ Either `--finding <id>` or `--flag <id>` must be provided.
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
 | `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
-| `--format <type>` | `md` | Output format: `json`, `md`, or `text` |
+| `--format <type>` | `json` | Output format: `json`, `md`, or `text` |
 | `--unified <n>` | `3` | Lines of unified context for patch hunks |
 | `--no-patch` | (off) | Do not include patch context, only evidence |
 | `--max-evidence-lines <n>` | `8` | Max evidence excerpt lines to show |

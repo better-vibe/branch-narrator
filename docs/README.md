@@ -14,7 +14,9 @@
 | [06-development](./06-development/) | Contributing, testing, coding standards |
 | [07-profiles](./07-profiles/) | Framework profiles and detection |
 | [08-rendering](./08-rendering/) | Output generation and risk scoring |
+| [09-stable-ids](./09-stable-ids/) | Stable IDs for findings and flags |
 | [10-snapshots](./10-snapshots/) | Local workspace snapshots for agent iteration |
+| [11-delta-mode](./11-delta-mode/) | Delta mode for comparing runs |
 
 ---
 
@@ -22,16 +24,16 @@
 
 ```bash
 # Install
-bun add -D branch-narrator
+bun add -D @better-vibe/branch-narrator
 
 # Generate PR description
 branch-narrator pr-body
 
-# Include uncommitted changes
-branch-narrator pr-body -u
+# Analyze unstaged changes (default)
+branch-narrator facts --pretty
 
-# Get JSON output
-branch-narrator facts
+# Compare branches
+branch-narrator facts --mode branch --base main
 ```
 
 ---

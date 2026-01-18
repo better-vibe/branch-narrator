@@ -786,7 +786,7 @@ program
     "Profile to use (auto|sveltekit|react|stencil|next)",
     "auto"
   )
-  .option("--format <type>", "Output format: json|md|text", "md")
+  .option("--format <type>", "Output format: json|md|text", "json")
   .option("--unified <n>", "Lines of unified context for patch hunks", "3")
   .option("--no-patch", "Do not include patch context, only evidence")
   .option("--max-evidence-lines <n>", "Max evidence excerpt lines to show", "8")
