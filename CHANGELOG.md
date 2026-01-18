@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.0.1
+
+### Patch Changes
+
+- 0e78eed: Refresh the root README structure and CLI reference for new contributors.
+
 ## 1.0.0
 
 ### Major Changes
