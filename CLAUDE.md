@@ -46,6 +46,7 @@ Before committing or creating a PR, **ALWAYS** run:
 bun run changeset:add
 # Select version: patch (fix), minor (feature), major (breaking)
 # Write user-centric description
+# IMPORTANT: Package name is "@better-vibe/branch-narrator" (NOT "branch-narrator")
 ```
 
 **Version selection guide:**

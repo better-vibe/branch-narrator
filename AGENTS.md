@@ -16,6 +16,7 @@ This file contains instructions for AI agents (Jules) working on the `branch-nar
         *   Command: `bun run changeset:add`
         *   Select `patch` (fix), `minor` (feature), or `major` (breaking).
         *   Write a user-centric description.
+        *   **IMPORTANT**: The package name is `@better-vibe/branch-narrator` (NOT `branch-narrator`).
     *   **Internal Changes**: Refactors or tests do not require a changeset.
 
 3.  **Testing**:

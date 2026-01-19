@@ -157,8 +157,11 @@ bun run changeset
 ```
 
 The CLI will prompt you to:
-1. Select change type: `patch`, `minor`, or `major`
-2. Write a user-facing summary
+1. Select the package (always `@better-vibe/branch-narrator`)
+2. Select change type: `patch`, `minor`, or `major`
+3. Write a user-facing summary
+
+**Important:** The package name is `@better-vibe/branch-narrator` (NOT `branch-narrator`).
 
 ### Version Guidelines
 

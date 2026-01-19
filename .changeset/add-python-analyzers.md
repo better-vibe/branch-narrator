@@ -1,5 +1,5 @@
 ---
-"branch-narrator": minor
+"@better-vibe/branch-narrator": minor
 ---
 
 Add Python analyzers and profile for Python project analysis
