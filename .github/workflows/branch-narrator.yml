@@ -1,0 +1,41 @@
+name: Branch Narrator
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+  actions: read  # Required to download baseline artifacts
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: better-vibe/branch-narrator-action@v1
+        id: narrator
+        with:
+          branch-narrator-version: "latest"
+          profile: "library"
+          sarif-upload: "true"
+          comment: "true"
+          redact: "true"
+          baseline-artifact: "branch-narrator"
+          explain-score: "true"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: branch-narrator.sarif
+
+      - name: Show delta info
+        if: steps.narrator.outputs.delta-new-findings
+        run: |
+          echo "New findings: ${{ steps.narrator.outputs.delta-new-findings }}"
+          echo "Resolved findings: ${{ steps.narrator.outputs.delta-resolved-findings }}"
+          echo "Score breakdown: ${{ steps.narrator.outputs.score-breakdown }}"
