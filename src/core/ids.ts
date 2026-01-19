@@ -272,6 +272,21 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "python-migration": {
+      // Fingerprint: type + tool + risk + sorted(files)
+      const files = sortForHash(finding.files.map(normalizePathForHash));
+      fingerprint = `python-migration:${finding.tool}:${finding.risk}:${files.join(",")}`;
+      break;
+    }
+
+    case "python-config": {
+      // Fingerprint: type + file + configType + isBreaking + sorted(affectedSections)
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `python-config:${file}:${finding.configType}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;
