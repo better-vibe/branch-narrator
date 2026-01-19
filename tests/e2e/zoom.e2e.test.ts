@@ -225,7 +225,7 @@ describe("zoom command - error handling", () => {
 // ============================================================================
 
 describe("zoom command - output formats", () => {
-  it("should output markdown by default", async () => {
+  it("should output JSON by default", async () => {
     currentRepo = await createRepoWithEnvVars();
 
     const { stdout: factsOutput } = await runCli(
@@ -245,8 +245,11 @@ describe("zoom command - output formats", () => {
       currentRepo.cwd
     );
 
-    // Default format is markdown
-    expect(stdout).toContain("# Finding:");
+    // Default format is JSON (changed from markdown for consistency with other analysis commands)
+    expect(() => JSON.parse(stdout)).not.toThrow();
+    const zoomOutput: ZoomFindingOutput = JSON.parse(stdout);
+    expect(zoomOutput.schemaVersion).toBe("1.0");
+    expect(zoomOutput.itemType).toBe("finding");
   });
 
   it("should output JSON with --format json", async () => {
