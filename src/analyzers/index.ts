@@ -30,4 +30,8 @@ export { monorepoAnalyzer } from "./monorepo.js";
 export { packageExportsAnalyzer } from "./package-exports.js";
 export { vueRoutesAnalyzer } from "./vue-routes.js";
 export { astroRoutesAnalyzer } from "./astro-routes.js";
+export { pythonDependenciesAnalyzer } from "./python-dependencies.js";
+export { pythonRoutesAnalyzer } from "./python-routes.js";
+export { pythonMigrationsAnalyzer } from "./python-migrations.js";
+export { pythonConfigAnalyzer } from "./python-config.js";
 

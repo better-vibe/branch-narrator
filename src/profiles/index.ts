@@ -13,6 +13,7 @@ import { nextProfile } from "./next.js";
 import { vueProfile } from "./vue.js";
 import { astroProfile } from "./astro.js";
 import { libraryProfile } from "./library.js";
+import { pythonProfile } from "./python.js";
 
 /**
  * Result of profile detection with reasons.
@@ -237,6 +238,69 @@ export function isLibraryProject(
 }
 
 /**
+ * Check if a project is a Python project.
+ */
+export function isPythonProject(cwd: string = process.cwd()): boolean {
+  // Check for common Python project files
+  const pythonFiles = [
+    "pyproject.toml",
+    "setup.py",
+    "setup.cfg",
+    "requirements.txt",
+    "Pipfile",
+    "poetry.lock",
+  ];
+
+  return pythonFiles.some(file => existsSync(join(cwd, file)));
+}
+
+/**
+ * Check if a project has Python web framework markers.
+ */
+export function hasPythonWebFramework(cwd: string = process.cwd()): boolean {
+  // Check for framework-specific directories/files
+  const frameworkMarkers = [
+    // Django
+    "manage.py",
+    // FastAPI common patterns
+    "app/main.py",
+    "src/main.py",
+    // Flask
+    "app/__init__.py",
+  ];
+
+  return frameworkMarkers.some(marker => existsSync(join(cwd, marker)));
+}
+
+/**
+ * Detect Python framework from changeset files.
+ */
+export function detectPythonFramework(changeSet: ChangeSet): string | null {
+  for (const file of changeSet.files) {
+    // Django
+    if (file.path.includes("/migrations/") && file.path.endsWith(".py")) {
+      return "django";
+    }
+    if (file.path === "manage.py" || file.path.includes("urls.py")) {
+      return "django";
+    }
+
+    // FastAPI/Flask detection from file content would need diff analysis
+    // For now, check file patterns
+    if (file.path.includes("routers/") || file.path.includes("endpoints/")) {
+      return "fastapi";
+    }
+
+    // Alembic
+    if (file.path.includes("alembic/versions/")) {
+      return "alembic";
+    }
+  }
+
+  return null;
+}
+
+/**
  * Detect the appropriate profile for a project with reasons.
  */
 export function detectProfileWithReasons(
@@ -367,7 +431,7 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Library project (should be last before default)
+  // Check for Library project (should be last before default for JS projects)
   const isLibrary = isLibraryProject(changeSet.headPackageJson);
 
   if (isLibrary) {
@@ -386,6 +450,28 @@ export function detectProfileWithReasons(
     return {
       profile: "library",
       confidence: "medium",
+      reasons,
+    };
+  }
+
+  // Check for Python project
+  const isPython = isPythonProject(cwd);
+  const hasPythonFramework = hasPythonWebFramework(cwd);
+  const pythonFramework = detectPythonFramework(changeSet);
+
+  if (isPython || hasPythonFramework || pythonFramework) {
+    if (isPython) {
+      reasons.push("Found Python project files (pyproject.toml, requirements.txt, etc.)");
+    }
+    if (hasPythonFramework) {
+      reasons.push("Found Python web framework markers (manage.py, main.py, etc.)");
+    }
+    if (pythonFramework) {
+      reasons.push(`Detected ${pythonFramework} framework from changed files`);
+    }
+    return {
+      profile: "python",
+      confidence: isPython && (hasPythonFramework || pythonFramework) ? "high" : "medium",
       reasons,
     };
   }
@@ -429,6 +515,8 @@ export function getProfile(name: ProfileName): Profile {
       return astroProfile;
     case "library":
       return libraryProfile;
+    case "python":
+      return pythonProfile;
     case "auto":
       return defaultProfile;
     default:
@@ -450,5 +538,5 @@ export function resolveProfileName(
   return name;
 }
 
-export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile, vueProfile, astroProfile, libraryProfile };
+export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile, vueProfile, astroProfile, libraryProfile, pythonProfile };
 

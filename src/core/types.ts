@@ -580,6 +580,43 @@ export interface PackageExportsFinding {
   findingId?: string;
 }
 
+// ============================================================================
+// Python Finding Types
+// ============================================================================
+
+export type PythonMigrationTool = "alembic" | "django";
+
+export interface PythonMigrationFinding {
+  type: "python-migration";
+  kind: "python-migration";
+  category: "database";
+  confidence: Confidence;
+  evidence: Evidence[];
+  tool: PythonMigrationTool;
+  files: string[];
+  risk: MigrationRisk;
+  reasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+export interface PythonConfigFinding {
+  type: "python-config";
+  kind: "python-config";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  configType: string;
+  configCategory: string;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
 export type RiskyPackageCategory =
   | "auth"
   | "database"
@@ -616,7 +653,9 @@ export type Finding =
   | TypeScriptConfigFinding
   | TailwindConfigFinding
   | MonorepoConfigFinding
-  | PackageExportsFinding;
+  | PackageExportsFinding
+  | PythonMigrationFinding
+  | PythonConfigFinding;
 
 // ============================================================================
 // Risk Score
@@ -669,7 +708,7 @@ export interface Analyzer {
 // Profile
 // ============================================================================
 
-export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | "vue" | "astro" | "library";
+export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | "vue" | "astro" | "library" | "python";
 
 export interface Profile {
   name: ProfileName;

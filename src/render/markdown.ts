@@ -20,6 +20,8 @@ import type {
   LockfileFinding,
   MonorepoConfigFinding,
   PackageExportsFinding,
+  PythonConfigFinding,
+  PythonMigrationFinding,
   RenderContext,
   RouteChangeFinding,
   SecurityFileFinding,
@@ -886,6 +888,81 @@ function renderCIInfrastructure(
 }
 
 /**
+ * Render Python migrations section.
+ */
+function renderPythonMigrations(migrations: PythonMigrationFinding[]): string {
+  if (migrations.length === 0) {
+    return "";
+  }
+
+  let output = "## Database (Python)\n\n";
+
+  for (const migration of migrations) {
+    const riskEmoji =
+      migration.risk === "high"
+        ? "🔴"
+        : migration.risk === "medium"
+          ? "🟡"
+          : "🟢";
+    const toolLabel = migration.tool === "alembic" ? "Alembic" : "Django";
+    output += `**Tool:** ${toolLabel}\n`;
+    output += `**Risk Level:** ${riskEmoji} ${migration.risk.toUpperCase()}\n\n`;
+    output += "**Files:**\n";
+    for (const file of migration.files) {
+      output += `- \`${file}\`\n`;
+    }
+    output += "\n";
+
+    if (migration.reasons.length > 0) {
+      output += "**Detected patterns:**\n";
+      for (const reason of migration.reasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render Python configuration section.
+ */
+function renderPythonConfig(configs: PythonConfigFinding[]): string {
+  if (configs.length === 0) {
+    return "";
+  }
+
+  let output = "### Python Configuration\n\n";
+
+  for (const config of configs) {
+    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
+    output += `**File:** \`${config.file}\` (${config.configType}) ${breakingEmoji}\n\n`;
+
+    if (config.affectedSections.length > 0) {
+      output += "**Affected Sections:**\n";
+      for (const section of config.affectedSections.slice(0, 5)) {
+        output += `- ${section}\n`;
+      }
+      if (config.affectedSections.length > 5) {
+        output += `- ...and ${config.affectedSections.length - 5} more\n`;
+      }
+      output += "\n";
+    }
+
+    if (config.isBreaking && config.breakingReasons.length > 0) {
+      output += "**Breaking Changes:**\n";
+      for (const reason of config.breakingReasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
  * Render Warnings section (large-diff, lockfile-mismatch, test-gap).
  */
 function renderWarnings(groups: Map<string, Finding[]>): string {
@@ -1053,6 +1130,11 @@ export function renderMarkdown(context: RenderContext): string {
     (groups.get("db-migration") as DbMigrationFinding[]) ?? [];
   output += renderDatabase(migrations);
 
+  // Database (Python - Alembic/Django)
+  const pythonMigrations =
+    (groups.get("python-migration") as PythonMigrationFinding[]) ?? [];
+  output += renderPythonMigrations(pythonMigrations);
+
   // SQL Risk
   const sqlRisks = (groups.get("sql-risk") as SQLRiskFinding[]) ?? [];
   output += renderSQLRisk(sqlRisks);
@@ -1061,14 +1143,17 @@ export function renderMarkdown(context: RenderContext): string {
   const envVars = (groups.get("env-var") as EnvVarFinding[]) ?? [];
   output += renderEnvVars(envVars);
 
-  // Configuration Changes (TypeScript, Tailwind, Monorepo)
+  // Configuration Changes (TypeScript, Tailwind, Monorepo, Python)
   const tsConfigs =
     (groups.get("typescript-config") as TypeScriptConfigFinding[]) ?? [];
   const tailwindConfigs =
     (groups.get("tailwind-config") as TailwindConfigFinding[]) ?? [];
   const monorepoConfigs =
     (groups.get("monorepo-config") as MonorepoConfigFinding[]) ?? [];
+  const pythonConfigs =
+    (groups.get("python-config") as PythonConfigFinding[]) ?? [];
   output += renderConfiguration(tsConfigs, tailwindConfigs, monorepoConfigs);
+  output += renderPythonConfig(pythonConfigs);
 
   // Cloudflare
   const cloudflare =
