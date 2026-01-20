@@ -115,18 +115,26 @@ branch-narrator facts --profile <name>
 |---------|-------------|
 | `auto` | Auto-detect based on project |
 | `sveltekit` | SvelteKit-specific analyzers |
-| `stencil` | StencilJS component analyzers |
 | `next` | Next.js App Router analyzers |
 | `react` | React + React Router analyzers |
+| `vue` | Vue.js + Vue Router analyzers |
+| `astro` | Astro pages and routes analyzers |
+| `stencil` | StencilJS component API analyzers |
+| `library` | npm package/library analyzers (API surface, exports) |
+| `python` | Python project analyzers (Django, FastAPI, Flask) |
 
 ### Auto-Detection Logic
 
 1. Check for `src/routes/` directory → SvelteKit
 2. Check for `@sveltejs/kit` in package.json → SvelteKit
 3. Check for `@stencil/core` or `stencil.config.*` → Stencil
-4. Check for `next` in package.json → Next.js
+4. Check for `next` in package.json with `app/` directory → Next.js
 5. Check for `react` + `react-router-dom` → React
-6. Otherwise → Default profile
+6. Check for `vue` + Nuxt markers → Vue
+7. Check for `astro` in package.json → Astro
+8. Check for `exports`/`publishConfig`/`bin` in package.json → Library
+9. Check for Python files (pyproject.toml, requirements.txt) → Python
+10. Otherwise → Default profile
 
 ---
 

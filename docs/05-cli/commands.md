@@ -17,7 +17,7 @@ branch-narrator pretty [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `library`, `python` |
 
 ### Diff Modes
 
@@ -30,11 +30,37 @@ branch-narrator pretty [options]
 
 ### Features
 
+- **Summary Box** with prioritized highlights and detected profile
+- **Profile-specific test suggestions** (e.g., `bun run check` for SvelteKit, `bun run build` for library)
 - Colorized output with risk indicators
 - Formatted tables for routes, dependencies, env vars
 - Section boxes and visual separators
 - Progress spinner during analysis
 - File status colors (green=added, red=deleted, cyan=modified)
+
+### Output Sections
+
+The pretty command renders the following sections when relevant findings are detected:
+
+| Section | Description |
+|---------|-------------|
+| **Summary** | Prioritized highlights, file counts, profile, and risk score |
+| **Large Changes** | Warning for diffs exceeding 500 lines |
+| **Lockfile Warning** | Alert when package.json and lockfile are out of sync |
+| **Impact Analysis** | Files with high/medium blast radius |
+| **What Changed** | Files grouped by category |
+| **Routes / API** | Route changes with methods and types |
+| **Database** | Supabase migrations with risk levels |
+| **SQL Risks** | Destructive SQL pattern warnings |
+| **Config / Env** | Environment variable changes |
+| **Config Changes** | TypeScript, Tailwind, GraphQL, Package Exports, Monorepo config |
+| **Stencil Components** | Component API changes (props, events, methods, slots) |
+| **Infrastructure** | Docker, Terraform, Kubernetes changes |
+| **CI/CD Workflows** | GitHub Actions security warnings |
+| **Cloudflare** | Wrangler configuration changes |
+| **Dependencies** | Package updates with impact levels |
+| **Suggested Test Plan** | Profile-specific commands and test gaps |
+| **Risks / Notes** | Overall risk score with evidence bullets |
 
 ### Examples
 
@@ -50,6 +76,9 @@ branch-narrator pretty --mode all
 
 # Compare specific branches
 branch-narrator pretty --mode branch --base develop --head feature/auth
+
+# Force library profile for npm packages
+branch-narrator pretty --profile library
 ```
 
 ---

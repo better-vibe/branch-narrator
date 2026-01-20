@@ -18,27 +18,26 @@ interface Profile {
 ```mermaid
 flowchart TD
     A[CLI: --profile option] --> B{Value?}
+    B -->|explicit profile| X[Use Requested Profile]
     B -->|"auto"| C[detectProfile]
-    B -->|"sveltekit"| D[Use SvelteKit]
-    B -->|"next"| N[Use Next.js]
 
-    C --> E{src/routes exists?}
-    E -->|Yes| D
-    E -->|No| F{@sveltejs/kit in package.json?}
-    F -->|Yes| D
-    F -->|No| S{@stencil/core?}
+    C --> E{SvelteKit markers?}
+    E -->|Yes| D[Use SvelteKit]
+    E -->|No| S{Stencil markers?}
     S -->|Yes| T[Use Stencil]
-    S -->|No| J{next in package.json?}
-    J -->|Yes| N
-    J -->|No| K{react + react-router-dom?}
+    S -->|No| J{Next.js markers?}
+    J -->|Yes| N[Use Next.js]
+    J -->|No| K{React Router?}
     K -->|Yes| L[Use React]
-    K -->|No| G[Use Default]
-
-    D --> H[SvelteKit Analyzers]
-    N --> O[Next.js Analyzers]
-    T --> U[Stencil Analyzers]
-    L --> M[React Analyzers]
-    G --> I[Default Analyzers]
+    K -->|No| V{Vue/Nuxt markers?}
+    V -->|Yes| VU[Use Vue]
+    V -->|No| AS{Astro markers?}
+    AS -->|Yes| AST[Use Astro]
+    AS -->|No| LIB{Library markers?}
+    LIB -->|Yes| LIBP[Use Library]
+    LIB -->|No| PY{Python markers?}
+    PY -->|Yes| PYP[Use Python]
+    PY -->|No| G[Use Default]
 ```
 
 ## Available Profiles
@@ -49,6 +48,10 @@ flowchart TD
 | `stencil` | Stencil web components | `@stencil/core` or `stencil.config.ts` |
 | `next` | Next.js App Router apps | `next` dependency + `app/` directory |
 | `react` | React + React Router apps | `react` + `react-router-dom` |
+| `vue` | Vue.js + Nuxt apps | `vue` or `nuxt` + `pages/` directory |
+| `astro` | Astro static sites | `astro` dependency or `astro.config.*` |
+| `library` | npm packages/libraries | `exports`, `publishConfig`, or `bin` in package.json |
+| `python` | Python projects | `pyproject.toml`, `requirements.txt`, Django/FastAPI markers |
 | `auto` (default) | Generic projects | Fallback when no framework detected |
 
 ## Profile Comparison
@@ -144,6 +147,10 @@ When a profile is auto-detected, the `facts` command includes detailed reasons e
 | `stencil` | "Found @stencil/core in package.json dependencies", "Found stencil.config.ts or stencil.config.js" |
 | `next` | "Found next in package.json dependencies", "Found app/ directory (Next.js App Router)" |
 | `react` | "Found react and react-dom in package.json dependencies", "Found react-router or react-router-dom in package.json dependencies" |
+| `vue` | "Found vue in package.json dependencies", "Found pages/ directory (Nuxt file-based routing)" |
+| `astro` | "Found astro in package.json dependencies", "Found astro.config.{mjs,ts,js}" |
+| `library` | "Found exports field in package.json", "Found bin field in package.json (CLI tool)", "Package marked as public (private: false)" |
+| `python` | "Found Python project files (pyproject.toml, requirements.txt, etc.)", "Found Python web framework markers (manage.py, main.py, etc.)" |
 | `auto` | "No framework-specific markers detected, using default analyzers" |
 
 Example output:

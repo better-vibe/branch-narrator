@@ -6,6 +6,7 @@ import chalk from "chalk";
 import boxen from "boxen";
 import Table from "cli-table3";
 import type {
+  CIWorkflowFinding,
   CloudflareChangeFinding,
   DbMigrationFinding,
   DependencyChangeFinding,
@@ -13,13 +14,30 @@ import type {
   FileCategoryFinding,
   FileSummaryFinding,
   Finding,
+  GraphQLChangeFinding,
+  ImpactAnalysisFinding,
+  InfraChangeFinding,
+  LargeDiffFinding,
+  LockfileFinding,
+  MonorepoConfigFinding,
+  PackageExportsFinding,
+  ProfileName,
   RenderContext,
   RouteChangeFinding,
-  SecurityFileFinding,
+  SQLRiskFinding,
+  StencilComponentChangeFinding,
+  StencilEventChangeFinding,
+  StencilMethodChangeFinding,
+  StencilPropChangeFinding,
+  StencilSlotChangeFinding,
+  TailwindConfigFinding,
   TestChangeFinding,
+  TestGapFinding,
+  TypeScriptConfigFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 import { getCategoryLabel } from "../analyzers/file-category.js";
+import { buildHighlights } from "../commands/facts/highlights.js";
 
 /**
  * Color scheme for terminal output.
@@ -74,6 +92,29 @@ const icons = {
   riskHigh: "🔴",
   riskMedium: "🟡",
   riskLow: "🟢",
+  impact: "💥",
+  infra: "🏗️",
+  ci: "🔄",
+  sql: "📊",
+  lock: "🔐",
+  component: "🧩",
+  large: "📏",
+  python: "🐍",
+};
+
+/**
+ * Profile-specific test commands.
+ */
+const TEST_COMMANDS: Record<ProfileName, { cmd: string; label: string }[]> = {
+  sveltekit: [{ cmd: "bun run check", label: "Run SvelteKit type check" }],
+  next: [{ cmd: "bun run build", label: "Run Next.js build" }],
+  react: [],
+  vue: [{ cmd: "bun run build", label: "Run Vue build" }],
+  astro: [{ cmd: "bun run build", label: "Run Astro build" }],
+  stencil: [{ cmd: "bun run build", label: "Run Stencil build" }],
+  library: [{ cmd: "bun run build", label: "Build library" }],
+  python: [{ cmd: "pytest", label: "Run pytest" }],
+  auto: [],
 };
 
 /**
@@ -121,16 +162,22 @@ function sectionHeader(title: string, icon?: string): string {
 
 /**
  * Render the Summary section in a box.
+ * Uses buildHighlights() for consistent, prioritized summaries.
  */
 function renderSummary(
-  groups: Map<string, Finding[]>,
-  riskScore: RenderContext["riskScore"]
+  findings: Finding[],
+  riskScore: RenderContext["riskScore"],
+  profile: ProfileName
 ): string {
-  const bullets: string[] = [];
+  // Use highlights for prioritized, consistent bullets
+  const highlights = buildHighlights(findings);
 
-  const fileSummary = groups.get("file-summary")?.[0] as
+  // Get file counts for the header
+  const fileSummary = findings.find((f) => f.type === "file-summary") as
     | FileSummaryFinding
     | undefined;
+
+  let fileCountLine = "";
   if (fileSummary) {
     const total =
       fileSummary.added.length +
@@ -138,78 +185,50 @@ function renderSummary(
       fileSummary.deleted.length +
       fileSummary.renamed.length;
 
-    bullets.push(`${colors.value(String(total))} file(s) changed`);
-
+    const parts: string[] = [];
     if (fileSummary.added.length > 0) {
-      bullets.push(
-        `${colors.fileAdded(`+${fileSummary.added.length}`)} file(s) added`
-      );
-    }
-    if (fileSummary.deleted.length > 0) {
-      bullets.push(
-        `${colors.fileDeleted(`-${fileSummary.deleted.length}`)} file(s) deleted`
-      );
+      parts.push(colors.fileAdded(`+${fileSummary.added.length}`));
     }
     if (fileSummary.modified.length > 0) {
-      bullets.push(
-        `${colors.fileModified(`~${fileSummary.modified.length}`)} file(s) modified`
-      );
+      parts.push(colors.fileModified(`~${fileSummary.modified.length}`));
     }
-  }
-
-  const routeChanges = groups.get("route-change") as
-    | RouteChangeFinding[]
-    | undefined;
-  if (routeChanges && routeChanges.length > 0) {
-    const newRoutes = routeChanges.filter((r) => r.change === "added");
-    if (newRoutes.length > 0) {
-      bullets.push(
-        `${colors.success(String(newRoutes.length))} new route(s)`
-      );
+    if (fileSummary.deleted.length > 0) {
+      parts.push(colors.fileDeleted(`-${fileSummary.deleted.length}`));
     }
-  }
-
-  const migrations = groups.get("db-migration") as
-    | DbMigrationFinding[]
-    | undefined;
-  if (migrations && migrations.length > 0) {
-    bullets.push(`${icons.database} Database migrations detected`);
-  }
-
-  const deps = groups.get("dependency-change") as
-    | DependencyChangeFinding[]
-    | undefined;
-  if (deps && deps.length > 0) {
-    const majorBumps = deps.filter((d) => d.impact === "major");
-    if (majorBumps.length > 0) {
-      bullets.push(
-        `${colors.warning(String(majorBumps.length))} major dependency update(s)`
-      );
+    if (fileSummary.renamed.length > 0) {
+      parts.push(colors.fileRenamed(`→${fileSummary.renamed.length}`));
     }
+
+    fileCountLine = `${colors.value(String(total))} file(s) changed ${parts.length > 0 ? `(${parts.join(", ")})` : ""}`;
   }
 
-  const securityFiles = groups.get("security-file") as
-    | SecurityFileFinding[]
-    | undefined;
-  if (securityFiles && securityFiles.length > 0) {
-    const totalFiles = securityFiles.reduce(
-      (acc, sf) => acc + sf.files.length,
-      0
-    );
-    bullets.push(
-      `${icons.security} ${totalFiles} security-sensitive file(s)`
-    );
+  // Build the content
+  const bullets: string[] = [];
+
+  // File count first
+  if (fileCountLine) {
+    bullets.push(fileCountLine);
   }
 
+  // Add highlights (limit to 8 for readability)
+  for (const highlight of highlights.slice(0, 8)) {
+    bullets.push(highlight);
+  }
+
+  // Fallback if no bullets
   if (bullets.length === 0) {
     bullets.push("Minor changes detected");
   }
 
+  // Profile line
+  const profileLine = `${colors.label("Profile:")} ${colors.accent(profile)}`;
+
   // Risk line
-  const riskLine = `\n${colors.label("Risk:")} ${getRiskBadge(riskScore.level)} ${colors.muted(`(score: ${riskScore.score}/100)`)}`;
+  const riskLine = `${colors.label("Risk:")} ${getRiskBadge(riskScore.level)} ${colors.muted(`(score: ${riskScore.score}/100)`)}`;
 
   const content =
-    bullets.map((b) => `  ${icons.bullet} ${b}`).join("\n") + riskLine;
+    bullets.map((b) => `  ${icons.bullet} ${b}`).join("\n") +
+    `\n\n${profileLine}\n${riskLine}`;
 
   return boxen(content, {
     title: "SUMMARY",
@@ -529,6 +548,7 @@ function renderDependencies(deps: DependencyChangeFinding[]): string {
 
 /**
  * Render Suggested test plan section.
+ * Uses profile-aware test commands instead of hardcoded framework checks.
  */
 function renderTestPlan(
   context: RenderContext,
@@ -543,8 +563,10 @@ function renderTestPlan(
     bullets.push(`${colors.accent("bun test")} - Run test suite`);
   }
 
-  if (context.profile === "sveltekit") {
-    bullets.push(`${colors.accent("bun run check")} - Run SvelteKit type check`);
+  // Profile-specific test commands
+  const profileCommands = TEST_COMMANDS[context.profile] ?? [];
+  for (const { cmd, label } of profileCommands) {
+    bullets.push(`${colors.accent(cmd)} - ${label}`);
   }
 
   const routes = groups.get("route-change") as RouteChangeFinding[] | undefined;
@@ -565,6 +587,18 @@ function renderTestPlan(
     }
   }
 
+  // Test gaps warning
+  const testGaps = groups.get("test-gap") as TestGapFinding[] | undefined;
+  if (testGaps && testGaps.length > 0) {
+    const totalUntested = testGaps.reduce(
+      (sum, t) => sum + t.prodFilesChanged,
+      0
+    );
+    bullets.push(
+      `${colors.warning(`${totalUntested} modified file(s) lack test coverage`)}`
+    );
+  }
+
   if (context.interactive?.testNotes) {
     bullets.push(context.interactive.testNotes);
   }
@@ -577,6 +611,487 @@ function renderTestPlan(
   for (const bullet of bullets) {
     output += `  ${colors.muted("[ ]")} ${bullet}\n`;
   }
+
+  return output;
+}
+
+/**
+ * Render Impact Analysis (blast radius) section.
+ */
+function renderImpact(impacts: ImpactAnalysisFinding[]): string {
+  if (impacts.length === 0) {
+    return "";
+  }
+
+  // Only show high and medium blast radius
+  const significant = impacts.filter(
+    (i) => i.blastRadius === "high" || i.blastRadius === "medium"
+  );
+
+  if (significant.length === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("IMPACT ANALYSIS", icons.impact);
+
+  const high = significant.filter((i) => i.blastRadius === "high");
+  const medium = significant.filter((i) => i.blastRadius === "medium");
+
+  if (high.length > 0) {
+    output += `${colors.riskHigh("HIGH BLAST RADIUS")} ${colors.muted(`(${high.length} file(s))`)}\n`;
+    for (const impact of high.slice(0, 5)) {
+      output += `  ${icons.bullet} ${colors.value(impact.sourceFile)}`;
+      if (impact.affectedFiles.length > 0) {
+        output += ` ${colors.muted(`→ affects ${impact.affectedFiles.length} file(s)`)}`;
+      }
+      output += "\n";
+    }
+    if (high.length > 5) {
+      output += `  ${colors.muted(`...and ${high.length - 5} more`)}\n`;
+    }
+    output += "\n";
+  }
+
+  if (medium.length > 0) {
+    output += `${colors.riskMedium("MEDIUM BLAST RADIUS")} ${colors.muted(`(${medium.length} file(s))`)}\n`;
+    for (const impact of medium.slice(0, 3)) {
+      output += `  ${icons.bullet} ${colors.value(impact.sourceFile)}`;
+      if (impact.affectedFiles.length > 0) {
+        output += ` ${colors.muted(`→ affects ${impact.affectedFiles.length} file(s)`)}`;
+      }
+      output += "\n";
+    }
+    if (medium.length > 3) {
+      output += `  ${colors.muted(`...and ${medium.length - 3} more`)}\n`;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render Infrastructure changes section.
+ */
+function renderInfra(changes: InfraChangeFinding[]): string {
+  if (changes.length === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("INFRASTRUCTURE", icons.infra);
+
+  // Group by infra type
+  const byType = new Map<string, string[]>();
+  for (const change of changes) {
+    if (!byType.has(change.infraType)) {
+      byType.set(change.infraType, []);
+    }
+    byType.get(change.infraType)!.push(...change.files);
+  }
+
+  for (const [infraType, files] of byType) {
+    const label =
+      infraType === "docker"
+        ? "Docker"
+        : infraType === "terraform"
+          ? "Terraform"
+          : infraType === "kubernetes"
+            ? "Kubernetes"
+            : infraType === "compose"
+              ? "Docker Compose"
+              : infraType.charAt(0).toUpperCase() + infraType.slice(1);
+
+    output += `${colors.subheader(label)} ${colors.muted(`(${files.length})`)}\n`;
+    for (const file of files.slice(0, 5)) {
+      output += `  ${icons.bullet} ${colors.value(file)}\n`;
+    }
+    if (files.length > 5) {
+      output += `  ${colors.muted(`...and ${files.length - 5} more`)}\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Render CI/CD Workflows section.
+ */
+function renderCIWorkflows(workflows: CIWorkflowFinding[]): string {
+  if (workflows.length === 0) {
+    return "";
+  }
+
+  // Separate security issues from general changes
+  const securityIssues = workflows.filter(
+    (w) =>
+      w.riskType === "permissions_broadened" ||
+      w.riskType === "pull_request_target"
+  );
+  const otherChanges = workflows.filter(
+    (w) =>
+      w.riskType !== "permissions_broadened" &&
+      w.riskType !== "pull_request_target"
+  );
+
+  if (securityIssues.length === 0 && otherChanges.length === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("CI/CD WORKFLOWS", icons.ci);
+
+  if (securityIssues.length > 0) {
+    output += `${colors.riskHigh("⚠️  SECURITY CONCERNS")}\n`;
+    for (const issue of securityIssues) {
+      const riskLabel =
+        issue.riskType === "permissions_broadened"
+          ? "Permissions broadened"
+          : "pull_request_target trigger";
+      output += `  ${icons.bullet} ${colors.warning(issue.file)}: ${colors.error(riskLabel)}\n`;
+    }
+    output += "\n";
+  }
+
+  if (otherChanges.length > 0) {
+    output += `${colors.subheader("Modified Workflows")} ${colors.muted(`(${otherChanges.length})`)}\n`;
+    for (const change of otherChanges.slice(0, 5)) {
+      output += `  ${icons.bullet} ${colors.value(change.file)}`;
+      if (change.riskType) {
+        output += ` ${colors.muted(`(${change.riskType})`)}`;
+      }
+      output += "\n";
+    }
+    if (otherChanges.length > 5) {
+      output += `  ${colors.muted(`...and ${otherChanges.length - 5} more`)}\n`;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render SQL Risks section.
+ */
+function renderSQLRisks(risks: SQLRiskFinding[]): string {
+  if (risks.length === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("SQL RISKS", icons.sql);
+
+  const destructive = risks.filter((r) => r.riskType === "destructive");
+  const other = risks.filter((r) => r.riskType !== "destructive");
+
+  if (destructive.length > 0) {
+    output += `${colors.riskHigh("⚠️  DESTRUCTIVE SQL DETECTED")}\n`;
+    for (const risk of destructive) {
+      output += `  ${icons.bullet} ${colors.error(risk.file)}`;
+      if (risk.details) {
+        output += `: ${colors.warning(risk.details)}`;
+      }
+      output += "\n";
+    }
+    output += "\n";
+  }
+
+  if (other.length > 0) {
+    output += `${colors.subheader("Other SQL Changes")} ${colors.muted(`(${other.length})`)}\n`;
+    for (const risk of other.slice(0, 5)) {
+      output += `  ${icons.bullet} ${colors.value(risk.file)}`;
+      if (risk.riskType) {
+        output += ` ${colors.muted(`(${risk.riskType})`)}`;
+      }
+      output += "\n";
+    }
+    if (other.length > 5) {
+      output += `  ${colors.muted(`...and ${other.length - 5} more`)}\n`;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render Lockfile Mismatch warning.
+ */
+function renderLockfileMismatch(findings: LockfileFinding[]): string {
+  const mismatch = findings.find((f) => f.type === "lockfile-mismatch");
+  if (!mismatch) {
+    return "";
+  }
+
+  // Only show if there's a mismatch situation
+  if (mismatch.manifestChanged === mismatch.lockfileChanged) {
+    return "";
+  }
+
+  let output = sectionHeader("LOCKFILE WARNING", icons.lock);
+
+  if (mismatch.manifestChanged && !mismatch.lockfileChanged) {
+    output += `${colors.warning("⚠️  package.json changed but lockfile not updated")}\n`;
+    output += `${colors.muted("Run your package manager to update the lockfile.")}\n`;
+  } else if (!mismatch.manifestChanged && mismatch.lockfileChanged) {
+    output += `${colors.warning("⚠️  Lockfile changed but package.json not updated")}\n`;
+    output += `${colors.muted("This may indicate inconsistent dependency resolution.")}\n`;
+  }
+
+  return output;
+}
+
+/**
+ * Render Stencil component API changes section.
+ */
+function renderStencil(groups: Map<string, Finding[]>): string {
+  const componentChanges = (groups.get("stencil-component-change") ??
+    []) as StencilComponentChangeFinding[];
+  const propChanges = (groups.get("stencil-prop-change") ??
+    []) as StencilPropChangeFinding[];
+  const eventChanges = (groups.get("stencil-event-change") ??
+    []) as StencilEventChangeFinding[];
+  const methodChanges = (groups.get("stencil-method-change") ??
+    []) as StencilMethodChangeFinding[];
+  const slotChanges = (groups.get("stencil-slot-change") ??
+    []) as StencilSlotChangeFinding[];
+
+  const total =
+    componentChanges.length +
+    propChanges.length +
+    eventChanges.length +
+    methodChanges.length +
+    slotChanges.length;
+
+  if (total === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("STENCIL COMPONENTS", icons.component);
+
+  // Group by component tag
+  const byTag = new Map<
+    string,
+    { props: string[]; events: string[]; methods: string[]; slots: string[] }
+  >();
+
+  const ensureTag = (tag: string) => {
+    if (!byTag.has(tag)) {
+      byTag.set(tag, { props: [], events: [], methods: [], slots: [] });
+    }
+    return byTag.get(tag)!;
+  };
+
+  for (const prop of propChanges) {
+    const entry = ensureTag(prop.tag);
+    entry.props.push(`${prop.propName} (${prop.change})`);
+  }
+  for (const event of eventChanges) {
+    const entry = ensureTag(event.tag);
+    entry.events.push(`${event.eventName} (${event.change})`);
+  }
+  for (const method of methodChanges) {
+    const entry = ensureTag(method.tag);
+    entry.methods.push(`${method.methodName} (${method.change})`);
+  }
+  for (const slot of slotChanges) {
+    const entry = ensureTag(slot.tag);
+    const slotLabel = slot.slotName || "(default)";
+    entry.slots.push(`${slotLabel} (${slot.change})`);
+  }
+
+  for (const [tag, changes] of byTag) {
+    output += `${colors.subheader(`<${tag}>`)}`;
+
+    const parts: string[] = [];
+    if (changes.props.length > 0) {
+      parts.push(`${changes.props.length} prop(s)`);
+    }
+    if (changes.events.length > 0) {
+      parts.push(`${changes.events.length} event(s)`);
+    }
+    if (changes.methods.length > 0) {
+      parts.push(`${changes.methods.length} method(s)`);
+    }
+    if (changes.slots.length > 0) {
+      parts.push(`${changes.slots.length} slot(s)`);
+    }
+
+    output += ` ${colors.muted(`(${parts.join(", ")})`)}\n`;
+
+    // Show details (limited)
+    const allChanges = [
+      ...changes.props.map((p) => `@Prop ${p}`),
+      ...changes.events.map((e) => `@Event ${e}`),
+      ...changes.methods.map((m) => `@Method ${m}`),
+      ...changes.slots.map((s) => `slot ${s}`),
+    ];
+
+    for (const change of allChanges.slice(0, 4)) {
+      output += `  ${icons.bullet} ${colors.value(change)}\n`;
+    }
+    if (allChanges.length > 4) {
+      output += `  ${colors.muted(`...and ${allChanges.length - 4} more`)}\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Render Config Changes (TypeScript, Tailwind, GraphQL, Package Exports, Monorepo).
+ */
+function renderConfigChanges(groups: Map<string, Finding[]>): string {
+  const tsConfig = (groups.get("typescript-config") ??
+    []) as TypeScriptConfigFinding[];
+  const tailwind = (groups.get("tailwind-config") ??
+    []) as TailwindConfigFinding[];
+  const graphql = (groups.get("graphql-change") ??
+    []) as GraphQLChangeFinding[];
+  const pkgExports = (groups.get("package-exports") ??
+    []) as PackageExportsFinding[];
+  const monorepo = (groups.get("monorepo-config") ??
+    []) as MonorepoConfigFinding[];
+
+  const total =
+    tsConfig.length +
+    tailwind.length +
+    graphql.length +
+    pkgExports.length +
+    monorepo.length;
+
+  if (total === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("CONFIG CHANGES", icons.config);
+
+  // TypeScript config
+  if (tsConfig.length > 0) {
+    const breaking = tsConfig.some((c) => c.isBreaking);
+    output += `${colors.subheader("TypeScript Config")}`;
+    if (breaking) {
+      output += ` ${colors.error("(BREAKING)")}`;
+    }
+    output += "\n";
+    for (const config of tsConfig) {
+      output += `  ${icons.bullet} ${colors.value(config.file)}`;
+      const allChanges = [
+        ...config.changedOptions.added,
+        ...config.changedOptions.removed,
+        ...config.changedOptions.modified,
+      ];
+      if (allChanges.length > 0) {
+        output += `: ${colors.muted(allChanges.slice(0, 3).join(", "))}`;
+        if (allChanges.length > 3) {
+          output += colors.muted(` +${allChanges.length - 3}`);
+        }
+      }
+      output += "\n";
+    }
+    output += "\n";
+  }
+
+  // Tailwind config
+  if (tailwind.length > 0) {
+    const breaking = tailwind.some((c) => c.isBreaking);
+    output += `${colors.subheader("Tailwind Config")}`;
+    if (breaking) {
+      output += ` ${colors.error("(BREAKING)")}`;
+    }
+    output += "\n";
+    for (const config of tailwind) {
+      output += `  ${icons.bullet} ${colors.value(config.file)}\n`;
+    }
+    output += "\n";
+  }
+
+  // GraphQL schema
+  if (graphql.length > 0) {
+    const breaking = graphql.some((c) => c.isBreaking);
+    output += `${colors.subheader("GraphQL Schema")}`;
+    if (breaking) {
+      output += ` ${colors.error("(BREAKING)")}`;
+    }
+    output += "\n";
+    for (const schema of graphql) {
+      output += `  ${icons.bullet} ${colors.value(schema.file)}`;
+      const changes = [
+        ...schema.breakingChanges.map((c) => `${c} (breaking)`),
+        ...schema.addedElements,
+      ];
+      if (changes.length > 0) {
+        output += `: ${colors.muted(changes.slice(0, 2).join(", "))}`;
+        if (changes.length > 2) {
+          output += colors.muted(` +${changes.length - 2}`);
+        }
+      }
+      output += "\n";
+    }
+    output += "\n";
+  }
+
+  // Package exports
+  if (pkgExports.length > 0) {
+    const breaking = pkgExports.some((c) => c.isBreaking);
+    output += `${colors.subheader("Package Exports")}`;
+    if (breaking) {
+      output += ` ${colors.error("(BREAKING)")}`;
+    }
+    output += "\n";
+    for (const pkg of pkgExports) {
+      const parts: string[] = [];
+      if (pkg.addedExports && pkg.addedExports.length > 0) {
+        parts.push(`+${pkg.addedExports.length} added`);
+      }
+      if (pkg.removedExports && pkg.removedExports.length > 0) {
+        parts.push(`-${pkg.removedExports.length} removed`);
+      }
+      if (pkg.binChanges) {
+        if (pkg.binChanges.added.length > 0) {
+          parts.push(`+${pkg.binChanges.added.length} bin`);
+        }
+        if (pkg.binChanges.removed.length > 0) {
+          parts.push(`-${pkg.binChanges.removed.length} bin`);
+        }
+      }
+      output += `  ${icons.bullet} ${colors.value("package.json exports")}`;
+      if (parts.length > 0) {
+        output += `: ${colors.muted(parts.join(", "))}`;
+      }
+      output += "\n";
+    }
+    output += "\n";
+  }
+
+  // Monorepo config
+  if (monorepo.length > 0) {
+    output += `${colors.subheader("Monorepo Config")}\n`;
+    for (const config of monorepo) {
+      output += `  ${icons.bullet} ${colors.value(config.tool)}: ${colors.muted(config.file)}\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Render Large Diff warning.
+ */
+function renderLargeDiff(findings: LargeDiffFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  // LargeDiffFinding is a summary finding with filesChanged and linesChanged
+  const largeDiff = findings[0];
+  if (!largeDiff || largeDiff.linesChanged < 500) {
+    return "";
+  }
+
+  let output = sectionHeader("LARGE CHANGES", icons.large);
+
+  output += `${colors.warning("⚠️  Large change detected - review carefully")}\n\n`;
+  output += `  ${icons.bullet} ${colors.value(`${largeDiff.filesChanged} file(s)`)} changed\n`;
+  output += `  ${icons.bullet} ${colors.value(`${largeDiff.linesChanged} line(s)`)} modified\n`;
 
   return output;
 }
@@ -629,9 +1144,22 @@ export function renderTerminal(context: RenderContext): string {
   // Context (interactive only)
   output += renderContext(context);
 
-  // Summary box
-  output += renderSummary(groups, context.riskScore);
+  // Summary box (now uses highlights and shows profile)
+  output += renderSummary(context.findings, context.riskScore, context.profile);
   output += "\n";
+
+  // Large diff warning (show early if present)
+  const largeDiff = (groups.get("large-diff") as LargeDiffFinding[]) ?? [];
+  output += renderLargeDiff(largeDiff);
+
+  // Lockfile mismatch warning
+  const lockfile = (groups.get("lockfile-mismatch") as LockfileFinding[]) ?? [];
+  output += renderLockfileMismatch(lockfile);
+
+  // Impact analysis (blast radius)
+  const impacts =
+    (groups.get("impact-analysis") as ImpactAnalysisFinding[]) ?? [];
+  output += renderImpact(impacts);
 
   // What Changed (grouped by category)
   const categoryFinding = groups.get("file-category")?.[0] as
@@ -651,9 +1179,27 @@ export function renderTerminal(context: RenderContext): string {
     (groups.get("db-migration") as DbMigrationFinding[]) ?? [];
   output += renderDatabase(migrations);
 
+  // SQL Risks
+  const sqlRisks = (groups.get("sql-risk") as SQLRiskFinding[]) ?? [];
+  output += renderSQLRisks(sqlRisks);
+
   // Config / Env
   const envVars = (groups.get("env-var") as EnvVarFinding[]) ?? [];
   output += renderEnvVars(envVars);
+
+  // Config Changes (TypeScript, Tailwind, GraphQL, Package Exports, Monorepo)
+  output += renderConfigChanges(groups);
+
+  // Stencil Components
+  output += renderStencil(groups);
+
+  // Infrastructure
+  const infra = (groups.get("infra-change") as InfraChangeFinding[]) ?? [];
+  output += renderInfra(infra);
+
+  // CI/CD Workflows
+  const ciWorkflows = (groups.get("ci-workflow") as CIWorkflowFinding[]) ?? [];
+  output += renderCIWorkflows(ciWorkflows);
 
   // Cloudflare
   const cloudflare =

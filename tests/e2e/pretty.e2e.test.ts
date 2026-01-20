@@ -175,6 +175,56 @@ describe("pretty command - profile handling", () => {
 
     expect(exitCode).toBe(0);
   });
+
+  it("should show profile-specific test commands for SvelteKit", async () => {
+    currentRepo = await createSvelteKitRepo();
+
+    const { stdout } = await runCli(
+      ["pretty", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Should show SvelteKit-specific test command
+    expect(stdout).toContain("bun run check");
+    expect(stdout.toLowerCase()).toContain("sveltekit");
+  });
+
+  it("should show profile-specific test commands for library profile", async () => {
+    currentRepo = await createTestRepo({
+      files: {
+        "src/index.ts": "export const x = 1;",
+        "package.json": JSON.stringify({
+          name: "test-lib",
+          exports: { ".": "./dist/index.js" },
+        }),
+      },
+    });
+
+    const { stdout } = await runCli(
+      ["pretty", "--profile", "library", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Should show library-specific test command, NOT SvelteKit
+    expect(stdout).toContain("Build library");
+    expect(stdout).not.toContain("SvelteKit type check");
+  });
+
+  it("should display detected profile in summary", async () => {
+    currentRepo = await createTestRepo({
+      files: {
+        "src/index.ts": "export const x = 1;",
+      },
+    });
+
+    const { stdout } = await runCli(
+      ["pretty", "--profile", "react", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Should show the profile name in output
+    expect(stdout.toLowerCase()).toContain("profile:");
+  });
 });
 
 // ============================================================================
