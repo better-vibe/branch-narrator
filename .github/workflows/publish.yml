@@ -91,11 +91,46 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build standalone executables
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          mkdir -p release-binaries
+          
+          # Build for Linux x64
+          bun build ./src/cli.ts --compile --target=bun-linux-x64 --outfile ./release-binaries/branch-narrator-linux-x64
+          
+          # Build for Linux ARM64
+          bun build ./src/cli.ts --compile --target=bun-linux-arm64 --outfile ./release-binaries/branch-narrator-linux-arm64
+          
+          # Build for macOS x64
+          bun build ./src/cli.ts --compile --target=bun-darwin-x64 --outfile ./release-binaries/branch-narrator-darwin-x64
+          
+          # Build for macOS ARM64 (Apple Silicon)
+          bun build ./src/cli.ts --compile --target=bun-darwin-arm64 --outfile ./release-binaries/branch-narrator-darwin-arm64
+          
+          # Build for Windows x64
+          bun build ./src/cli.ts --compile --target=bun-windows-x64 --outfile ./release-binaries/branch-narrator-windows-x64.exe
+          
+          # Create archives
+          cd release-binaries
+          for f in branch-narrator-linux-* branch-narrator-darwin-*; do
+            if [ -f "$f" ]; then
+              chmod +x "$f"
+              tar -czvf "${f}.tar.gz" "$f"
+            fi
+          done
+          if [ -f "branch-narrator-windows-x64.exe" ]; then
+            zip branch-narrator-windows-x64.zip branch-narrator-windows-x64.exe
+          fi
+
       - name: Create GitHub Release
         if: steps.changesets.outputs.has_changesets == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.NEW_VERSION }}
           generate_release_notes: true
+          files: |
+            release-binaries/*.tar.gz
+            release-binaries/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,25 @@
+# Source files (dist is published)
+src/
+
+# Tests
+tests/
+benchmarks/
+
+# Documentation (available on GitHub)
+docs/
+.github/
+.cursor/
+.jules/
+AGENTS.md
+CLAUDE.md
+
+# Development files
+.changeset/
+tsconfig.json
+bun.lock
+
+# Sourcemaps (not needed for published package)
+*.map
+
+# Website
+website/
