@@ -177,7 +177,7 @@ export function extractAngularRoutes(
 
   // First pass: collect Routes variable declarations
   traverse(ast, {
-    VariableDeclarator(path) {
+    VariableDeclarator(path: any) {
       if (t.isIdentifier(path.node.id) && t.isArrayExpression(path.node.init)) {
         // Check if variable has a type annotation of Routes or Routes[]
         const parent = path.parent;
@@ -195,7 +195,7 @@ export function extractAngularRoutes(
 
   // Second pass: find RouterModule.forRoot/forChild and provideRouter calls
   traverse(ast, {
-    CallExpression(path) {
+    CallExpression(path: any) {
       let routesArray: t.ArrayExpression | null = null;
 
       // Check for RouterModule.forRoot(routes) or RouterModule.forChild(routes)

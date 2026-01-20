@@ -77,7 +77,7 @@ function extractDecoratorInfo(content: string): DecoratorInfo | null {
     let decoratorInfo: DecoratorInfo | null = null;
 
     traverse(ast, {
-      Decorator(path) {
+      Decorator(path: any) {
         const expr = path.node.expression;
 
         // Check for @Component, @NgModule, @Injectable, etc.
@@ -109,11 +109,11 @@ function extractDecoratorInfo(content: string): DecoratorInfo | null {
                   // Extract providers
                   else if (prop.key.name === "providers" && t.isArrayExpression(prop.value)) {
                     config.providers = prop.value.elements
-                      .map((el) => {
+                      .map((el: any) => {
                         if (t.isIdentifier(el)) return el.name;
                         return null;
                       })
-                      .filter((name): name is string => name !== null);
+                      .filter((name: any): name is string => name !== null);
                   }
                 }
               }
