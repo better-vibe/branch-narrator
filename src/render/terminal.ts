@@ -112,6 +112,7 @@ const TEST_COMMANDS: Record<ProfileName, { cmd: string; label: string }[]> = {
   vue: [{ cmd: "bun run build", label: "Run Vue build" }],
   astro: [{ cmd: "bun run build", label: "Run Astro build" }],
   stencil: [{ cmd: "bun run build", label: "Run Stencil build" }],
+  angular: [{ cmd: "ng build", label: "Run Angular build" }],
   library: [{ cmd: "bun run build", label: "Build library" }],
   python: [{ cmd: "pytest", label: "Run pytest" }],
   auto: [],
