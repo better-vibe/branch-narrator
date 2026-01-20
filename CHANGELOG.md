@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.2.0
+
+### Minor Changes
+
+- 057ffa3: improve build to make it 57% smaller
+
 ## 1.1.0
 
 ### Minor Changes
