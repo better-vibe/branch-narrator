@@ -527,6 +527,26 @@ export interface TailwindConfigFinding {
 }
 
 // ============================================================================
+// Vite Config Finding Types
+// ============================================================================
+
+export interface ViteConfigFinding {
+  type: "vite-config";
+  kind: "vite-config";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+  pluginsDetected: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
 // Monorepo Config Finding Types
 // ============================================================================
 
@@ -672,6 +692,7 @@ export type Finding =
   | GraphQLChangeFinding
   | TypeScriptConfigFinding
   | TailwindConfigFinding
+  | ViteConfigFinding
   | MonorepoConfigFinding
   | PackageExportsFinding
   | PythonMigrationFinding
@@ -729,7 +750,7 @@ export interface Analyzer {
 // Profile
 // ============================================================================
 
-export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | "vue" | "astro" | "angular" | "library" | "python";
+export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | "vue" | "astro" | "angular" | "library" | "python" | "vite";
 
 export interface Profile {
   name: ProfileName;

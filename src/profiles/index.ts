@@ -15,6 +15,7 @@ import { astroProfile } from "./astro.js";
 import { angularProfile } from "./angular.js";
 import { libraryProfile } from "./library.js";
 import { pythonProfile } from "./python.js";
+import { viteProfile } from "./vite.js";
 
 /**
  * Result of profile detection with reasons.
@@ -287,6 +288,34 @@ export function isPythonProject(cwd: string = process.cwd()): boolean {
 }
 
 /**
+ * Check if package.json contains Vite dependency.
+ */
+export function hasViteDependency(
+  packageJson: Record<string, unknown> | undefined
+): boolean {
+  if (!packageJson) return false;
+
+  const deps = packageJson.dependencies as Record<string, string> | undefined;
+  const devDeps = packageJson.devDependencies as
+    | Record<string, string>
+    | undefined;
+
+  return Boolean(deps?.["vite"] || devDeps?.["vite"]);
+}
+
+/**
+ * Check if project has Vite config.
+ */
+export function hasViteConfig(cwd: string = process.cwd()): boolean {
+  return (
+    existsSync(join(cwd, "vite.config.ts")) ||
+    existsSync(join(cwd, "vite.config.js")) ||
+    existsSync(join(cwd, "vite.config.mjs")) ||
+    existsSync(join(cwd, "vite.config.mts"))
+  );
+}
+
+/**
  * Check if a project has Python web framework markers.
  */
 export function hasPythonWebFramework(cwd: string = process.cwd()): boolean {
@@ -481,6 +510,29 @@ export function detectProfileWithReasons(
     };
   }
 
+  // Check for Vite (generic Vite project without specific framework)
+  const hasVite = hasViteDependency(changeSet.headPackageJson);
+  const hasViteConf = hasViteConfig(cwd);
+
+  if (hasVite && hasViteConf) {
+    reasons.push("Found vite in package.json dependencies");
+    reasons.push("Found vite.config.{ts,js,mjs,mts}");
+    return {
+      profile: "vite",
+      confidence: "high",
+      reasons,
+    };
+  }
+
+  if (hasVite) {
+    reasons.push("Found vite in package.json dependencies");
+    return {
+      profile: "vite",
+      confidence: "medium",
+      reasons,
+    };
+  }
+
   // Check for Library project (should be last before default for JS projects)
   const isLibrary = isLibraryProject(changeSet.headPackageJson);
 
@@ -569,6 +621,8 @@ export function getProfile(name: ProfileName): Profile {
       return libraryProfile;
     case "python":
       return pythonProfile;
+    case "vite":
+      return viteProfile;
     case "auto":
       return defaultProfile;
     default:
@@ -590,5 +644,5 @@ export function resolveProfileName(
   return name;
 }
 
-export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile, vueProfile, astroProfile, angularProfile, libraryProfile, pythonProfile };
+export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile, vueProfile, astroProfile, angularProfile, libraryProfile, pythonProfile, viteProfile };
 
