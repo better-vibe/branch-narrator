@@ -12,6 +12,7 @@ import { stencilProfile } from "./stencil.js";
 import { nextProfile } from "./next.js";
 import { vueProfile } from "./vue.js";
 import { astroProfile } from "./astro.js";
+import { angularProfile } from "./angular.js";
 import { libraryProfile } from "./library.js";
 import { pythonProfile } from "./python.js";
 
@@ -201,6 +202,37 @@ export function hasAstroDependency(
     | undefined;
 
   return Boolean(deps?.["astro"] || devDeps?.["astro"]);
+}
+
+/**
+ * Check if package.json contains Angular dependencies.
+ */
+export function hasAngularDependency(
+  packageJson: Record<string, unknown> | undefined
+): boolean {
+  if (!packageJson) return false;
+
+  const deps = packageJson.dependencies as Record<string, string> | undefined;
+  const devDeps = packageJson.devDependencies as
+    | Record<string, string>
+    | undefined;
+
+  return Boolean(
+    deps?.["@angular/core"] ||
+    deps?.["@angular/common"] ||
+    devDeps?.["@angular/core"] ||
+    devDeps?.["@angular/common"]
+  );
+}
+
+/**
+ * Check if project has Angular config.
+ */
+export function hasAngularConfig(cwd: string = process.cwd()): boolean {
+  return (
+    existsSync(join(cwd, "angular.json")) ||
+    existsSync(join(cwd, ".angular-cli.json"))
+  );
 }
 
 /**
@@ -431,6 +463,24 @@ export function detectProfileWithReasons(
     };
   }
 
+  // Check for Angular
+  const hasAngular = hasAngularDependency(changeSet.headPackageJson);
+  const hasAngularConf = hasAngularConfig(cwd);
+
+  if (hasAngular || hasAngularConf) {
+    if (hasAngular) {
+      reasons.push("Found @angular/core or @angular/common in package.json dependencies");
+    }
+    if (hasAngularConf) {
+      reasons.push("Found angular.json or .angular-cli.json");
+    }
+    return {
+      profile: "angular",
+      confidence: hasAngular && hasAngularConf ? "high" : "medium",
+      reasons,
+    };
+  }
+
   // Check for Library project (should be last before default for JS projects)
   const isLibrary = isLibraryProject(changeSet.headPackageJson);
 
@@ -513,6 +563,8 @@ export function getProfile(name: ProfileName): Profile {
       return vueProfile;
     case "astro":
       return astroProfile;
+    case "angular":
+      return angularProfile;
     case "library":
       return libraryProfile;
     case "python":
@@ -538,5 +590,5 @@ export function resolveProfileName(
   return name;
 }
 
-export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile, vueProfile, astroProfile, libraryProfile, pythonProfile };
+export { defaultProfile, sveltekitProfile, reactProfile, stencilProfile, nextProfile, vueProfile, astroProfile, angularProfile, libraryProfile, pythonProfile };
 

@@ -617,6 +617,26 @@ export interface PythonConfigFinding {
   findingId?: string;
 }
 
+// ============================================================================
+// Angular Finding Types
+// ============================================================================
+
+export interface AngularComponentChangeFinding {
+  type: "angular-component-change";
+  kind: "angular-component-change";
+  category: "api";
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
+  file: string;
+  change: "added" | "modified" | "deleted";
+  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor";
+  selector?: string;
+  standalone?: boolean;
+  providers?: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
 export type RiskyPackageCategory =
   | "auth"
   | "database"
@@ -655,7 +675,8 @@ export type Finding =
   | MonorepoConfigFinding
   | PackageExportsFinding
   | PythonMigrationFinding
-  | PythonConfigFinding;
+  | PythonConfigFinding
+  | AngularComponentChangeFinding;
 
 // ============================================================================
 // Risk Score
@@ -708,7 +729,7 @@ export interface Analyzer {
 // Profile
 // ============================================================================
 
-export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | "vue" | "astro" | "library" | "python";
+export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | "vue" | "astro" | "angular" | "library" | "python";
 
 export interface Profile {
   name: ProfileName;

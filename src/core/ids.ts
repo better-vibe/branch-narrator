@@ -287,6 +287,13 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "angular-component-change": {
+      // Fingerprint: type + file + change + componentType + selector
+      const file = normalizePathForHash(finding.file);
+      fingerprint = `angular-component-change:${file}:${finding.change}:${finding.componentType}:${finding.selector || ""}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;
