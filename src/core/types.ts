@@ -169,7 +169,14 @@ export interface TestChangeFinding {
   confidence: Confidence;
   evidence: Evidence[];
   framework: "vitest";
+  /** All test files changed (added + modified + deleted) */
   files: string[];
+  /** Test files that were added */
+  added: string[];
+  /** Test files that were modified */
+  modified: string[];
+  /** Test files that were deleted */
+  deleted: string[];
   tags?: string[];
   findingId?: string; // Stable ID, format: "finding.test-change#<hash>"
 }

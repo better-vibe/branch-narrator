@@ -194,4 +194,86 @@ describe("vitestAnalyzer", () => {
     expect(finding.category).toBe("tests");
     expect(finding.confidence).toBe("high");
   });
+
+  it("should differentiate between added and modified test files", () => {
+    const changeSet = createChangeSet({
+      files: [
+        createFileChange("tests/new.test.ts", "added"),
+        createFileChange("tests/existing.test.ts", "modified"),
+        createFileChange("tests/another-new.test.ts", "added"),
+      ],
+    });
+
+    const findings = vitestAnalyzer.analyze(changeSet);
+    expect(findings).toHaveLength(1);
+
+    const finding = findings[0] as TestChangeFinding;
+    expect(finding.files).toHaveLength(3);
+    expect(finding.added).toHaveLength(2);
+    expect(finding.modified).toHaveLength(1);
+    expect(finding.deleted).toHaveLength(0);
+
+    expect(finding.added).toContain("tests/new.test.ts");
+    expect(finding.added).toContain("tests/another-new.test.ts");
+    expect(finding.modified).toContain("tests/existing.test.ts");
+  });
+
+  it("should track deleted test files", () => {
+    const changeSet = createChangeSet({
+      files: [
+        createFileChange("tests/removed.test.ts", "deleted"),
+        createFileChange("tests/kept.test.ts", "modified"),
+      ],
+    });
+
+    const findings = vitestAnalyzer.analyze(changeSet);
+    expect(findings).toHaveLength(1);
+
+    const finding = findings[0] as TestChangeFinding;
+    expect(finding.files).toHaveLength(2);
+    expect(finding.added).toHaveLength(0);
+    expect(finding.modified).toHaveLength(1);
+    expect(finding.deleted).toHaveLength(1);
+
+    expect(finding.deleted).toContain("tests/removed.test.ts");
+    expect(finding.modified).toContain("tests/kept.test.ts");
+  });
+
+  it("should treat renamed files as modified", () => {
+    const changeSet = createChangeSet({
+      files: [
+        createFileChange("tests/renamed.test.ts", "renamed"),
+      ],
+    });
+
+    const findings = vitestAnalyzer.analyze(changeSet);
+    expect(findings).toHaveLength(1);
+
+    const finding = findings[0] as TestChangeFinding;
+    expect(finding.files).toHaveLength(1);
+    expect(finding.added).toHaveLength(0);
+    expect(finding.modified).toHaveLength(1);
+    expect(finding.deleted).toHaveLength(0);
+
+    expect(finding.modified).toContain("tests/renamed.test.ts");
+  });
+
+  it("should include status in evidence description", () => {
+    const changeSet = createChangeSet({
+      files: [
+        createFileChange("tests/new.test.ts", "added"),
+        createFileChange("tests/existing.test.ts", "modified"),
+      ],
+    });
+
+    const findings = vitestAnalyzer.analyze(changeSet);
+    const finding = findings[0] as TestChangeFinding;
+
+    // Check that evidence includes status information
+    const addedEvidence = finding.evidence.find(e => e.file === "tests/new.test.ts");
+    const modifiedEvidence = finding.evidence.find(e => e.file === "tests/existing.test.ts");
+
+    expect(addedEvidence?.excerpt).toContain("added");
+    expect(modifiedEvidence?.excerpt).toContain("modified");
+  });
 });

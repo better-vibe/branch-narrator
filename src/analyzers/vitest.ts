@@ -44,11 +44,30 @@ export const vitestAnalyzer: Analyzer = {
 
   analyze(changeSet: ChangeSet): Finding[] {
     const testFiles: string[] = [];
+    const addedFiles: string[] = [];
+    const modifiedFiles: string[] = [];
+    const deletedFiles: string[] = [];
 
-    // Collect test files
+    // Collect test files by status
     for (const file of changeSet.files) {
       if (isTestFile(file.path) || isVitestConfig(file.path)) {
         testFiles.push(file.path);
+
+        switch (file.status) {
+          case "added":
+            addedFiles.push(file.path);
+            break;
+          case "modified":
+            modifiedFiles.push(file.path);
+            break;
+          case "deleted":
+            deletedFiles.push(file.path);
+            break;
+          case "renamed":
+            // Treat renamed as modified
+            modifiedFiles.push(file.path);
+            break;
+        }
       }
     }
 
@@ -57,10 +76,17 @@ export const vitestAnalyzer: Analyzer = {
       return [];
     }
 
-    // Create evidence from file list
+    // Create evidence from file list with status info
     const evidence = testFiles
       .slice(0, 3)
-      .map((file) => createEvidence(file, `Test file ${file}`));
+      .map((file) => {
+        const status = addedFiles.includes(file)
+          ? "added"
+          : deletedFiles.includes(file)
+            ? "deleted"
+            : "modified";
+        return createEvidence(file, `Test file ${status}: ${file}`);
+      });
 
     const finding: TestChangeFinding = {
       type: "test-change",
@@ -70,6 +96,9 @@ export const vitestAnalyzer: Analyzer = {
       evidence,
       framework: "vitest",
       files: testFiles,
+      added: addedFiles,
+      modified: modifiedFiles,
+      deleted: deletedFiles,
     };
 
     return [finding];

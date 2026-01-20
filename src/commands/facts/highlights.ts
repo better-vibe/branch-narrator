@@ -321,8 +321,22 @@ export function buildHighlights(findings: Finding[]): string[] {
   // Test changes
   const testChanges = findings.filter(f => f.type === "test-change");
   if (testChanges.length > 0) {
-    const files = testChanges.flatMap(t => t.files);
-    add(`${files.length} test file(s) modified`, HIGHLIGHT_PRIORITY.TEST_CHANGES);
+    const addedCount = testChanges.reduce((sum, t) => sum + t.added.length, 0);
+    const modifiedCount = testChanges.reduce((sum, t) => sum + t.modified.length, 0);
+    const deletedCount = testChanges.reduce((sum, t) => sum + t.deleted.length, 0);
+
+    const parts: string[] = [];
+    if (addedCount > 0) parts.push(`${addedCount} added`);
+    if (modifiedCount > 0) parts.push(`${modifiedCount} modified`);
+    if (deletedCount > 0) parts.push(`${deletedCount} deleted`);
+
+    if (parts.length > 0) {
+      add(`Test files: ${parts.join(", ")}`, HIGHLIGHT_PRIORITY.TEST_CHANGES);
+    } else {
+      // Fallback for edge cases
+      const totalFiles = testChanges.flatMap(t => t.files).length;
+      add(`${totalFiles} test file(s) changed`, HIGHLIGHT_PRIORITY.TEST_CHANGES);
+    }
   }
 
   // Convention violations (test gaps)

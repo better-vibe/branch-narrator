@@ -12,6 +12,7 @@ import type {
   RenderContext,
   RouteChangeFinding,
   SecurityFileFinding,
+  TestChangeFinding,
 } from "../src/core/types.js";
 import { renderMarkdown } from "../src/render/markdown.js";
 import { computeRiskScore } from "../src/render/risk-score.js";
@@ -130,9 +131,16 @@ describe("renderMarkdown", () => {
     const findings: Finding[] = [
       {
         type: "test-change",
+        kind: "test-change",
+        category: "tests",
+        confidence: "high",
+        evidence: [],
         framework: "vitest",
         files: ["tests/unit.test.ts"],
-      },
+        added: [],
+        modified: ["tests/unit.test.ts"],
+        deleted: [],
+      } as TestChangeFinding,
       {
         type: "route-change",
         routeId: "/api/users",
@@ -147,6 +155,7 @@ describe("renderMarkdown", () => {
 
     expect(markdown).toContain("## Suggested Test Plan");
     expect(markdown).toContain("`bun test`");
+    expect(markdown).toContain("1 updated test file(s)");
     expect(markdown).toContain("`bun run check`");
     expect(markdown).toContain("GET /api/users");
   });

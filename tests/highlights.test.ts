@@ -127,8 +127,9 @@ function createTestChange(): TestChangeFinding {
     evidence: [],
     framework: "vitest",
     files: ["tests/utils.test.ts"],
-    testCount: 5,
-    changeType: "modified",
+    added: [],
+    modified: ["tests/utils.test.ts"],
+    deleted: [],
   };
 }
 
@@ -291,7 +292,7 @@ describe("buildHighlights", () => {
       const highlights = buildHighlights(findings);
 
       const routeIdx = highlights.findIndex(h => h.includes("route(s) changed"));
-      const testIdx = highlights.findIndex(h => h.includes("test file(s) modified"));
+      const testIdx = highlights.findIndex(h => h.includes("Test files:"));
 
       expect(routeIdx).toBeLessThan(testIdx);
     });
@@ -329,7 +330,7 @@ describe("buildHighlights", () => {
         lockfile: highlights.findIndex(h => h.includes("Lockfile mismatch")),
         route: highlights.findIndex(h => h.includes("route(s) changed")),
         stencil: highlights.findIndex(h => h.includes("Stencil component")),
-        test: highlights.findIndex(h => h.includes("test file(s) modified")),
+        test: highlights.findIndex(h => h.includes("Test files:")),
       };
 
       // Verify ordering

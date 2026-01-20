@@ -13,7 +13,14 @@ Detects test file and configuration changes.
 interface TestChangeFinding {
   type: "test-change";
   framework: "vitest";
+  /** All test files changed (added + modified + deleted) */
   files: string[];
+  /** Test files that were added */
+  added: string[];
+  /** Test files that were modified */
+  modified: string[];
+  /** Test files that were deleted */
+  deleted: string[];
 }
 ```
 
@@ -49,29 +56,33 @@ interface TestChangeFinding {
   "files": [
     "tests/auth.test.ts",
     "tests/login.test.ts",
+    "tests/new-feature.test.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "added": ["tests/new-feature.test.ts"],
+  "modified": ["tests/auth.test.ts", "vitest.config.ts"],
+  "deleted": ["tests/login.test.ts"]
 }
 ```
 
 ## Usage in Markdown
 
-### Summary Section
+### Summary Section (Highlights)
+
+Test changes are summarized with status breakdown:
 
 ```markdown
-## Summary
-
-- Test files changed
+Test files: 1 added, 2 modified
 ```
 
 ### Suggested Test Plan
 
-When tests change, adds to test plan:
+When tests change, adds to test plan with counts:
 
 ```markdown
 ## Suggested Test Plan
 
-- [ ] `bun run test` - Run test suite
+- [ ] `bun run test` - Run test suite (1 new, 2 updated test file(s))
 ```
 
 ## E2E Config Detection

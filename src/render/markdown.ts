@@ -1072,7 +1072,17 @@ function renderTestPlan(
     | TestChangeFinding[]
     | undefined;
   if (testChanges && testChanges.length > 0) {
-    bullets.push("`bun test` - Run test suite");
+    const addedCount = testChanges.reduce((sum, t) => sum + t.added.length, 0);
+    const modifiedCount = testChanges.reduce((sum, t) => sum + t.modified.length, 0);
+
+    let testSummary = "`bun test` - Run test suite";
+    if (addedCount > 0 || modifiedCount > 0) {
+      const parts: string[] = [];
+      if (addedCount > 0) parts.push(`${addedCount} new`);
+      if (modifiedCount > 0) parts.push(`${modifiedCount} updated`);
+      testSummary += ` (${parts.join(", ")} test file(s))`;
+    }
+    bullets.push(testSummary);
   }
 
   // SvelteKit check

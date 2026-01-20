@@ -270,7 +270,27 @@ interface CloudflareChangeFinding {
 interface TestChangeFinding {
   type: "test-change";
   framework: "vitest";
+  /** All test files changed (added + modified + deleted) */
   files: string[];
+  /** Test files that were added */
+  added: string[];
+  /** Test files that were modified */
+  modified: string[];
+  /** Test files that were deleted */
+  deleted: string[];
+}
+```
+
+### Example
+
+```json
+{
+  "type": "test-change",
+  "framework": "vitest",
+  "files": ["tests/utils.test.ts", "tests/new-feature.test.ts", "tests/old.test.ts"],
+  "added": ["tests/new-feature.test.ts"],
+  "modified": ["tests/utils.test.ts"],
+  "deleted": ["tests/old.test.ts"]
 }
 ```
 
