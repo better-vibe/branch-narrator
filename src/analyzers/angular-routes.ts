@@ -161,32 +161,57 @@ function extractRoutesFromArray(
 }
 
 /**
+ * Check if a type annotation is a Routes type.
+ */
+function isRoutesTypeAnnotation(typeAnnotation: any): boolean {
+  if (!typeAnnotation) return false;
+  
+  // Handle TSTypeAnnotation wrapper
+  const type = typeAnnotation.typeAnnotation || typeAnnotation;
+  
+  // Check for Routes type reference
+  if (t.isTSTypeReference(type) && t.isIdentifier(type.typeName)) {
+    return type.typeName.name === "Routes";
+  }
+  
+  // Check for Route[] array type
+  if (t.isTSArrayType(type)) {
+    const elementType = type.elementType;
+    if (t.isTSTypeReference(elementType) && t.isIdentifier(elementType.typeName)) {
+      return elementType.typeName.name === "Route";
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Extract routes from Angular router configuration.
  * Looks for:
  * - RouterModule.forRoot(routes)
  * - RouterModule.forChild(routes)
  * - provideRouter(routes)
- * - const routes: Routes = [...]
+ * - const routes: Routes = [...] (standalone declarations)
  */
 export function extractAngularRoutes(
   ast: t.File,
   filePath: string
 ): ExtractedRoute[] {
   const routes: ExtractedRoute[] = [];
-  const routeConfigs = new Map<string, t.Expression>();
+  const routeConfigs = new Map<string, t.ArrayExpression>();
+  const usedRouteVars = new Set<string>();
 
   // First pass: collect Routes variable declarations
   traverse(ast, {
     VariableDeclarator(path: any) {
       if (t.isIdentifier(path.node.id) && t.isArrayExpression(path.node.init)) {
-        // Check if variable has a type annotation of Routes or Routes[]
-        const parent = path.parent;
-        if (
-          t.isVariableDeclaration(parent) &&
-          parent.declarations.length > 0 &&
-          parent.declarations[0] === path.node
-        ) {
-          // Store the routes array
+        // Check if variable has a Routes type annotation
+        const hasRoutesType = isRoutesTypeAnnotation(path.node.id.typeAnnotation);
+        
+        // Also check by variable name pattern (routes, appRoutes, etc.)
+        const hasRoutesName = /routes/i.test(path.node.id.name);
+        
+        if (hasRoutesType || hasRoutesName) {
           routeConfigs.set(path.node.id.name, path.node.init);
         }
       }
@@ -197,6 +222,7 @@ export function extractAngularRoutes(
   traverse(ast, {
     CallExpression(path: any) {
       let routesArray: t.ArrayExpression | null = null;
+      let routeVarName: string | null = null;
 
       // Check for RouterModule.forRoot(routes) or RouterModule.forChild(routes)
       if (t.isMemberExpression(path.node.callee)) {
@@ -214,8 +240,9 @@ export function extractAngularRoutes(
           if (t.isArrayExpression(firstArg)) {
             routesArray = firstArg;
           } else if (t.isIdentifier(firstArg)) {
+            routeVarName = firstArg.name;
             const config = routeConfigs.get(firstArg.name);
-            if (config && t.isArrayExpression(config)) {
+            if (config) {
               routesArray = config;
             }
           }
@@ -229,8 +256,9 @@ export function extractAngularRoutes(
           if (t.isArrayExpression(firstArg)) {
             routesArray = firstArg;
           } else if (t.isIdentifier(firstArg)) {
+            routeVarName = firstArg.name;
             const config = routeConfigs.get(firstArg.name);
-            if (config && t.isArrayExpression(config)) {
+            if (config) {
               routesArray = config;
             }
           }
@@ -240,9 +268,23 @@ export function extractAngularRoutes(
       if (routesArray) {
         const extracted = extractRoutesFromArray(routesArray, filePath);
         routes.push(...extracted);
+        if (routeVarName) {
+          usedRouteVars.add(routeVarName);
+        }
       }
     },
   });
+
+  // Third pass: extract routes from standalone declarations not used in RouterModule/provideRouter
+  // This handles cases like: const routes: Routes = [...] without explicit usage
+  if (routes.length === 0) {
+    for (const [varName, arrayExpr] of routeConfigs) {
+      if (!usedRouteVars.has(varName)) {
+        const extracted = extractRoutesFromArray(arrayExpr, filePath);
+        routes.push(...extracted);
+      }
+    }
+  }
 
   return routes;
 }

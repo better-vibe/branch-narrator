@@ -177,24 +177,19 @@ describe("angularComponentsAnalyzer", () => {
   it("should extract selector from component decorator", () => {
     const changeSet = createChangeSet({
       files: [createFileChange("src/app/user/user.component.ts", "added")],
-      diffs: [createFileDiff("src/app/user/user.component.ts", "added", [
-        {
-          oldStart: 0,
-          oldLines: 0,
-          newStart: 1,
-          newLines: 10,
-          content: "@Component({\\n  selector: 'app-user'\\n})\\nexport class UserComponent {}",
-          additions: [
-            "@Component({",
-            "  selector: 'app-user',",
-            "  templateUrl: './user.component.html'",
-            "})",
-            "export class UserComponent {",
-            "}",
-          ],
-          deletions: [],
-        },
-      ])],
+      diffs: [createFileDiff(
+        "src/app/user/user.component.ts",
+        [
+          "@Component({",
+          "  selector: 'app-user',",
+          "  templateUrl: './user.component.html'",
+          "})",
+          "export class UserComponent {",
+          "}",
+        ],
+        [],
+        "added"
+      )],
     });
 
     const findings = angularComponentsAnalyzer.analyze(changeSet);
@@ -207,22 +202,17 @@ describe("angularComponentsAnalyzer", () => {
   it("should detect standalone components", () => {
     const changeSet = createChangeSet({
       files: [createFileChange("src/app/standalone.component.ts", "added")],
-      diffs: [createFileDiff("src/app/standalone.component.ts", "added", [
-        {
-          oldStart: 0,
-          oldLines: 0,
-          newStart: 1,
-          newLines: 10,
-          content: "@Component({\\n  standalone: true\\n})\\nexport class StandaloneComponent {}",
-          additions: [
-            "@Component({",
-            "  selector: 'app-standalone',",
-            "  standalone: true",
-            "})",
-          ],
-          deletions: [],
-        },
-      ])],
+      diffs: [createFileDiff(
+        "src/app/standalone.component.ts",
+        [
+          "@Component({",
+          "  selector: 'app-standalone',",
+          "  standalone: true",
+          "})",
+        ],
+        [],
+        "added"
+      )],
     });
 
     const findings = angularComponentsAnalyzer.analyze(changeSet);

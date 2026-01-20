@@ -67,7 +67,38 @@ interface DecoratorInfo {
   providers?: string[];
 }
 
+/**
+ * Try to extract decorator info using regex as a fallback.
+ * This handles cases where AST parsing fails on partial code snippets.
+ */
+function extractDecoratorInfoRegex(content: string): DecoratorInfo | null {
+  // Match @Component, @NgModule, @Directive, @Pipe decorators
+  const decoratorMatch = content.match(/@(Component|NgModule|Injectable|Directive|Pipe)\s*\(\s*\{/);
+  if (!decoratorMatch) {
+    return null;
+  }
+
+  const config: DecoratorInfo = {
+    name: decoratorMatch[1],
+  };
+
+  // Extract selector - handle both single and double quotes
+  const selectorMatch = content.match(/selector\s*:\s*['"]([^'"]+)['"]/);
+  if (selectorMatch) {
+    config.selector = selectorMatch[1];
+  }
+
+  // Extract standalone flag
+  const standaloneMatch = content.match(/standalone\s*:\s*(true|false)/);
+  if (standaloneMatch) {
+    config.standalone = standaloneMatch[1] === "true";
+  }
+
+  return config;
+}
+
 function extractDecoratorInfo(content: string): DecoratorInfo | null {
+  // First try AST parsing for accurate extraction
   try {
     const ast = parse(content, {
       sourceType: "module",
@@ -77,58 +108,68 @@ function extractDecoratorInfo(content: string): DecoratorInfo | null {
     let decoratorInfo: DecoratorInfo | null = null;
 
     traverse(ast, {
-      Decorator(path: any) {
-        const expr = path.node.expression;
+      ClassDeclaration(path: any) {
+        // Check decorators attached to class declarations
+        const decorators = path.node.decorators || [];
+        for (const decorator of decorators) {
+          const expr = decorator.expression;
 
-        // Check for @Component, @NgModule, @Injectable, etc.
-        if (t.isCallExpression(expr) && t.isIdentifier(expr.callee)) {
-          const decoratorName = expr.callee.name;
+          // Check for @Component, @NgModule, @Injectable, etc.
+          if (t.isCallExpression(expr) && t.isIdentifier(expr.callee)) {
+            const decoratorName = expr.callee.name;
 
-          if (
-            ["Component", "NgModule", "Injectable", "Directive", "Pipe"].includes(
-              decoratorName
-            )
-          ) {
-            const config: DecoratorInfo = {
-              name: decoratorName,
-            };
+            if (
+              ["Component", "NgModule", "Injectable", "Directive", "Pipe"].includes(
+                decoratorName
+              )
+            ) {
+              const config: DecoratorInfo = {
+                name: decoratorName,
+              };
 
-            // Extract configuration object
-            const firstArg = expr.arguments[0];
-            if (t.isObjectExpression(firstArg)) {
-              for (const prop of firstArg.properties) {
-                if (t.isObjectProperty(prop) && t.isIdentifier(prop.key)) {
-                  // Extract selector
-                  if (prop.key.name === "selector" && t.isStringLiteral(prop.value)) {
-                    config.selector = prop.value.value;
-                  }
-                  // Extract standalone flag
-                  else if (prop.key.name === "standalone" && t.isBooleanLiteral(prop.value)) {
-                    config.standalone = prop.value.value;
-                  }
-                  // Extract providers
-                  else if (prop.key.name === "providers" && t.isArrayExpression(prop.value)) {
-                    config.providers = prop.value.elements
-                      .map((el: any) => {
-                        if (t.isIdentifier(el)) return el.name;
-                        return null;
-                      })
-                      .filter((name: any): name is string => name !== null);
+              // Extract configuration object
+              const firstArg = expr.arguments[0];
+              if (t.isObjectExpression(firstArg)) {
+                for (const prop of firstArg.properties) {
+                  if (t.isObjectProperty(prop) && t.isIdentifier(prop.key)) {
+                    // Extract selector
+                    if (prop.key.name === "selector" && t.isStringLiteral(prop.value)) {
+                      config.selector = prop.value.value;
+                    }
+                    // Extract standalone flag
+                    else if (prop.key.name === "standalone" && t.isBooleanLiteral(prop.value)) {
+                      config.standalone = prop.value.value;
+                    }
+                    // Extract providers
+                    else if (prop.key.name === "providers" && t.isArrayExpression(prop.value)) {
+                      config.providers = prop.value.elements
+                        .map((el: any) => {
+                          if (t.isIdentifier(el)) return el.name;
+                          return null;
+                        })
+                        .filter((name: any): name is string => name !== null);
+                    }
                   }
                 }
               }
-            }
 
-            decoratorInfo = config;
+              decoratorInfo = config;
+              break;
+            }
           }
         }
       },
     });
 
-    return decoratorInfo;
+    if (decoratorInfo) {
+      return decoratorInfo;
+    }
   } catch (error) {
-    return null;
+    // AST parsing failed, fall through to regex
   }
+
+  // Fallback to regex-based extraction for partial code snippets
+  return extractDecoratorInfoRegex(content);
 }
 
 // ============================================================================

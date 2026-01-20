@@ -3,6 +3,7 @@
  */
 
 import type {
+  AngularComponentChangeFinding,
   APIContractChangeFinding,
   CIWorkflowFinding,
   CloudflareChangeFinding,
@@ -151,7 +152,15 @@ function renderSummary(groups: Map<string, Finding[]>): string {
     | StencilComponentChangeFinding[]
     | undefined;
   if (stencilComponents && stencilComponents.length > 0) {
-    bullets.push(`${stencilComponents.length} component API change(s)`);
+    bullets.push(`${stencilComponents.length} Stencil component API change(s)`);
+  }
+
+  // Angular component changes
+  const angularComponents = groups.get("angular-component-change") as
+    | AngularComponentChangeFinding[]
+    | undefined;
+  if (angularComponents && angularComponents.length > 0) {
+    bullets.push(`${angularComponents.length} Angular component change(s)`);
   }
 
   // Package exports breaking changes
@@ -776,6 +785,50 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
 }
 
 /**
+ * Render Angular Component changes.
+ */
+function renderAngularChanges(groups: Map<string, Finding[]>): string {
+  const componentChanges =
+    (groups.get("angular-component-change") as AngularComponentChangeFinding[]) ?? [];
+
+  if (componentChanges.length === 0) {
+    return "";
+  }
+
+  let output = "## Angular Components\n\n";
+
+  // Group by component type
+  const byType = new Map<string, AngularComponentChangeFinding[]>();
+  for (const change of componentChanges) {
+    const type = change.componentType;
+    if (!byType.has(type)) {
+      byType.set(type, []);
+    }
+    byType.get(type)!.push(change);
+  }
+
+  // Render table for each type
+  for (const [type, changes] of byType) {
+    const typeLabel = type.charAt(0).toUpperCase() + type.slice(1) + "s";
+    output += `### ${typeLabel}\n\n`;
+    output += "| File | Change | Selector | Standalone |\n";
+    output += "|------|--------|----------|------------|\n";
+
+    for (const change of changes) {
+      const changeEmoji =
+        change.change === "deleted" ? "🔴" :
+        change.change === "added" ? "🟢" : "🟡";
+      const selector = change.selector || "-";
+      const standalone = change.standalone !== undefined ? (change.standalone ? "Yes" : "No") : "-";
+      output += `| \`${change.file}\` | ${changeEmoji} ${change.change} | \`${selector}\` | ${standalone} |\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
  * Render CI Workflow findings.
  */
 function renderCIWorkflow(findings: CIWorkflowFinding[]): string {
@@ -1172,6 +1225,9 @@ export function renderMarkdown(context: RenderContext): string {
 
   // Component API (Stencil)
   output += renderStencilChanges(groups);
+
+  // Angular Components
+  output += renderAngularChanges(groups);
 
   // CI / Infrastructure
   const ciWorkflows =

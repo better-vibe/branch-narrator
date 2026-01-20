@@ -5,6 +5,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   angularRoutesAnalyzer,
+  dependencies,
   normalizePath,
   joinPaths,
   extractAngularRoutes,
@@ -165,24 +166,22 @@ describe("angularRoutesAnalyzer", () => {
       base: "base-ref",
       head: "head-ref",
       files: [createFileChange("src/app/app.routes.ts", "modified")],
-      diffs: [createFileDiff("src/app/app.routes.ts", "modified")],
+      diffs: [createFileDiff("src/app/app.routes.ts", [], [], "modified")],
     });
 
     // Mock the batch content fetcher
-    const originalDeps = (angularRoutesAnalyzer as any).dependencies;
-    (angularRoutesAnalyzer as any).dependencies = {
-      batchGetFileContent: async () => {
-        const map = new Map();
-        map.set("base-ref:src/app/app.routes.ts", baseContent);
-        map.set("head-ref:src/app/app.routes.ts", headContent);
-        return map;
-      },
+    const originalBatchGetFileContent = dependencies.batchGetFileContent;
+    dependencies.batchGetFileContent = async () => {
+      const map = new Map();
+      map.set("base-ref:src/app/app.routes.ts", baseContent);
+      map.set("head-ref:src/app/app.routes.ts", headContent);
+      return map;
     };
 
     const findings = await angularRoutesAnalyzer.analyze(changeSet);
 
     // Restore original dependencies
-    (angularRoutesAnalyzer as any).dependencies = originalDeps;
+    dependencies.batchGetFileContent = originalBatchGetFileContent;
 
     expect(findings.length).toBe(1);
     const finding = findings[0] as RouteChangeFinding;
@@ -209,24 +208,22 @@ describe("angularRoutesAnalyzer", () => {
       base: "base-ref",
       head: "head-ref",
       files: [createFileChange("src/app/app.routes.ts", "modified")],
-      diffs: [createFileDiff("src/app/app.routes.ts", "modified")],
+      diffs: [createFileDiff("src/app/app.routes.ts", [], [], "modified")],
     });
 
     // Mock the batch content fetcher
-    const originalDeps = (angularRoutesAnalyzer as any).dependencies;
-    (angularRoutesAnalyzer as any).dependencies = {
-      batchGetFileContent: async () => {
-        const map = new Map();
-        map.set("base-ref:src/app/app.routes.ts", baseContent);
-        map.set("head-ref:src/app/app.routes.ts", headContent);
-        return map;
-      },
+    const originalBatchGetFileContent = dependencies.batchGetFileContent;
+    dependencies.batchGetFileContent = async () => {
+      const map = new Map();
+      map.set("base-ref:src/app/app.routes.ts", baseContent);
+      map.set("head-ref:src/app/app.routes.ts", headContent);
+      return map;
     };
 
     const findings = await angularRoutesAnalyzer.analyze(changeSet);
 
     // Restore original dependencies
-    (angularRoutesAnalyzer as any).dependencies = originalDeps;
+    dependencies.batchGetFileContent = originalBatchGetFileContent;
 
     expect(findings.length).toBe(1);
     const finding = findings[0] as RouteChangeFinding;
@@ -246,24 +243,22 @@ describe("angularRoutesAnalyzer", () => {
       base: "base-ref",
       head: "head-ref",
       files: [createFileChange("src/app/my.service.ts", "modified")],
-      diffs: [createFileDiff("src/app/my.service.ts", "modified")],
+      diffs: [createFileDiff("src/app/my.service.ts", [], [], "modified")],
     });
 
     // Mock the batch content fetcher
-    const originalDeps = (angularRoutesAnalyzer as any).dependencies;
-    (angularRoutesAnalyzer as any).dependencies = {
-      batchGetFileContent: async () => {
-        const map = new Map();
-        map.set("base-ref:src/app/my.service.ts", content);
-        map.set("head-ref:src/app/my.service.ts", content);
-        return map;
-      },
+    const originalBatchGetFileContent = dependencies.batchGetFileContent;
+    dependencies.batchGetFileContent = async () => {
+      const map = new Map();
+      map.set("base-ref:src/app/my.service.ts", content);
+      map.set("head-ref:src/app/my.service.ts", content);
+      return map;
     };
 
     const findings = await angularRoutesAnalyzer.analyze(changeSet);
 
     // Restore original dependencies
-    (angularRoutesAnalyzer as any).dependencies = originalDeps;
+    dependencies.batchGetFileContent = originalBatchGetFileContent;
 
     expect(findings.length).toBe(0);
   });
