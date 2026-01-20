@@ -294,6 +294,15 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "vite-config": {
+      // Fingerprint: type + file + isBreaking + sorted(affectedSections) + sorted(plugins)
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      const plugins = sortForHash(finding.pluginsDetected).join(",");
+      fingerprint = `vite-config:${file}:${finding.isBreaking}:${sections}:${plugins}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;

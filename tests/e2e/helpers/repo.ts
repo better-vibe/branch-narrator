@@ -1259,6 +1259,39 @@ export function welcome(name: string) {
 }
 
 /**
+ * Create a Vite project repository.
+ */
+export async function createViteRepo(): Promise<TestRepo> {
+  return createTestRepo({
+    packageJson: {
+      name: "test-vite",
+      devDependencies: {
+        vite: "^5.0.0",
+        vitest: "^1.0.0",
+      },
+    },
+    files: {
+      "vite.config.ts": `import { defineConfig } from 'vite';
+
+export default defineConfig({
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+  },
+  server: {
+    port: 3000,
+  },
+});`,
+      "src/main.ts": `const apiUrl = import.meta.env.VITE_API_URL;
+console.log('Starting app with API:', apiUrl);`,
+      "src/utils.ts": `export function greet(name: string) {
+  return \`Hello, \${name}!\`;
+}`,
+    },
+  });
+}
+
+/**
  * Create a repository with package.json exports changes.
  */
 export async function createRepoWithPackageExports(): Promise<TestRepo> {

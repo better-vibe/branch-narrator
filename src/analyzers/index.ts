@@ -36,4 +36,5 @@ export { pythonMigrationsAnalyzer } from "./python-migrations.js";
 export { pythonConfigAnalyzer } from "./python-config.js";
 export { angularRoutesAnalyzer } from "./angular-routes.js";
 export { angularComponentsAnalyzer } from "./angular-components.js";
+export { viteConfigAnalyzer } from "./vite-config.js";
 

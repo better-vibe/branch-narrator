@@ -115,6 +115,7 @@ const TEST_COMMANDS: Record<ProfileName, { cmd: string; label: string }[]> = {
   angular: [{ cmd: "ng build", label: "Run Angular build" }],
   library: [{ cmd: "bun run build", label: "Build library" }],
   python: [{ cmd: "pytest", label: "Run pytest" }],
+  vite: [{ cmd: "bun run build", label: "Run Vite build" }],
   auto: [],
 };
 

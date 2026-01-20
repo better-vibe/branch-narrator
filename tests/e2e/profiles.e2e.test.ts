@@ -14,6 +14,7 @@ import {
   createAstroRepo,
   createStencilRepo,
   createLibraryRepo,
+  createViteRepo,
   runCli,
   type TestRepo,
 } from "./helpers/repo.js";
@@ -655,5 +656,83 @@ describe("Profile detection - Library", () => {
 
     // Library profile takes precedence when exports field is present
     expect(output.profile.detected).toBe("library");
+  });
+});
+
+// ============================================================================
+// Vite Profile Detection Tests
+// ============================================================================
+
+describe("Profile detection - Vite", () => {
+  it("should detect Vite from vite dependency and config", async () => {
+    currentRepo = await createViteRepo();
+
+    const { stdout, exitCode } = await runCli(
+      ["facts", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head, "--no-timestamp"],
+      currentRepo.cwd
+    );
+
+    expect(exitCode).toBe(0);
+    const output: FactsOutput = JSON.parse(stdout);
+
+    expect(output.profile.detected).toBe("vite");
+    expect(output.profile.confidence).toBe("high");
+    expect(output.profile.reasons.some(r => r.includes("vite"))).toBe(true);
+  });
+
+  it("should detect Vite from vite dependency alone", async () => {
+    currentRepo = await createTestRepo({
+      packageJson: {
+        name: "test-vite-only",
+        devDependencies: {
+          vite: "^5.0.0",
+        },
+      },
+      files: {
+        "src/main.ts": "console.log('Hello');",
+      },
+    });
+
+    const { stdout } = await runCli(
+      ["facts", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head, "--no-timestamp"],
+      currentRepo.cwd
+    );
+
+    const output: FactsOutput = JSON.parse(stdout);
+
+    expect(output.profile.detected).toBe("vite");
+    expect(output.profile.confidence).toBe("medium");
+  });
+
+  it("should detect vite-config findings for Vite projects", async () => {
+    currentRepo = await createViteRepo();
+
+    const { stdout } = await runCli(
+      ["facts", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head, "--no-timestamp"],
+      currentRepo.cwd
+    );
+
+    const output: FactsOutput = JSON.parse(stdout);
+
+    // Should have vite-config findings
+    const viteConfigFindings = output.findings.filter(f => f.type === "vite-config");
+    expect(viteConfigFindings.length).toBeGreaterThan(0);
+  });
+
+  it("should allow forcing Vite profile", async () => {
+    currentRepo = await createTestRepo({
+      files: {
+        "src/index.ts": "export const x = 1;",
+      },
+    });
+
+    const { stdout } = await runCli(
+      ["facts", "--profile", "vite", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head, "--no-timestamp"],
+      currentRepo.cwd
+    );
+
+    const output: FactsOutput = JSON.parse(stdout);
+
+    expect(output.profile.requested).toBe("vite");
   });
 });
