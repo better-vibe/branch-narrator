@@ -1,0 +1,153 @@
+# diff-facts.skill.yaml
+# Claude Code Skill: Structured diff analysis using branch-narrator
+#
+# Usage: /diff-facts [--mode <mode>] [--base <ref>]
+#
+# This skill provides AI agents with comprehensive, structured analysis
+# of git diff changes including findings, risk scores, and highlights.
+
+apiVersion: claude.ai/v1
+kind: Skill
+metadata:
+  name: diff-facts
+  displayName: Diff Facts
+  description: Get structured analysis of git diff changes with findings, risk scores, and prioritized highlights
+  category: development
+  tags:
+    - git
+    - diff
+    - analysis
+    - code-review
+    - risk
+  version: "1.0.0"
+  author: "@better-vibe/branch-narrator"
+
+spec:
+  # Slash command trigger
+  trigger: /diff-facts
+
+  # Help text shown in /help
+  help: |
+    Analyze git changes with structured findings and risk assessment.
+
+    Usage:
+      /diff-facts              # Analyze unstaged changes (default)
+      /diff-facts --staged     # Analyze staged changes only
+      /diff-facts --all        # Analyze all local changes
+      /diff-facts --branch     # Compare current branch to base
+
+    Output includes:
+      - Prioritized highlights (3-7 key points)
+      - Typed findings with evidence
+      - Risk score (0-100) with level
+      - File categories and stats
+
+  # Command arguments
+  arguments:
+    - name: mode
+      type: string
+      short: m
+      default: unstaged
+      enum:
+        - unstaged  # Working tree vs index (default)
+        - staged    # Staged changes only
+        - all       # All local changes
+        - branch    # Branch comparison
+      description: Which changes to analyze
+
+    - name: base
+      type: string
+      short: b
+      required: false
+      description: Base ref for branch mode (auto-detected if omitted)
+
+    - name: profile
+      type: string
+      short: p
+      required: false
+      enum:
+        - auto
+        - sveltekit
+        - next
+        - react
+        - vue
+        - astro
+        - stencil
+        - angular
+        - python
+        - library
+      description: Force a specific framework profile
+
+  # Execution configuration
+  execution:
+    tool: bash
+    workdir: "{{ cwd }}"
+
+    # The command to run
+    command: |
+      branch-narrator facts \
+        --mode {{ args.mode }} \
+        {{ if args.base }}--base {{ args.base }}{{ end }} \
+        {{ if args.profile }}--profile {{ args.profile }}{{ end }} \
+        --format json \
+        --pretty \
+        --no-timestamp
+
+    # Timeout in milliseconds
+    timeout: 30000
+
+    # How to handle execution errors
+    on_error:
+      - code: 1
+        message: "Not a git repository or invalid refs"
+      - code: "*"
+        message: "Failed to analyze diff"
+
+  # Output handling
+  output:
+    # Expected output format
+    format: json
+
+    # How to inject into conversation
+    injection: context
+
+    # Fields to extract for summary
+    summary_template: |
+      **Diff Analysis Complete**
+      - Files: {{ .stats.filesChanged }} changed (+{{ .stats.insertions }}/-{{ .stats.deletions }})
+      - Profile: {{ .profile.detected }} ({{ .profile.confidence }} confidence)
+      - Risk: {{ .risk.score }}/100 ({{ .risk.level }})
+
+      **Highlights:**
+      {{ range .highlights }}- {{ . }}
+      {{ end }}
+
+    # Validation rules
+    validate:
+      required_fields:
+        - schemaVersion
+        - findings
+        - risk
+        - highlights
+
+  # Caching configuration
+  cache:
+    # Cache key based on git status
+    key_strategy: git-status-hash
+
+    # Time-to-live in seconds
+    ttl: 300
+
+    # Invalidate when these change
+    invalidate_on:
+      - file_save
+      - git_operation
+
+  # Dependencies
+  requires:
+    command:
+      name: branch-narrator
+      version: ">=1.5.0"
+      install:
+        npm: "npm install -g @better-vibe/branch-narrator"
+        bun: "bun add -g @better-vibe/branch-narrator"

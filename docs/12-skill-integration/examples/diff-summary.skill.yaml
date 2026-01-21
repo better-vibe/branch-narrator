@@ -1,0 +1,86 @@
+# diff-summary.skill.yaml
+# Claude Code Skill: Quick diff summary using branch-narrator
+#
+# Usage: /diff-summary [--mode <mode>]
+#
+# This skill provides a token-efficient summary of changes,
+# perfect for quick context or conversational refreshes.
+
+apiVersion: claude.ai/v1
+kind: Skill
+metadata:
+  name: diff-summary
+  displayName: Diff Summary
+  description: Quick, token-efficient summary of git diff changes
+  category: development
+  tags:
+    - git
+    - diff
+    - summary
+    - quick
+  version: "1.0.0"
+  author: "@better-vibe/branch-narrator"
+
+spec:
+  trigger: /diff-summary
+
+  help: |
+    Get a quick summary of current changes.
+
+    Usage:
+      /diff-summary          # Summary of unstaged changes
+      /diff-summary --staged # Summary of staged changes
+      /diff-summary --all    # Summary of all local changes
+
+    Output: Highlights, file stats, and risk level (minimal tokens).
+
+  arguments:
+    - name: mode
+      type: string
+      short: m
+      default: unstaged
+      enum: [unstaged, staged, all, branch]
+      description: Which changes to summarize
+
+  execution:
+    tool: bash
+    workdir: "{{ cwd }}"
+
+    # Use jq to extract only essential fields
+    command: |
+      branch-narrator facts \
+        --mode {{ args.mode }} \
+        --format json \
+        --no-timestamp \
+      | jq -c '{
+        highlights: .highlights,
+        stats: .stats,
+        risk: {score: .risk.score, level: .risk.level},
+        profile: .profile.detected,
+        fileCount: (.changeset.files.added + .changeset.files.modified + .changeset.files.deleted | length)
+      }'
+
+    timeout: 15000
+
+  output:
+    format: json
+    injection: inline  # Inline in conversation, not as context block
+
+    summary_template: |
+      **Quick Summary** ({{ .fileCount }} files, risk: {{ .risk.score }}/100)
+      {{ range .highlights }}- {{ . }}
+      {{ end }}
+
+  cache:
+    key_strategy: git-status-hash
+    ttl: 120  # Shorter TTL for quick checks
+
+  requires:
+    command:
+      name: branch-narrator
+      version: ">=1.5.0"
+    command:
+      name: jq
+      install:
+        apt: "apt install jq"
+        brew: "brew install jq"

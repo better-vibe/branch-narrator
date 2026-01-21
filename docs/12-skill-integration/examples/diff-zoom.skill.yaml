@@ -1,0 +1,114 @@
+# diff-zoom.skill.yaml
+# Claude Code Skill: Deep dive into specific findings using branch-narrator
+#
+# Usage: /diff-zoom <finding-id|flag-id>
+#
+# This skill provides detailed context for a specific finding or flag,
+# including patch hunks and evidence excerpts.
+
+apiVersion: claude.ai/v1
+kind: Skill
+metadata:
+  name: diff-zoom
+  displayName: Diff Zoom
+  description: Drill into a specific finding or risk flag for detailed context
+  category: development
+  tags:
+    - git
+    - diff
+    - investigation
+    - detail
+  version: "1.0.0"
+  author: "@better-vibe/branch-narrator"
+
+spec:
+  trigger: /diff-zoom
+
+  help: |
+    Zoom into a specific finding or flag for detailed analysis.
+
+    Usage:
+      /diff-zoom finding.env-var#abc123
+      /diff-zoom flag.db.destructive_sql#def456
+
+    Get finding/flag IDs from /diff-facts or /diff-risk output.
+
+    Output includes:
+      - Full finding/flag details
+      - Evidence excerpts with line numbers
+      - Patch context (surrounding code changes)
+
+  arguments:
+    - name: target
+      type: string
+      required: true
+      position: 0  # Positional argument
+      description: Finding ID (finding.*#hash) or Flag ID (flag.*#hash)
+
+    - name: mode
+      type: string
+      short: m
+      default: unstaged
+      enum: [unstaged, staged, all, branch]
+      description: Diff mode (must match original analysis)
+
+    - name: unified
+      type: number
+      short: u
+      default: 5
+      description: Lines of context around changes
+
+    - name: redact
+      type: boolean
+      short: r
+      default: false
+      description: Redact secret values
+
+  execution:
+    tool: bash
+    workdir: "{{ cwd }}"
+
+    # Determine if target is finding or flag
+    command: |
+      {{ if hasPrefix args.target "finding." }}
+      branch-narrator zoom \
+        --finding {{ args.target }} \
+        --mode {{ args.mode }} \
+        --unified {{ args.unified }} \
+        {{ if args.redact }}--redact{{ end }} \
+        --format json \
+        --pretty \
+        --no-timestamp
+      {{ else if hasPrefix args.target "flag." }}
+      branch-narrator zoom \
+        --flag {{ args.target }} \
+        --mode {{ args.mode }} \
+        --unified {{ args.unified }} \
+        {{ if args.redact }}--redact{{ end }} \
+        --format json \
+        --pretty \
+        --no-timestamp
+      {{ else }}
+      echo '{"error": "Invalid target. Must start with finding. or flag.", "target": "{{ args.target }}"}'
+      exit 1
+      {{ end }}
+
+    timeout: 20000
+
+  output:
+    format: json
+    injection: context
+
+    summary_template: |
+      **Zoom: {{ .findingId }}{{ .flagId }}**
+      Type: {{ .finding.type }}{{ .flag.ruleKey }}
+      Files: {{ range .evidence }}{{ .file }} {{ end }}
+
+  # No caching for zoom - always fresh
+  cache:
+    enabled: false
+
+  requires:
+    command:
+      name: branch-narrator
+      version: ">=1.5.0"
