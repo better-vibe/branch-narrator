@@ -1,7 +1,7 @@
 # Claude Code Skill Integration Proposal
 
-**Version:** 1.0.0
-**Status:** Proposal
+**Version:** 1.1.0
+**Status:** Implemented
 **Author:** AI-assisted
 **Date:** January 2026
 
@@ -79,16 +79,37 @@ Integrate branch-narrator as Claude Code skills that provide:
 
 ### Skill Definition Structure
 
-Each skill follows Claude Code's skill manifest format:
+Claude Code skills use **SKILL.md** files with YAML frontmatter. Each skill is a directory:
 
-```yaml
+```
+.claude/skills/
+  diff-facts/
+    SKILL.md          # Required: skill definition
+  diff-risk/
+    SKILL.md
+  marketplace.json    # Optional: for distribution
+```
+
+**SKILL.md format:**
+
+```markdown
+---
 name: diff-facts
-description: Analyze git changes with structured findings
-trigger: /diff-facts
-tool: bash
-command: branch-narrator facts --pretty --format json
-output_handling: inject_as_context
-cache_strategy: session  # Invalidate on file changes
+description: Analyze git changes with structured findings, risk assessment, and framework detection.
+allowed-tools: Bash(branch-narrator:*)
+argument-hint: "[--staged | --all | --mode branch --base <ref>]"
+---
+
+# Diff Facts Analysis
+
+Instructions for Claude on how to use this skill...
+
+## Commands
+- Default: `branch-narrator facts --format json --pretty`
+- Staged only: `branch-narrator facts --mode staged --format json --pretty`
+
+## Response Format
+[How Claude should format the response]
 ```
 
 ### Data Flow
@@ -734,25 +755,77 @@ interface ZoomOutput {
 
 ---
 
-## Implementation Roadmap
+## Implementation Status
 
-### Phase 1: Core Skills (MVP)
-- [ ] `/diff-facts` skill implementation
-- [ ] `/diff-risk` skill implementation
-- [ ] Basic skill manifest format
-- [ ] Documentation
+### Implemented Skills
 
-### Phase 2: Enhanced Skills
-- [ ] `/diff-summary` for quick context
-- [ ] `/diff-raw` for detailed diffs
-- [ ] `/diff-zoom` for drill-down
-- [ ] Caching layer
+| Skill | Status | Location |
+|-------|--------|----------|
+| `/diff-facts` | ✅ Complete | `.claude/skills/diff-facts/SKILL.md` |
+| `/diff-risk` | ✅ Complete | `.claude/skills/diff-risk/SKILL.md` |
+| `/diff-summary` | ✅ Complete | `.claude/skills/diff-summary/SKILL.md` |
+| `/diff-zoom` | ✅ Complete | `.claude/skills/diff-zoom/SKILL.md` |
 
-### Phase 3: Integration
-- [ ] Claude Code skill registry submission
-- [ ] Project template generation
-- [ ] IDE extension support
-- [ ] CI/CD skill variants
+### Distribution Assets
+
+| Asset | Status | Purpose |
+|-------|--------|---------|
+| `marketplace.json` | ✅ Complete | Plugin installation metadata |
+| Skills README | ✅ Complete | User documentation |
+
+---
+
+## Publishing Options
+
+### Option 1: Anthropic Official Repository
+
+Submit to [github.com/anthropics/skills](https://github.com/anthropics/skills):
+
+1. Fork the repository
+2. Add skills to appropriate category (`development/`)
+3. Submit pull request
+4. Community review process
+
+**Best for:** Widely-useful, production-grade skills
+
+### Option 2: Community Marketplaces
+
+Register with community skill directories:
+
+| Marketplace | URL | Process |
+|-------------|-----|---------|
+| SkillsMP | [skillsmp.com](https://skillsmp.com) | Submit GitHub URL |
+| Awesome Claude Skills | [github.com/travisvn/awesome-claude-skills](https://github.com/travisvn/awesome-claude-skills) | Submit PR |
+| Claude Skills Marketplace | Various community repos | Fork and PR |
+
+### Option 3: Direct Distribution
+
+Users can install directly from this repository:
+
+```bash
+# Copy to project
+cp -r .claude/skills/ your-project/.claude/skills/
+
+# Or install globally
+cp -r .claude/skills/ ~/.claude/skills/
+```
+
+### Option 4: Plugin Installation
+
+With `marketplace.json`, users can install via:
+
+```
+/plugin install branch-narrator-skills@better-vibe
+```
+
+---
+
+## Future Enhancements
+
+- [ ] Caching layer for session-level diff analysis
+- [ ] IDE extension packaging (VS Code, JetBrains)
+- [ ] CI/CD-specific skill variants
+- [ ] MCP server integration for richer tool access
 
 ---
 
@@ -776,8 +849,16 @@ By integrating as Claude Code skills, we enable AI assistants to:
 
 ## References
 
-- [Branch-narrator CLI Documentation](../05-cli/commands.md)
+### Branch-narrator Documentation
+- [CLI Commands](../05-cli/commands.md)
 - [Facts Command Output](../08-rendering/json.md)
 - [Risk Scoring Model](../08-rendering/risk-scoring.md)
 - [Stable IDs](../09-stable-ids/09-stable-ids.md)
 - [Delta Mode](../11-delta-mode/11-delta-mode.md)
+
+### External Resources
+- [Agent Skills Open Standard](https://agentskills.io) - Cross-platform skill specification
+- [Anthropic Skills Repository](https://github.com/anthropics/skills) - Official skill examples
+- [Claude Code Documentation](https://docs.anthropic.com/claude-code) - Claude Code reference
+- [SkillsMP](https://skillsmp.com) - Community skill marketplace
+- [Awesome Claude Skills](https://github.com/travisvn/awesome-claude-skills) - Curated skill list

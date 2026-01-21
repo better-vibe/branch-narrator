@@ -16,11 +16,14 @@ Branch-narrator's deterministic, structured output makes it ideal for AI agent c
 ## Quick Start
 
 ```bash
-# Install branch-narrator
-bun add -g @better-vibe/branch-narrator
+# Install branch-narrator CLI
+npm install -g @better-vibe/branch-narrator
 
-# Copy skill manifests to your project
-cp docs/12-skill-integration/examples/*.skill.yaml .claude/skills/
+# Copy skills to your project
+cp -r .claude/skills/ your-project/.claude/skills/
+
+# Or install globally for all projects
+cp -r .claude/skills/ ~/.claude/skills/
 ```
 
 Then use in Claude Code:
@@ -29,36 +32,40 @@ Then use in Claude Code:
 /diff-facts    # Full structured analysis
 /diff-risk     # Risk assessment
 /diff-summary  # Quick overview
-/diff-raw      # AI-optimized diff
 /diff-zoom     # Drill into specific finding
 ```
+
+## Implemented Skills
+
+Skills are located in `/.claude/skills/`:
+
+| Skill | Location | Purpose |
+|-------|----------|---------|
+| `/diff-facts` | [.claude/skills/diff-facts/](../../.claude/skills/diff-facts/SKILL.md) | Full structured analysis with findings, risk, highlights |
+| `/diff-risk` | [.claude/skills/diff-risk/](../../.claude/skills/diff-risk/SKILL.md) | Risk-focused assessment with evidence-backed flags |
+| `/diff-summary` | [.claude/skills/diff-summary/](../../.claude/skills/diff-summary/SKILL.md) | Quick, token-efficient summary |
+| `/diff-zoom` | [.claude/skills/diff-zoom/](../../.claude/skills/diff-zoom/SKILL.md) | Drill into specific finding or flag |
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Proposal](./proposal.md) | Full integration proposal with architecture |
-| [Examples](./examples/) | Ready-to-use skill manifests |
+| [Proposal](./proposal.md) | Full integration proposal with architecture and publishing |
+| [Skills README](../../.claude/skills/README.md) | Installation and usage guide |
+| [marketplace.json](../../.claude/skills/marketplace.json) | Plugin distribution metadata |
 
-## Skill Manifests
+## Publishing
 
-| Skill | File | Purpose |
-|-------|------|---------|
-| `/diff-facts` | [diff-facts.skill.yaml](./examples/diff-facts.skill.yaml) | Full structured analysis |
-| `/diff-risk` | [diff-risk.skill.yaml](./examples/diff-risk.skill.yaml) | Risk-focused assessment |
-| `/diff-summary` | [diff-summary.skill.yaml](./examples/diff-summary.skill.yaml) | Quick token-efficient summary |
-| `/diff-zoom` | [diff-zoom.skill.yaml](./examples/diff-zoom.skill.yaml) | Drill into specific finding |
-| `/diff-raw` | [diff-raw.skill.yaml](./examples/diff-raw.skill.yaml) | AI-optimized raw diff |
+These skills can be published to:
 
-## Why Use as a Skill?
+| Destination | How |
+|-------------|-----|
+| **Anthropic Official** | Submit PR to [github.com/anthropics/skills](https://github.com/anthropics/skills) |
+| **SkillsMP** | Register at [skillsmp.com](https://skillsmp.com) |
+| **Awesome Claude Skills** | Submit PR to [github.com/travisvn/awesome-claude-skills](https://github.com/travisvn/awesome-claude-skills) |
+| **Direct sharing** | Users copy `.claude/skills/` directory |
 
-| Without Skill | With Skill |
-|---------------|------------|
-| Run CLI manually | Simple slash command |
-| Parse output yourself | Automatic context injection |
-| No caching | Session-level caching |
-| Raw JSON output | Formatted summaries |
-| No discoverability | Shows in `/help` |
+See [proposal.md](./proposal.md#publishing-options) for detailed publishing instructions.
 
 ## Example Workflow
 
@@ -95,3 +102,4 @@ Would you like me to help address any of these?
 - [CLI Commands](../05-cli/commands.md)
 - [JSON Output Format](../08-rendering/json.md)
 - [Risk Scoring](../08-rendering/risk-scoring.md)
+- [Agent Skills Open Standard](https://agentskills.io)
