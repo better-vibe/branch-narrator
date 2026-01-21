@@ -164,22 +164,20 @@ function sectionHeader(title: string, icon?: string): string {
 
 /**
  * Render the Summary section in a box.
- * Uses buildHighlights() for consistent, prioritized summaries.
+ * Shows file counts, profile, and risk level. Highlights are in a separate section.
  */
 function renderSummary(
   findings: Finding[],
   riskScore: RenderContext["riskScore"],
   profile: ProfileName
 ): string {
-  // Use highlights for prioritized, consistent bullets
-  const highlights = buildHighlights(findings);
-
   // Get file counts for the header
   const fileSummary = findings.find((f) => f.type === "file-summary") as
     | FileSummaryFinding
     | undefined;
 
-  let fileCountLine = "";
+  const bullets: string[] = [];
+
   if (fileSummary) {
     const total =
       fileSummary.added.length +
@@ -201,20 +199,8 @@ function renderSummary(
       parts.push(colors.fileRenamed(`→${fileSummary.renamed.length}`));
     }
 
-    fileCountLine = `${colors.value(String(total))} file(s) changed ${parts.length > 0 ? `(${parts.join(", ")})` : ""}`;
-  }
-
-  // Build the content
-  const bullets: string[] = [];
-
-  // File count first
-  if (fileCountLine) {
+    const fileCountLine = `${colors.value(String(total))} file(s) changed ${parts.length > 0 ? `(${parts.join(", ")})` : ""}`;
     bullets.push(fileCountLine);
-  }
-
-  // Add highlights (limit to 8 for readability)
-  for (const highlight of highlights.slice(0, 8)) {
-    bullets.push(highlight);
   }
 
   // Fallback if no bullets
@@ -1076,6 +1062,77 @@ function renderConfigChanges(groups: Map<string, Finding[]>): string {
 }
 
 /**
+ * Render Highlights section showing all prioritized highlights.
+ */
+function renderHighlights(findings: Finding[]): string {
+  const highlights = buildHighlights(findings);
+
+  if (highlights.length === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("KEY HIGHLIGHTS", "⚡");
+
+  // Categorize highlights by type for better visual grouping
+  const riskHighlights: string[] = [];
+  const changeHighlights: string[] = [];
+  const infoHighlights: string[] = [];
+
+  for (const highlight of highlights) {
+    const lower = highlight.toLowerCase();
+    if (
+      lower.includes("risk") ||
+      lower.includes("security") ||
+      lower.includes("breaking") ||
+      lower.includes("destructive") ||
+      lower.includes("blast radius")
+    ) {
+      riskHighlights.push(highlight);
+    } else if (
+      lower.includes("added") ||
+      lower.includes("modified") ||
+      lower.includes("deleted") ||
+      lower.includes("changed") ||
+      lower.includes("updated") ||
+      lower.includes("new")
+    ) {
+      changeHighlights.push(highlight);
+    } else {
+      infoHighlights.push(highlight);
+    }
+  }
+
+  // Render risk highlights first (with warning styling)
+  if (riskHighlights.length > 0) {
+    output += `${colors.riskHigh("Risks & Breaking Changes")}\n`;
+    for (const h of riskHighlights) {
+      output += `  ${icons.warning} ${colors.warning(h)}\n`;
+    }
+    output += "\n";
+  }
+
+  // Render change highlights
+  if (changeHighlights.length > 0) {
+    output += `${colors.subheader("Changes")}\n`;
+    for (const h of changeHighlights) {
+      output += `  ${icons.bullet} ${colors.value(h)}\n`;
+    }
+    output += "\n";
+  }
+
+  // Render info highlights
+  if (infoHighlights.length > 0) {
+    output += `${colors.subheader("Info")}\n`;
+    for (const h of infoHighlights) {
+      output += `  ${icons.bullet} ${colors.muted(h)}\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
  * Render Large Diff warning.
  */
 function renderLargeDiff(findings: LargeDiffFinding[]): string {
@@ -1146,9 +1203,12 @@ export function renderTerminal(context: RenderContext): string {
   // Context (interactive only)
   output += renderContext(context);
 
-  // Summary box (now uses highlights and shows profile)
+  // Summary box (shows file counts and profile)
   output += renderSummary(context.findings, context.riskScore, context.profile);
   output += "\n";
+
+  // Key Highlights section (all prioritized highlights)
+  output += renderHighlights(context.findings);
 
   // Large diff warning (show early if present)
   const largeDiff = (groups.get("large-diff") as LargeDiffFinding[]) ?? [];

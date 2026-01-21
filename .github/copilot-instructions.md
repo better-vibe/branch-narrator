@@ -259,7 +259,7 @@ bun run dev
 1. Check git command output with `--no-pager`
 2. Test with different git refs (branches, tags, commits)
 3. Handle renamed files carefully (oldPath vs newPath)
-4. Test with uncommitted changes (`-u` flag)
+4. Test with unstaged changes (`--mode unstaged`)
 
 ### Improving Risk Scoring
 

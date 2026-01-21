@@ -291,6 +291,10 @@ describe("renderMarkdown", () => {
     const findings: Finding[] = [
       {
         type: "file-summary",
+        kind: "file-summary",
+        category: "routes",
+        confidence: "high",
+        evidence: [],
         added: [],
         modified: ["src/lib/auth.ts"],
         deleted: [],
@@ -298,6 +302,10 @@ describe("renderMarkdown", () => {
       } as FileSummaryFinding,
       {
         type: "security-file",
+        kind: "security-file",
+        category: "infra",
+        confidence: "high",
+        evidence: [],
         files: ["src/lib/auth.ts"],
         reasons: ["auth-path"],
       } as SecurityFileFinding,
@@ -305,7 +313,10 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).toContain("security-sensitive");
+    // Check summary contains security mention OR the new Security section renders
+    const hasSecurityInSummary = markdown.includes("Security-sensitive files changed");
+    const hasSecuritySection = markdown.includes("## 🔒 Security-Sensitive Files");
+    expect(hasSecurityInSummary || hasSecuritySection).toBe(true);
   });
 });
 

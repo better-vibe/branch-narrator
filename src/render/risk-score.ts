@@ -271,7 +271,7 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
     if (coreFilesModified.length > 0) {
       const weight = 10;
       score += weight;
-      evidenceBullets.push(`⚡ Core module files modified: ${coreFilesModified.join(", ")}`);
+      evidenceBullets.push(`ℹ️ Core module files modified: ${coreFilesModified.join(", ")}`);
       factors.push({
         kind: "core-module-change",
         weight,

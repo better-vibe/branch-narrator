@@ -71,7 +71,7 @@ branch-narrator pretty
 # Review staged changes only
 branch-narrator pretty --mode staged
 
-# Review all uncommitted changes (staged + unstaged + untracked)
+# Review all local changes (staged + unstaged + untracked)
 branch-narrator pretty --mode all
 
 # Compare specific branches
@@ -98,7 +98,6 @@ branch-narrator pr-body [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `-u, --uncommitted` | `false` | **[DEPRECATED]** Use `--mode unstaged` instead |
 | `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
 | `--interactive` | `false` | Prompt for context |
 
@@ -185,7 +184,7 @@ branch-narrator facts --mode branch --base develop --head feature/auth
 # Analyze staged changes
 branch-narrator facts --mode staged
 
-# Analyze all uncommitted changes
+# Analyze all local changes
 branch-narrator facts --mode all
 
 # Parse with jq
@@ -327,7 +326,7 @@ branch-narrator dump-diff [options]
 | `unstaged` | Working tree vs index + untracked files - **default** | `git diff` + `git ls-files --others` |
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
-| `all` | Working tree vs HEAD (all uncommitted) | `git diff HEAD` |
+| `all` | Working tree vs HEAD (all local changes) | `git diff HEAD` |
 
 ### Default Exclusions
 
@@ -563,7 +562,7 @@ branch-narrator risk-report --mode branch --base develop --head feature/auth
 # Analyze staged changes
 branch-narrator risk-report --mode staged
 
-# Analyze all uncommitted changes
+# Analyze all local changes
 branch-narrator risk-report --mode all
 
 # Use Markdown format

@@ -17,7 +17,7 @@
 - [x] Risk scoring with evidence
 - [x] Markdown PR body generation
 - [x] JSON facts output
-- [x] Uncommitted changes support
+- [x] Unstaged changes support
 - [x] Interactive mode
 - [x] React profile (React Router support)
 - [x] Test parity analyzer
@@ -108,7 +108,7 @@
 | Issue | Status | Workaround |
 |-------|--------|------------|
 | Monorepo support limited | 🔧 In Progress | Run from package root |
-| Large diffs slow | 📋 Backlog | Use `--uncommitted` for incremental |
+| Large diffs slow | 📋 Backlog | Use `--mode unstaged` for incremental |
 
 ---
 

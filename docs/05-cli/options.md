@@ -67,38 +67,6 @@ Same value types as `--base`.
 
 ---
 
-## -u, --uncommitted
-
-**[DEPRECATED]** Use `--mode unstaged` instead. Include uncommitted and untracked changes. Only available on `pr-body` command.
-
-```bash
-# Deprecated (use --mode unstaged instead)
-branch-narrator pr-body -u
-branch-narrator pr-body --uncommitted
-```
-
-### Behavior
-
-When enabled:
-- Compares working directory against `--base`
-- Includes modified tracked files (staged and unstaged)
-- Includes new untracked files (not in .gitignore)
-- Sets `head` to `"WORKING"` in output
-
-### Use Cases
-
-```bash
-# OLD (deprecated)
-branch-narrator pr-body -u
-
-# NEW (recommended)
-branch-narrator pr-body --mode unstaged
-```
-
-**Note:** For `pretty` and `facts` commands, use `--mode unstaged` or `--mode all`.
-
----
-
 ## --profile
 
 Specify which analyzer profile to use.
@@ -363,7 +331,7 @@ branch-narrator pr-body \
   --profile sveltekit \
   --interactive
 
-# Using modes for uncommitted work
+# Using modes for unstaged work
 branch-narrator pretty --mode all
 branch-narrator facts --mode staged
 

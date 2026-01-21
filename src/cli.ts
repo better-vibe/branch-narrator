@@ -209,7 +209,6 @@ program
   )
   .option("--base <ref>", "Base branch to compare against (branch mode; auto-detected if omitted)")
   .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
-  .option("-u, --uncommitted", "[DEPRECATED] Use --mode unstaged instead", false)
   .option(
     "--profile <name>",
     "Profile to use (auto|sveltekit|react|stencil|next)",
@@ -218,12 +217,7 @@ program
   .option("--interactive", "Prompt for additional context", false)
   .action(async (options) => {
     try {
-      // Handle deprecated --uncommitted flag
-      let mode = options.mode as DiffMode;
-      if (options.uncommitted) {
-        warn("Warning: --uncommitted is deprecated. Use --mode unstaged instead.");
-        mode = "unstaged";
-      }
+      const mode = options.mode as DiffMode;
 
       // Validate mode
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {

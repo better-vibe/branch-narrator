@@ -182,7 +182,7 @@ branch-narrator pretty
 # Compare branches
 branch-narrator pretty --mode branch --base develop --head feature/auth
 
-# Review all uncommitted changes
+# Review all local changes
 branch-narrator pretty --mode all
 ```
 
@@ -199,7 +199,6 @@ branch-narrator pr-body [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `-u, --uncommitted` | `false` | Deprecated: use `--mode unstaged` |
 | `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `library` |
 | `--interactive` | `false` | Prompt for context and test notes |
 

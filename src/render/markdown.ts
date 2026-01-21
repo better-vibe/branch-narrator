@@ -37,9 +37,12 @@ import type {
   TestGapFinding,
   TestParityViolationFinding,
   TypeScriptConfigFinding,
+  ViteConfigFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 import { getCategoryLabel } from "../analyzers/file-category.js";
+import { getSecurityReasonLabel } from "../analyzers/security-files.js";
+import { buildHighlights } from "../commands/facts/highlights.js";
 
 /**
  * Group findings by type.
@@ -66,11 +69,12 @@ function renderContext(context: RenderContext): string {
 }
 
 /**
- * Render the Summary section.
+ * Render the Summary section using prioritized highlights.
  */
-function renderSummary(groups: Map<string, Finding[]>): string {
+function renderSummary(groups: Map<string, Finding[]>, allFindings: Finding[]): string {
   const bullets: string[] = [];
 
+  // Always show file count first with details
   const fileSummary = groups.get("file-summary")?.[0] as
     | FileSummaryFinding
     | undefined;
@@ -90,87 +94,16 @@ function renderSummary(groups: Map<string, Finding[]>): string {
     }
   }
 
-  const routeChanges = groups.get("route-change") as
-    | RouteChangeFinding[]
-    | undefined;
-  if (routeChanges && routeChanges.length > 0) {
-    const newRoutes = routeChanges.filter((r) => r.change === "added");
-    if (newRoutes.length > 0) {
-      bullets.push(`${newRoutes.length} new route(s)`);
-    }
-  }
+  // Use buildHighlights for consistent, prioritized summary bullets
+  const highlights = buildHighlights(allFindings);
 
-  const migrations = groups.get("db-migration") as
-    | DbMigrationFinding[]
-    | undefined;
-  if (migrations && migrations.length > 0) {
-    bullets.push(`Database migrations detected`);
-  }
-
-  const deps = groups.get("dependency-change") as
-    | DependencyChangeFinding[]
-    | undefined;
-  if (deps && deps.length > 0) {
-    const majorBumps = deps.filter((d) => d.impact === "major");
-    if (majorBumps.length > 0) {
-      bullets.push(`${majorBumps.length} major dependency update(s)`);
-    }
-  }
-
-  const securityFiles = groups.get("security-file") as
-    | SecurityFileFinding[]
-    | undefined;
-  if (securityFiles && securityFiles.length > 0) {
-    const totalFiles = securityFiles.reduce(
-      (acc, sf) => acc + sf.files.length,
-      0
-    );
-    bullets.push(`${totalFiles} security-sensitive file(s) changed`);
-  }
-
-  // GraphQL breaking changes
-  const graphqlChanges = groups.get("graphql-change") as
-    | GraphQLChangeFinding[]
-    | undefined;
-  if (graphqlChanges && graphqlChanges.length > 0) {
-    const breakingCount = graphqlChanges.filter((g) => g.isBreaking).length;
-    if (breakingCount > 0) {
-      bullets.push(`${breakingCount} GraphQL breaking change(s)`);
-    }
-  }
-
-  // CI workflow risks
-  const ciWorkflows = groups.get("ci-workflow") as
-    | CIWorkflowFinding[]
-    | undefined;
-  if (ciWorkflows && ciWorkflows.length > 0) {
-    bullets.push(`${ciWorkflows.length} CI workflow change(s) detected`);
-  }
-
-  // Stencil component changes
-  const stencilComponents = groups.get("stencil-component-change") as
-    | StencilComponentChangeFinding[]
-    | undefined;
-  if (stencilComponents && stencilComponents.length > 0) {
-    bullets.push(`${stencilComponents.length} Stencil component API change(s)`);
-  }
-
-  // Angular component changes
-  const angularComponents = groups.get("angular-component-change") as
-    | AngularComponentChangeFinding[]
-    | undefined;
-  if (angularComponents && angularComponents.length > 0) {
-    bullets.push(`${angularComponents.length} Angular component change(s)`);
-  }
-
-  // Package exports breaking changes
-  const packageExports = groups.get("package-exports") as
-    | PackageExportsFinding[]
-    | undefined;
-  if (packageExports && packageExports.length > 0) {
-    const breakingExports = packageExports.filter((p) => p.isBreaking);
-    if (breakingExports.length > 0) {
-      bullets.push(`Package API breaking changes detected`);
+  // Add highlights (they're already priority-ordered)
+  for (const highlight of highlights) {
+    // Skip if it duplicates file-related info we already have
+    if (!highlight.includes("file(s) changed") && 
+        !highlight.includes("file(s) with") &&
+        !highlight.toLowerCase().includes("finding")) {
+      bullets.push(highlight);
     }
   }
 
@@ -178,8 +111,8 @@ function renderSummary(groups: Map<string, Finding[]>): string {
     bullets.push("Minor changes detected");
   }
 
-  // Limit to 6 bullets
-  const limitedBullets = bullets.slice(0, 6);
+  // Limit to 8 bullets for comprehensive but readable summary
+  const limitedBullets = bullets.slice(0, 8);
 
   return (
     `## Summary\n\n` +
@@ -399,6 +332,48 @@ function renderDependencies(deps: DependencyChangeFinding[]): string {
 }
 
 /**
+ * Render Security section showing security-sensitive files.
+ */
+function renderSecurityFiles(securityFiles: SecurityFileFinding[]): string {
+  if (securityFiles.length === 0) {
+    return "";
+  }
+
+  let output = "## 🔒 Security-Sensitive Files\n\n";
+  output += "The following files touch authentication, authorization, or security-critical code:\n\n";
+
+  // Collect all files with their reasons
+  type SecurityFileReason = SecurityFileFinding["reasons"][number];
+  const fileReasons = new Map<string, SecurityFileReason[]>();
+  for (const sf of securityFiles) {
+    for (const file of sf.files) {
+      if (!fileReasons.has(file)) {
+        fileReasons.set(file, []);
+      }
+      for (const reason of sf.reasons) {
+        if (!fileReasons.get(file)!.includes(reason)) {
+          fileReasons.get(file)!.push(reason);
+        }
+      }
+    }
+  }
+
+  // Render file list with reasons
+  const sortedFiles = [...fileReasons.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [file, reasons] of sortedFiles.slice(0, 10)) {
+    const reasonLabels = reasons.map(r => getSecurityReasonLabel(r)).join(", ");
+    output += `- \`${file}\` *(${reasonLabels})*\n`;
+  }
+
+  if (sortedFiles.length > 10) {
+    output += `- ...and ${sortedFiles.length - 10} more\n`;
+  }
+
+  output += "\n";
+  return output;
+}
+
+/**
  * Render GraphQL Schema section.
  */
 function renderGraphQL(changes: GraphQLChangeFinding[]): string {
@@ -563,16 +538,60 @@ function renderMonorepoConfig(configs: MonorepoConfigFinding[]): string {
 /**
  * Render combined Configuration section.
  */
+/**
+ * Render Vite Config section.
+ */
+function renderViteConfig(configs: ViteConfigFinding[]): string {
+  if (configs.length === 0) {
+    return "";
+  }
+
+  let output = "### Vite Configuration\n\n";
+
+  for (const config of configs) {
+    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
+    output += `**File:** \`${config.file}\` ${breakingEmoji}\n\n`;
+
+    // Show detected plugins
+    if (config.pluginsDetected.length > 0) {
+      output += `**Plugins:** ${config.pluginsDetected.map(p => `\`${p}\``).join(", ")}\n`;
+    }
+
+    if (config.affectedSections.length > 0) {
+      output += "**Affected Sections:**\n";
+      for (const section of config.affectedSections.slice(0, 5)) {
+        output += `- ${section}\n`;
+      }
+      if (config.affectedSections.length > 5) {
+        output += `- ...and ${config.affectedSections.length - 5} more\n`;
+      }
+      output += "\n";
+    }
+
+    if (config.isBreaking && config.breakingReasons.length > 0) {
+      output += "**Breaking Changes:**\n";
+      for (const reason of config.breakingReasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
 function renderConfiguration(
   tsConfigs: TypeScriptConfigFinding[],
   tailwindConfigs: TailwindConfigFinding[],
-  monorepoConfigs: MonorepoConfigFinding[]
+  monorepoConfigs: MonorepoConfigFinding[],
+  viteConfigs: ViteConfigFinding[]
 ): string {
   const hasTsConfig = tsConfigs.length > 0;
   const hasTailwind = tailwindConfigs.length > 0;
   const hasMonorepo = monorepoConfigs.length > 0;
+  const hasVite = viteConfigs.length > 0;
 
-  if (!hasTsConfig && !hasTailwind && !hasMonorepo) {
+  if (!hasTsConfig && !hasTailwind && !hasMonorepo && !hasVite) {
     return "";
   }
 
@@ -583,6 +602,9 @@ function renderConfiguration(
   }
   if (hasTailwind) {
     output += renderTailwindConfig(tailwindConfigs);
+  }
+  if (hasVite) {
+    output += renderViteConfig(viteConfigs);
   }
   if (hasMonorepo) {
     output += renderMonorepoConfig(monorepoConfigs);
@@ -1162,8 +1184,8 @@ export function renderMarkdown(context: RenderContext): string {
   // Context (interactive only)
   output += renderContext(context);
 
-  // Summary
-  output += renderSummary(groups);
+  // Summary (using prioritized highlights)
+  output += renderSummary(groups, context.findings);
 
   // What Changed (grouped by category)
   const categoryFinding = groups.get("file-category")?.[0] as
@@ -1206,16 +1228,18 @@ export function renderMarkdown(context: RenderContext): string {
   const envVars = (groups.get("env-var") as EnvVarFinding[]) ?? [];
   output += renderEnvVars(envVars);
 
-  // Configuration Changes (TypeScript, Tailwind, Monorepo, Python)
+  // Configuration Changes (TypeScript, Tailwind, Vite, Monorepo, Python)
   const tsConfigs =
     (groups.get("typescript-config") as TypeScriptConfigFinding[]) ?? [];
   const tailwindConfigs =
     (groups.get("tailwind-config") as TailwindConfigFinding[]) ?? [];
   const monorepoConfigs =
     (groups.get("monorepo-config") as MonorepoConfigFinding[]) ?? [];
+  const viteConfigs =
+    (groups.get("vite-config") as ViteConfigFinding[]) ?? [];
   const pythonConfigs =
     (groups.get("python-config") as PythonConfigFinding[]) ?? [];
-  output += renderConfiguration(tsConfigs, tailwindConfigs, monorepoConfigs);
+  output += renderConfiguration(tsConfigs, tailwindConfigs, monorepoConfigs, viteConfigs);
   output += renderPythonConfig(pythonConfigs);
 
   // Cloudflare
@@ -1245,6 +1269,14 @@ export function renderMarkdown(context: RenderContext): string {
   const infraChanges =
     (groups.get("infra-change") as InfraChangeFinding[]) ?? [];
   output += renderCIInfrastructure(ciWorkflows, infraChanges);
+
+  // Security-Sensitive Files
+  const securityFiles =
+    (groups.get("security-file") as SecurityFileFinding[]) ?? [];
+  output += renderSecurityFiles(securityFiles);
+
+  // Note: Tests are shown in "What Changed > Tests" and "Suggested Test Plan"
+  // No dedicated section needed to avoid redundancy
 
   // Convention Violations
   const violations =
@@ -1283,8 +1315,14 @@ export function renderMarkdown(context: RenderContext): string {
   const impacts =
     (groups.get("impact-analysis") as ImpactAnalysisFinding[]) ?? [];
   if (impacts.length > 0) {
+    // Sort by blast radius priority: high first, medium second, low last
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    const sortedImpacts = [...impacts].sort((a, b) => 
+      priorityOrder[a.blastRadius] - priorityOrder[b.blastRadius]
+    );
+
     output += "## 🧨 Impact Analysis\n\n";
-    for (const impact of impacts) {
+    for (const impact of sortedImpacts) {
       const radiusEmoji = impact.blastRadius === "high" ? "🔴" : impact.blastRadius === "medium" ? "🟡" : "🟢";
       output += `### \`${impact.sourceFile}\` ${radiusEmoji}\n\n`;
       output += `**Blast Radius:** ${impact.blastRadius.toUpperCase()} (${impact.affectedFiles.length} files)\n\n`;

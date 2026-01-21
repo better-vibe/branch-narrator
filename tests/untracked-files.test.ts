@@ -7,7 +7,7 @@
 import { describe, expect, it } from "bun:test";
 
 describe("untracked files integration", () => {
-  it("should include untracked files in file-summary when uncommitted", async () => {
+  it("should include untracked files in file-summary when using unstaged mode", async () => {
     // This is a behavioral test - we verify the analyzer handles
     // added files correctly (which is how untracked files appear)
     const { fileSummaryAnalyzer } = await import(

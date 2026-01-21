@@ -2,7 +2,7 @@
  * Snap command module - local workspace snapshots.
  *
  * Provides commands for creating, listing, comparing, and restoring
- * snapshots of uncommitted work.
+ * snapshots of local work.
  */
 
 // Export all types

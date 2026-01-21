@@ -413,7 +413,6 @@ export interface CollectChangeSetOptions {
   base: string;
   head: string;
   cwd?: string;
-  uncommitted?: boolean;
 }
 
 export interface CollectChangeSetOptionsV2 {
@@ -426,7 +425,7 @@ export interface CollectChangeSetOptionsV2 {
 
 /**
  * Collect all git diff data and build a ChangeSet.
- * Supports both legacy options (base/head/uncommitted) and new mode-based options.
+ * Supports both legacy options (base/head) and new mode-based options.
  */
 export async function collectChangeSet(
   baseOrOptions: string | CollectChangeSetOptions | CollectChangeSetOptionsV2,
@@ -447,8 +446,8 @@ export async function collectChangeSet(
     cwd = options.cwd ?? process.cwd();
   }
 
-  const { base, uncommitted } = options;
-  const headRef = uncommitted ? null : options.head;
+  const { base } = options;
+  const headRef = options.head;
 
   // Validate git repo
   if (!(await isGitRepo(cwd))) {
@@ -471,40 +470,19 @@ export async function collectChangeSet(
   ]);
 
   // Parse unified diff for tracked files
-  let parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
-  let finalNameStatus = nameStatusOutput;
+  const parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
 
-  // If uncommitted mode, also include untracked files
-  if (uncommitted) {
-    const untrackedFiles = await getUntrackedFiles(cwd);
-    if (untrackedFiles.length > 0) {
-      const untrackedData = await createUntrackedDiffs(untrackedFiles, cwd);
-
-      // Merge untracked files into results
-      if (untrackedData.nameStatus) {
-        finalNameStatus = finalNameStatus
-          ? `${finalNameStatus}\n${untrackedData.nameStatus}`
-          : untrackedData.nameStatus;
-      }
-      parsedDiffs = [...parsedDiffs, ...untrackedData.diffs];
-    }
-  }
-
-  // Get head package.json (from ref or working directory)
-  const headPackageContent = uncommitted
-    ? await getWorkingPackageJson(cwd)
-    : parsePackageJson(await getFileAtRef(headRef!, "package.json", cwd));
+  // Get head package.json from ref
+  const headPackageContent = parsePackageJson(await getFileAtRef(headRef!, "package.json", cwd));
 
   // Build ChangeSet
   return buildChangeSet({
     base,
-    head: uncommitted ? "WORKING" : options.head,
-    nameStatusOutput: finalNameStatus,
+    head: options.head,
+    nameStatusOutput,
     parsedDiffs,
     basePackageJson: parsePackageJson(basePackageContent),
-    headPackageJson: uncommitted ? headPackageContent : parsePackageJson(
-      await getFileAtRef(options.head, "package.json", cwd)
-    ),
+    headPackageJson: headPackageContent,
   });
 }
 

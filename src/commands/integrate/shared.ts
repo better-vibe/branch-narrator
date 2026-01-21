@@ -150,7 +150,7 @@ Before risky/experimental changes   → run \`snap save\`
 
 ## Default Behavior
 
-- **Mode:** Defaults to \`unstaged\` (local uncommitted changes) if no mode specified
+- **Mode:** Defaults to \`unstaged\` (local unstaged changes) if no mode specified
 - **Base/Head:** For branch mode, defaults to \`main\` and \`HEAD\` if not specified
 - **For PR descriptions:** Always use \`--mode branch\`
 `;
