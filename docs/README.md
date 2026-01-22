@@ -17,7 +17,6 @@
 | [09-stable-ids](./09-stable-ids/) | Stable IDs for findings and flags |
 | [10-snapshots](./10-snapshots/) | Local workspace snapshots for agent iteration |
 | [11-delta-mode](./11-delta-mode/) | Delta mode for comparing runs |
-| [12-skill-integration](./12-skill-integration/) | Claude Code skill integration proposal |
 
 ---
 
