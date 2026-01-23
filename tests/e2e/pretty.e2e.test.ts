@@ -206,8 +206,9 @@ describe("pretty command - profile handling", () => {
     );
 
     // Should show library-specific test command, NOT SvelteKit
-    expect(stdout).toContain("Build library");
-    expect(stdout).not.toContain("SvelteKit type check");
+    expect(stdout).toContain("bun run build");
+    expect(stdout).toContain("library profile");
+    expect(stdout).not.toContain("SvelteKit profile");
   });
 
   it("should display detected profile in summary", async () => {
