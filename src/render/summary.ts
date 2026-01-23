@@ -6,12 +6,23 @@
  */
 
 import type {
+  CIWorkflowFinding,
+  DbMigrationFinding,
+  DependencyChangeFinding,
   FileCategoryFinding,
   FileSummaryFinding,
   Finding,
+  GraphQLChangeFinding,
   ImpactAnalysisFinding,
+  LockfileFinding,
+  PackageExportsFinding,
   RiskScore,
   RouteChangeFinding,
+  SecurityFileFinding,
+  SQLRiskFinding,
+  TailwindConfigFinding,
+  TestChangeFinding,
+  TypeScriptConfigFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 
@@ -149,7 +160,27 @@ function buildFindingsByCategory(findings: Finding[]): FindingsByCategory {
 }
 
 /**
+ * Group findings by type in a single pass for O(n) performance.
+ * This avoids multiple filter() calls which would be O(n*m) where m is number of types.
+ */
+function groupFindingsByType(findings: Finding[]): Map<string, Finding[]> {
+  const groups = new Map<string, Finding[]>();
+
+  for (const finding of findings) {
+    const existing = groups.get(finding.type);
+    if (existing) {
+      existing.push(finding);
+    } else {
+      groups.set(finding.type, [finding]);
+    }
+  }
+
+  return groups;
+}
+
+/**
  * Build top findings list (prioritized, capped).
+ * Uses single-pass grouping for O(n) performance instead of multiple filter() calls.
  *
  * Priority order:
  * 1. High blast radius
@@ -164,10 +195,11 @@ function buildFindingsByCategory(findings: Finding[]): FindingsByCategory {
 function buildTopFindings(findings: Finding[]): TopFinding[] {
   const items: TopFinding[] = [];
 
+  // Single-pass grouping for O(n) performance
+  const grouped = groupFindingsByType(findings);
+
   // 1. High blast radius
-  const impactFindings = findings.filter(
-    (f) => f.type === "impact-analysis"
-  ) as ImpactAnalysisFinding[];
+  const impactFindings = (grouped.get("impact-analysis") ?? []) as ImpactAnalysisFinding[];
   const highImpact = impactFindings.filter((i) => i.blastRadius === "high");
   for (const impact of highImpact) {
     const examples = impact.affectedFiles.slice(0, EXAMPLES_LIMIT);
@@ -192,7 +224,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
   }
 
   // 3. High-risk DB migrations
-  const dbMigrations = findings.filter((f) => f.type === "db-migration");
+  const dbMigrations = (grouped.get("db-migration") ?? []) as DbMigrationFinding[];
   const highRiskMigrations = dbMigrations.filter((m) => m.risk === "high");
   if (highRiskMigrations.length > 0) {
     const files = highRiskMigrations.flatMap((m) => m.files);
@@ -206,7 +238,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
   }
 
   // 4. Destructive SQL
-  const sqlRisks = findings.filter((f) => f.type === "sql-risk");
+  const sqlRisks = (grouped.get("sql-risk") ?? []) as SQLRiskFinding[];
   const destructiveSql = sqlRisks.filter((s) => s.riskType === "destructive");
   if (destructiveSql.length > 0) {
     const files = destructiveSql.map((s) => s.file);
@@ -220,7 +252,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
   }
 
   // 5. CI security issues
-  const ciWorkflows = findings.filter((f) => f.type === "ci-workflow");
+  const ciWorkflows = (grouped.get("ci-workflow") ?? []) as CIWorkflowFinding[];
   const ciSecurityIssues = ciWorkflows.filter(
     (c) =>
       c.riskType === "permissions_broadened" ||
@@ -237,10 +269,10 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
     });
   }
 
-  // 6. Breaking config changes
+  // 6. Breaking config changes (use grouped data)
   const breakingConfigs: { type: string; files: string[] }[] = [];
 
-  const tsConfigs = findings.filter((f) => f.type === "typescript-config");
+  const tsConfigs = (grouped.get("typescript-config") ?? []) as TypeScriptConfigFinding[];
   const breakingTs = tsConfigs.filter((c) => c.isBreaking);
   if (breakingTs.length > 0) {
     breakingConfigs.push({
@@ -249,7 +281,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
     });
   }
 
-  const tailwindConfigs = findings.filter((f) => f.type === "tailwind-config");
+  const tailwindConfigs = (grouped.get("tailwind-config") ?? []) as TailwindConfigFinding[];
   const breakingTailwind = tailwindConfigs.filter((c) => c.isBreaking);
   if (breakingTailwind.length > 0) {
     breakingConfigs.push({
@@ -258,7 +290,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
     });
   }
 
-  const graphqlChanges = findings.filter((f) => f.type === "graphql-change");
+  const graphqlChanges = (grouped.get("graphql-change") ?? []) as GraphQLChangeFinding[];
   const breakingGraphql = graphqlChanges.filter((g) => g.isBreaking);
   if (breakingGraphql.length > 0) {
     breakingConfigs.push({
@@ -267,7 +299,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
     });
   }
 
-  const packageExports = findings.filter((f) => f.type === "package-exports");
+  const packageExports = (grouped.get("package-exports") ?? []) as PackageExportsFinding[];
   const breakingExports = packageExports.filter((p) => p.isBreaking);
   if (breakingExports.length > 0) {
     breakingConfigs.push({
@@ -286,8 +318,9 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
     });
   }
 
-  // 7. Lockfile mismatch
-  const lockfileMismatch = findings.find((f) => f.type === "lockfile-mismatch");
+  // 7. Lockfile mismatch (use grouped data - only one expected)
+  const lockfileMismatches = (grouped.get("lockfile-mismatch") ?? []) as LockfileFinding[];
+  const lockfileMismatch = lockfileMismatches[0];
   if (lockfileMismatch) {
     if (
       lockfileMismatch.manifestChanged &&
@@ -311,7 +344,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
   }
 
   // 8. Security-sensitive files
-  const securityFiles = findings.filter((f) => f.type === "security-file");
+  const securityFiles = (grouped.get("security-file") ?? []) as SecurityFileFinding[];
   if (securityFiles.length > 0) {
     const files = securityFiles.flatMap((s) => s.files);
     const examples = files.slice(0, EXAMPLES_LIMIT);
@@ -324,7 +357,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
   }
 
   // 9. Major dependency updates
-  const depChanges = findings.filter((f) => f.type === "dependency-change");
+  const depChanges = (grouped.get("dependency-change") ?? []) as DependencyChangeFinding[];
   const majorChanges = depChanges.filter((d) => d.impact === "major");
   if (majorChanges.length > 0) {
     const names = majorChanges.map((d) => d.name);
@@ -338,9 +371,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
   }
 
   // 10. Route changes
-  const routeChanges = findings.filter(
-    (f) => f.type === "route-change"
-  ) as RouteChangeFinding[];
+  const routeChanges = (grouped.get("route-change") ?? []) as RouteChangeFinding[];
   if (routeChanges.length > 0) {
     const routes = routeChanges.map((r) => routeIdToUrlPath(r.routeId));
     const examples = routes.slice(0, EXAMPLES_LIMIT);
@@ -353,7 +384,7 @@ function buildTopFindings(findings: Finding[]): TopFinding[] {
   }
 
   // 11. Test changes
-  const testChanges = findings.filter((f) => f.type === "test-change");
+  const testChanges = (grouped.get("test-change") ?? []) as TestChangeFinding[];
   if (testChanges.length > 0) {
     const allFiles = testChanges.flatMap((t) => t.files);
     const addedCount = testChanges.reduce((sum, t) => sum + t.added.length, 0);
