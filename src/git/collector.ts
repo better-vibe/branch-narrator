@@ -14,6 +14,7 @@ import {
   NotAGitRepoError,
 } from "../core/errors.js";
 import type { ChangeSet, DiffMode } from "../core/types.js";
+import { batchGetFileContent } from "./batch.js";
 
 /**
  * Check if the current directory is inside a git repository.
@@ -311,6 +312,7 @@ async function readWorkingFile(
 
 /**
  * Create synthetic diff entries for untracked files.
+ * Reads files in parallel for improved performance.
  */
 async function createUntrackedDiffs(
   untrackedFiles: string[],
@@ -319,14 +321,33 @@ async function createUntrackedDiffs(
   const nameStatusLines: string[] = [];
   const diffs: ParseDiffFile[] = [];
 
-  for (const file of untrackedFiles) {
-    // Skip binary files and very large files
-    if (isBinaryFile(file)) {
-      nameStatusLines.push(`A\t${file}`);
-      continue;
-    }
+  // Separate binary files from text files
+  const binaryFiles: string[] = [];
+  const textFiles: string[] = [];
 
-    const content = await readWorkingFile(file, cwd);
+  for (const file of untrackedFiles) {
+    if (isBinaryFile(file)) {
+      binaryFiles.push(file);
+    } else {
+      textFiles.push(file);
+    }
+  }
+
+  // Add binary files to name status (no diff content)
+  for (const file of binaryFiles) {
+    nameStatusLines.push(`A\t${file}`);
+  }
+
+  // Read all text files in parallel for performance
+  const fileReadResults = await Promise.all(
+    textFiles.map(async (file) => ({
+      file,
+      content: await readWorkingFile(file, cwd),
+    }))
+  );
+
+  // Process read results
+  for (const { file, content } of fileReadResults) {
     if (content === null) continue;
 
     nameStatusLines.push(`A\t${file}`);
@@ -462,18 +483,26 @@ export async function collectChangeSet(
     throw new InvalidRefError(headRef);
   }
 
-  // Collect data for tracked files
-  const [nameStatusOutput, unifiedDiff, basePackageContent] = await Promise.all([
+  // Collect data for tracked files and both package.json files in parallel
+  const [nameStatusOutput, unifiedDiff, packageJsonBatch] = await Promise.all([
     getNameStatus(base, headRef, cwd),
     getUnifiedDiff(base, headRef, cwd),
-    getFileAtRef(base, "package.json", cwd),
+    // Use batch operation to get both package.json files in one git call
+    batchGetFileContent(
+      [
+        { ref: base, path: "package.json" },
+        { ref: headRef!, path: "package.json" },
+      ],
+      cwd
+    ),
   ]);
 
   // Parse unified diff for tracked files
   const parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
 
-  // Get head package.json from ref
-  const headPackageContent = parsePackageJson(await getFileAtRef(headRef!, "package.json", cwd));
+  // Extract package.json content from batch result
+  const basePackageContent = packageJsonBatch.get(`${base}:package.json`) ?? null;
+  const headPackageContent = parsePackageJson(packageJsonBatch.get(`${headRef}:package.json`) ?? null);
 
   // Build ChangeSet
   return buildChangeSet({
@@ -556,12 +585,21 @@ async function collectChangeSetByMode(
   let headPackageJson: Record<string, unknown> | undefined;
 
   switch (options.mode) {
-    case "branch":
+    case "branch": {
       base = options.base!;
       head = options.head!;
-      basePackageJson = parsePackageJson(await getFileAtRef(base, "package.json", cwd));
-      headPackageJson = parsePackageJson(await getFileAtRef(head, "package.json", cwd));
+      // Use batch git operation to fetch both package.json files in one call
+      const batchResult = await batchGetFileContent(
+        [
+          { ref: base, path: "package.json" },
+          { ref: head, path: "package.json" },
+        ],
+        cwd
+      );
+      basePackageJson = parsePackageJson(batchResult.get(`${base}:package.json`) ?? null);
+      headPackageJson = parsePackageJson(batchResult.get(`${head}:package.json`) ?? null);
       break;
+    }
 
     case "unstaged":
       base = "INDEX";
@@ -571,19 +609,31 @@ async function collectChangeSetByMode(
       headPackageJson = await getWorkingPackageJson(cwd);
       break;
 
-    case "staged":
+    case "staged": {
       base = "HEAD";
       head = "INDEX";
-      basePackageJson = parsePackageJson(await getFileAtRef("HEAD", "package.json", cwd));
-      headPackageJson = await getWorkingPackageJson(cwd); // Staged content
+      // Parallelize HEAD fetch and working file read
+      const [headContent, workingPkg] = await Promise.all([
+        getFileAtRef("HEAD", "package.json", cwd),
+        getWorkingPackageJson(cwd),
+      ]);
+      basePackageJson = parsePackageJson(headContent);
+      headPackageJson = workingPkg;
       break;
+    }
 
-    case "all":
+    case "all": {
       base = "HEAD";
       head = "WORKING";
-      basePackageJson = parsePackageJson(await getFileAtRef("HEAD", "package.json", cwd));
-      headPackageJson = await getWorkingPackageJson(cwd);
+      // Parallelize HEAD fetch and working file read
+      const [headContent, workingPkg] = await Promise.all([
+        getFileAtRef("HEAD", "package.json", cwd),
+        getWorkingPackageJson(cwd),
+      ]);
+      basePackageJson = parsePackageJson(headContent);
+      headPackageJson = workingPkg;
       break;
+    }
   }
 
   // Build ChangeSet

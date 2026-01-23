@@ -17,6 +17,95 @@ import { libraryProfile } from "./library.js";
 import { pythonProfile } from "./python.js";
 import { viteProfile } from "./vite.js";
 
+// ============================================================================
+// Cached filesystem check helpers for improved performance
+// ============================================================================
+
+/**
+ * Cache for filesystem existence checks.
+ * This reduces redundant I/O when detecting profiles.
+ */
+interface FileExistsCache {
+  cache: Map<string, boolean>;
+  check(path: string): boolean;
+}
+
+/**
+ * Create a filesystem check cache for the given cwd.
+ * All paths are resolved relative to cwd and results are memoized.
+ */
+function createFileExistsCache(cwd: string): FileExistsCache {
+  const cache = new Map<string, boolean>();
+
+  return {
+    cache,
+    check(relativePath: string): boolean {
+      const fullPath = join(cwd, relativePath);
+      if (cache.has(fullPath)) {
+        return cache.get(fullPath)!;
+      }
+      const exists = existsSync(fullPath);
+      cache.set(fullPath, exists);
+      return exists;
+    },
+  };
+}
+
+/**
+ * Batch check multiple paths and cache results.
+ * This is useful for preloading commonly checked paths.
+ */
+function preloadFileExistsCache(
+  fsCache: FileExistsCache,
+  paths: string[]
+): void {
+  for (const path of paths) {
+    fsCache.check(path);
+  }
+}
+
+/**
+ * All paths that are commonly checked during profile detection.
+ * Pre-checking these in one batch reduces repeated filesystem calls.
+ */
+const COMMON_PROFILE_PATHS = [
+  // SvelteKit
+  "src/routes",
+  // Next.js
+  "app",
+  "src/app",
+  // Nuxt/Vue
+  "pages",
+  "src/pages",
+  // Stencil
+  "stencil.config.ts",
+  "stencil.config.js",
+  // Angular
+  "angular.json",
+  ".angular-cli.json",
+  // Astro
+  "astro.config.mjs",
+  "astro.config.ts",
+  "astro.config.js",
+  // Vite
+  "vite.config.ts",
+  "vite.config.js",
+  "vite.config.mjs",
+  "vite.config.mts",
+  // Python
+  "pyproject.toml",
+  "setup.py",
+  "setup.cfg",
+  "requirements.txt",
+  "Pipfile",
+  "poetry.lock",
+  // Python frameworks
+  "manage.py",
+  "app/main.py",
+  "src/main.py",
+  "app/__init__.py",
+];
+
 /**
  * Result of profile detection with reasons.
  */
@@ -363,6 +452,7 @@ export function detectPythonFramework(changeSet: ChangeSet): string | null {
 
 /**
  * Detect the appropriate profile for a project with reasons.
+ * Uses cached filesystem checks for improved performance.
  */
 export function detectProfileWithReasons(
   changeSet: ChangeSet,
@@ -370,8 +460,12 @@ export function detectProfileWithReasons(
 ): ProfileDetectionResult {
   const reasons: string[] = [];
 
-  // Check for SvelteKit
-  const hasSvelteRoutes = isSvelteKitProject(cwd);
+  // Create filesystem cache and preload common paths in one batch
+  const fsCache = createFileExistsCache(cwd);
+  preloadFileExistsCache(fsCache, COMMON_PROFILE_PATHS);
+
+  // Use cached checks for all filesystem operations
+  const hasSvelteRoutes = fsCache.check("src/routes");
   const hasSvelteDep = hasSvelteKitDependency(changeSet.headPackageJson);
 
   if (hasSvelteRoutes || hasSvelteDep) {
@@ -388,9 +482,9 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Stencil
+  // Check for Stencil (using cached checks)
   const hasStencilDep = hasStencilDependency(changeSet.headPackageJson);
-  const hasStencilConf = hasStencilConfig(cwd);
+  const hasStencilConf = fsCache.check("stencil.config.ts") || fsCache.check("stencil.config.js");
 
   if (hasStencilDep || hasStencilConf) {
     if (hasStencilDep) {
@@ -406,9 +500,9 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Next.js with App Router
+  // Check for Next.js with App Router (using cached checks)
   const hasNext = hasNextDependency(changeSet.headPackageJson);
-  const hasAppDir = isNextAppDir(cwd);
+  const hasAppDir = fsCache.check("app") || fsCache.check("src/app");
 
   if (hasNext && hasAppDir) {
     reasons.push("Found next in package.json dependencies");
@@ -443,10 +537,10 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Vue/Nuxt
+  // Check for Vue/Nuxt (using cached checks)
   const hasVue = hasVueDependency(changeSet.headPackageJson);
   const hasNuxt = hasNuxtDependency(changeSet.headPackageJson);
-  const isNuxt = isNuxtProject(cwd);
+  const isNuxt = fsCache.check("pages") || fsCache.check("src/pages");
 
   if (hasNuxt || (hasVue && isNuxt)) {
     if (hasNuxt) {
@@ -474,9 +568,11 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Astro
+  // Check for Astro (using cached checks)
   const hasAstro = hasAstroDependency(changeSet.headPackageJson);
-  const hasAstroConf = hasAstroConfig(cwd);
+  const hasAstroConf = fsCache.check("astro.config.mjs") ||
+    fsCache.check("astro.config.ts") ||
+    fsCache.check("astro.config.js");
 
   if (hasAstro || hasAstroConf) {
     if (hasAstro) {
@@ -492,9 +588,9 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Angular
+  // Check for Angular (using cached checks)
   const hasAngular = hasAngularDependency(changeSet.headPackageJson);
-  const hasAngularConf = hasAngularConfig(cwd);
+  const hasAngularConf = fsCache.check("angular.json") || fsCache.check(".angular-cli.json");
 
   if (hasAngular || hasAngularConf) {
     if (hasAngular) {
@@ -510,9 +606,12 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Vite (generic Vite project without specific framework)
+  // Check for Vite (using cached checks)
   const hasVite = hasViteDependency(changeSet.headPackageJson);
-  const hasViteConf = hasViteConfig(cwd);
+  const hasViteConf = fsCache.check("vite.config.ts") ||
+    fsCache.check("vite.config.js") ||
+    fsCache.check("vite.config.mjs") ||
+    fsCache.check("vite.config.mts");
 
   if (hasVite && hasViteConf) {
     reasons.push("Found vite in package.json dependencies");
@@ -556,9 +655,19 @@ export function detectProfileWithReasons(
     };
   }
 
-  // Check for Python project
-  const isPython = isPythonProject(cwd);
-  const hasPythonFramework = hasPythonWebFramework(cwd);
+  // Check for Python project (using cached checks)
+  const isPython = fsCache.check("pyproject.toml") ||
+    fsCache.check("setup.py") ||
+    fsCache.check("setup.cfg") ||
+    fsCache.check("requirements.txt") ||
+    fsCache.check("Pipfile") ||
+    fsCache.check("poetry.lock");
+
+  const hasPythonFramework = fsCache.check("manage.py") ||
+    fsCache.check("app/main.py") ||
+    fsCache.check("src/main.py") ||
+    fsCache.check("app/__init__.py");
+
   const pythonFramework = detectPythonFramework(changeSet);
 
   if (isPython || hasPythonFramework || pythonFramework) {
