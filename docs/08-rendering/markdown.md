@@ -8,36 +8,42 @@ The Markdown renderer generates human-readable PR descriptions.
 function renderMarkdown(context: RenderContext): string;
 ```
 
-## Sections
+## Structure Overview
 
-The output includes these sections in order:
+The output is organized into compact primary sections with extended information in a collapsible `<details>` block:
 
 ```mermaid
 flowchart TB
     S1["## Context"] -->|"interactive only"| S2
     S2["## Summary"] --> S3
-    S3["## What Changed"] --> S4
-    S4["## Routes / API"] --> S5
-    S5["## API Contracts"] --> S6
-    S6["## GraphQL Schema"] --> S7
-    S7["## Database"] --> S8
-    S8["## SQL Risk"] --> S9
-    S9["## Config / Env"] --> S10
-    S10["## Configuration Changes"] --> S11
-    S11["## Cloudflare"] --> S12
-    S12["## Dependencies"] --> S13
-    S13["## Package API"] --> S14
-    S14["## Component API"] --> S15
-    S15["## CI / Infrastructure"] --> S16
-    S16["## Conventions"] --> S17
-    S17["## Test Coverage Gaps"] --> S18
-    S18["## Impact Analysis"] --> S19
-    S19["## Warnings"] --> S20
-    S20["## Suggested Test Plan"] --> S21
-    S21["## Risks / Notes"]
+    S3["## Top findings"] --> S4
+    S4["## What changed"] --> S5
+    S5["## Suggested test plan"] --> S6
+    S6["## Notes"] --> S7
+    S7["<details>Details</details>"] --> D1
+    
+    subgraph Details Block
+        D1["### Impact Analysis"] --> D2
+        D2["### Routes / API"] --> D3
+        D3["### API Contracts"] --> D4
+        D4["### GraphQL Schema"] --> D5
+        D5["### Database"] --> D6
+        D6["### SQL Risk"] --> D7
+        D7["### Config / Env"] --> D8
+        D8["### Configuration Changes"] --> D9
+        D9["### Cloudflare"] --> D10
+        D10["### Dependencies"] --> D11
+        D11["### Package API"] --> D12
+        D12["### Component API"] --> D13
+        D13["### CI / Infrastructure"] --> D14
+        D14["### Security-Sensitive Files"] --> D15
+        D15["### Conventions"] --> D16
+        D16["### Test Coverage Gaps"] --> D17
+        D17["### Warnings"]
+    end
 ```
 
-## Section Details
+## Primary Sections
 
 ### Context (Interactive Only)
 
@@ -51,34 +57,45 @@ This PR implements user authentication using Supabase Auth.
 
 ### Summary
 
-2-6 bullets derived from top findings. Includes counts for:
-- Files changed/added/deleted
-- New routes
-- Database migrations
-- Major dependency updates
-- Security-sensitive files
-- GraphQL breaking changes
-- CI workflow changes
-- Component API changes
-- Package API breaking changes
+Compact summary with diffstat and key highlights.
 
 ```markdown
 ## Summary
 
-- 14 file(s) changed
-- 4 file(s) added
-- 2 new route(s)
-- Database migrations detected
-- 1 major dependency update(s)
-- 2 security-sensitive file(s) changed
+- Files: 14 changed (4 added, 9 modified, 1 deleted)
+- Review attention: HIGH (blast radius)
+- High blast radius: src/lib/db.ts (15 dependents)
+- 2 new routes
+- Changeset added
 ```
 
-### What Changed
+### Top findings
 
-Files grouped by category.
+Prioritized list of significant findings (max 5 items) with examples.
 
 ```markdown
-## What Changed
+## Top findings
+
+1) High blast radius: src/lib/db.ts (15 dependents)
+   `src/routes/api/users/+server.ts`, `src/lib/auth.ts` (+13 more)
+
+2) Security-sensitive files changed (2 files)
+   `src/lib/auth.ts`, `src/lib/session.ts`
+
+3) Major dependency updates (2 packages)
+   `@sveltejs/kit`, `vitest`
+```
+
+### What changed
+
+Files grouped by category with Primary files for small changes and Changesets separated from Documentation.
+
+```markdown
+## What changed
+
+### Primary files
+
+- `src/lib/auth.ts` (modified)
 
 ### Product Code (9)
 
@@ -90,14 +107,75 @@ Files grouped by category.
 
 - `tests/auth.test.ts` *(new)*
 - `tests/login.test.ts`
+
+### Changesets (1)
+
+- `.changeset/brave-tigers-fly.md` *(new)*
+```
+
+### Suggested test plan
+
+Profile-specific commands with rationales.
+
+```markdown
+## Suggested test plan
+
+- [ ] `bun test` (4 test files changed)
+- [ ] `bun run check` (SvelteKit profile)
+- [ ] `Test GET /api/users endpoint` (route changed)
+- [ ] `Verify /login page renders correctly` (page changed)
+```
+
+### Notes
+
+Risk level and evidence bullets.
+
+```markdown
+## Notes
+
+- Risk: LOW (15/100)
+- No elevated risks detected.
+```
+
+Or with evidence:
+
+```markdown
+## Notes
+
+- Risk: MEDIUM (45/100)
+- Major version bump: @sveltejs/kit ^1.0.0 → ^2.0.0
+- Security-sensitive files changed: 2 file(s)
+- New env var: PUBLIC_API_URL
+```
+
+## Details Block
+
+Extended information is placed in a collapsible `<details>` block.
+
+### Impact Analysis
+
+Files with high/medium blast radius and their dependents.
+
+```markdown
+### Impact Analysis
+
+**`src/lib/db.ts`** - Blast Radius: HIGH (15 files)
+
+Affected files:
+- `src/routes/api/users/+server.ts`
+- `src/routes/api/posts/+server.ts`
+- `src/lib/auth.ts`
+- `src/lib/cache.ts`
+- `src/lib/session.ts`
+- ...and 10 more
 ```
 
 ### Routes / API
 
-Table of SvelteKit route changes.
+Table of route changes.
 
 ```markdown
-## Routes / API
+### Routes / API
 
 | Route | Type | Change | Methods |
 |-------|------|--------|---------|
@@ -107,10 +185,10 @@ Table of SvelteKit route changes.
 
 ### API Contracts
 
-Lists changed API specification files (OpenAPI, Swagger, etc.).
+Lists changed API specification files.
 
 ```markdown
-## API Contracts
+### API Contracts
 
 The following API specification files have changed:
 
@@ -123,25 +201,25 @@ The following API specification files have changed:
 Shows GraphQL schema changes with breaking change detection.
 
 ```markdown
-## GraphQL Schema
+### GraphQL Schema
 
-### 🔴 Breaking Changes
+**Breaking Changes**
 
 **File:** `schema.graphql`
 - Removed field `User.email`
 - Changed type of `Query.users`
 
-### Added Elements
+**Added Elements**
 
 **File:** `schema.graphql`
 - Added type `Organization`
 - Added field `User.organization`
 
-### All Schema Changes
+**All Schema Changes**
 
 | File | Status | Breaking |
 |------|--------|----------|
-| `schema.graphql` | modified | 🔴 Yes |
+| `schema.graphql` | modified | Yes |
 ```
 
 ### Database (Supabase)
@@ -149,9 +227,9 @@ Shows GraphQL schema changes with breaking change detection.
 Migration files with risk assessment.
 
 ```markdown
-## Database (Supabase)
+### Database (Supabase)
 
-**Risk Level:** 🔴 HIGH
+**Risk Level:** HIGH
 
 **Files:**
 - `supabase/migrations/20240101_add_users.sql`
@@ -165,13 +243,13 @@ Migration files with risk assessment.
 SQL files with risky operations.
 
 ```markdown
-## SQL Risk
+### SQL Risk
 
-🔴 **destructive**
+**destructive**
 - File: `migrations/drop_users.sql`
 - Contains DROP TABLE statement
 
-🟡 **schema change**
+**schema change**
 - File: `migrations/alter_table.sql`
 - ALTER TABLE with column removal
 ```
@@ -181,7 +259,7 @@ SQL files with risky operations.
 Environment variable changes.
 
 ```markdown
-## Config / Env
+### Config / Env
 
 | Variable | Status | Evidence |
 |----------|--------|----------|
@@ -190,38 +268,38 @@ Environment variable changes.
 
 ### Configuration Changes
 
-TypeScript, Tailwind, and monorepo configuration changes.
+TypeScript, Tailwind, Vite, and monorepo configuration changes.
 
 ```markdown
-## Configuration Changes
+### Configuration Changes
 
-### TypeScript Configuration
+**TypeScript Configuration**
 
-**File:** `tsconfig.json` 🔴
+**File:** `tsconfig.json` (BREAKING)
 
-**Strictness Changes:**
+Strictness Changes:
 - Disabled `strict` mode
 
 **Modified:** `target`, `module`
 
-### Tailwind Configuration
+**Tailwind Configuration**
 
-**File:** `tailwind.config.js` (tailwind) 🟢
+**File:** `tailwind.config.js` (tailwind)
 
-**Affected Sections:**
+Affected Sections:
 - theme.colors
 - plugins
 
-### Monorepo Configuration
+**Monorepo Configuration**
 
 **Tool:** turborepo
 **File:** `turbo.json`
 
-**Changed Fields:**
+Changed Fields:
 - pipeline.build
 - pipeline.test
 
-**Impacts:**
+Impacts:
 - Build order may change
 ```
 
@@ -230,7 +308,7 @@ TypeScript, Tailwind, and monorepo configuration changes.
 Cloudflare-related changes.
 
 ```markdown
-## Cloudflare
+### Cloudflare
 
 **Area:** wrangler
 **Files:**
@@ -242,15 +320,15 @@ Cloudflare-related changes.
 Package.json changes.
 
 ```markdown
-## Dependencies
+### Dependencies
 
-### Production
+**Production**
 
 | Package | From | To | Impact |
 |---------|------|-----|--------|
 | `@sveltejs/kit` | ^1.0.0 | ^2.0.0 | major |
 
-### Dev Dependencies
+**Dev Dependencies**
 
 | Package | From | To | Impact |
 |---------|------|-----|--------|
@@ -262,27 +340,27 @@ Package.json changes.
 Changes to package exports and entry points.
 
 ```markdown
-## Package API
+### Package API
 
-**Status:** 🔴 Breaking
+**Status:** Breaking
 
-### Removed Exports
+**Removed Exports**
 
-- 🔴 `./utils`
-- 🔴 `./legacy`
+- `./utils`
+- `./legacy`
 
-### Added Exports
+**Added Exports**
 
-- 🟢 `./client`
-- 🟢 `./server`
+- `./client`
+- `./server`
 
-### Entry Point Changes
+**Entry Point Changes**
 
 | Field | From | To |
 |-------|------|-----|
 | `main` | dist/index.js | dist/cjs/index.js |
 
-### Binary Commands
+**Binary Commands**
 
 **Added:** `my-cli`
 **Removed:** `old-cli`
@@ -293,27 +371,27 @@ Changes to package exports and entry points.
 Stencil web component API changes grouped by component tag.
 
 ```markdown
-## Component API (Stencil)
+### Component API (Stencil)
 
-### `<my-button>`
+**`<my-button>`**
 
-**Component:** 🟡 tag-changed (button → my-button)
+**Component:** tag-changed (button → my-button)
 **File:** `src/components/button.tsx`
 
 **Props:**
-- 🟢 `variant`: string (added)
-- 🔴 `type`: string (removed)
-- 🟡 `size`: string (changed)
+- `variant`: string (added)
+- `type`: string (removed)
+- `size`: string (changed)
 
 **Events:**
-- 🟢 `buttonClick` (added)
+- `buttonClick` (added)
 
 **Methods:**
-- 🟢 `focus(): void` (added)
+- `focus(): void` (added)
 
 **Slots:**
-- 🟢 (default) (added)
-- 🟢 "icon" (added)
+- (default) (added)
+- "icon" (added)
 ```
 
 ### CI / Infrastructure
@@ -321,15 +399,13 @@ Stencil web component API changes grouped by component tag.
 CI workflow and infrastructure changes.
 
 ```markdown
-## CI / Infrastructure
-
 ### CI Workflows
 
-🔴 **permissions broadened**
+**permissions broadened**
 - File: `.github/workflows/ci.yml`
 - Added write permissions to workflow
 
-🟡 **pipeline changed**
+**pipeline changed**
 - File: `.github/workflows/deploy.yml`
 - Modified deployment steps
 
@@ -343,12 +419,26 @@ CI workflow and infrastructure changes.
 - `k8s/deployment.yaml`
 ```
 
+### Security-Sensitive Files
+
+Files touching authentication, authorization, or security-critical code.
+
+```markdown
+### Security-Sensitive Files
+
+The following files touch authentication, authorization, or security-critical code:
+
+- `src/lib/auth.ts` *(authentication)*
+- `src/lib/session.ts` *(session management)*
+- `src/middleware/guard.ts` *(authorization)*
+```
+
 ### Conventions
 
 Convention violations detected.
 
 ```markdown
-## ⚠️ Conventions
+### Conventions
 
 - **Test files should use .test.ts extension**
   - `src/utils.spec.ts`
@@ -360,33 +450,13 @@ Convention violations detected.
 Source files without corresponding tests.
 
 ```markdown
-## 🧪 Test Coverage Gaps
+### Test Coverage Gaps
 
 Found 3 source file(s) without corresponding tests:
 
-- 🔴 `src/lib/auth.ts`
-- 🟡 `src/utils/helpers.ts`
-- ⚪ `src/config.ts`
-```
-
-### Impact Analysis
-
-Files with high blast radius.
-
-```markdown
-## 🧨 Impact Analysis
-
-### `src/lib/db.ts` 🔴
-
-**Blast Radius:** HIGH (15 files)
-
-Affected files:
-- `src/routes/api/users/+server.ts`
-- `src/routes/api/posts/+server.ts`
-- `src/lib/auth.ts`
-- `src/lib/cache.ts`
-- `src/lib/session.ts`
-- ...and 10 more
+- [high] `src/lib/auth.ts`
+- [medium] `src/utils/helpers.ts`
+- [low] `src/config.ts`
 ```
 
 ### Warnings
@@ -394,65 +464,17 @@ Affected files:
 Warnings about changeset characteristics.
 
 ```markdown
-## ⚠️ Warnings
+### Warnings
 
 - **Large diff detected:** 50 files changed, 2500 lines modified
 - **Lockfile mismatch:** package.json changed but lockfile not updated
 - **Test coverage gap:** 10 production files changed, only 2 test files changed
 ```
 
-### Suggested Test Plan
-
-Actionable checklist.
-
-```markdown
-## Suggested Test Plan
-
-- [ ] `bun run test` - Run test suite
-- [ ] `bun run check` - Run SvelteKit type check
-- [ ] Test `GET/POST /api/users` endpoint
-- [ ] Verify `/login` page renders correctly
-```
-
-### Risks / Notes
-
-Risk score with evidence.
-
-```markdown
-## Risks / Notes
-
-**Overall Risk:** 🟡 MEDIUM (score: 45/100)
-
-- ⚠️ Major version bump: @sveltejs/kit ^1.0.0 → ^2.0.0
-- ⚡ Security-sensitive files changed (Authentication): 2 file(s)
-- ℹ️ New env var: PUBLIC_API_URL
-```
-
 ## Empty Section Handling
 
-Sections with no content are automatically omitted.
+Sections with no content are automatically omitted. The `<details>` block is only rendered if there is extended content to show.
 
-## Risk Emojis
+## No Emojis
 
-| Level | Emoji |
-|-------|-------|
-| High | 🔴 |
-| Medium | 🟡 |
-| Low | 🟢 |
-
-## Evidence Emojis
-
-| Level | Emoji |
-|-------|-------|
-| High risk | ⚠️ |
-| Medium risk | ⚡ |
-| Low risk / Info | ℹ️ |
-| Reduction | ✅ |
-
-## Change Status Emojis
-
-| Status | Emoji |
-|--------|-------|
-| Added | 🟢 |
-| Removed | 🔴 |
-| Changed | 🟡 |
+The markdown output is emoji-free for clean, professional PR descriptions.

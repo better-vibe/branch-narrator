@@ -5,5 +5,6 @@
 export * from "./markdown.js";
 export * from "./json.js";
 export * from "./risk-score.js";
+export * from "./summary.js";
 export { renderTerminal } from "./terminal.js";
 

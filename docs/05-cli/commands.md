@@ -44,11 +44,10 @@ The pretty command renders the following sections when relevant findings are det
 
 | Section | Description |
 |---------|-------------|
-| **Summary** | Prioritized highlights, file counts, profile, and risk score |
-| **Large Changes** | Warning for diffs exceeding 500 lines |
-| **Lockfile Warning** | Alert when package.json and lockfile are out of sync |
-| **Impact Analysis** | Files with high/medium blast radius |
-| **What Changed** | Files grouped by category |
+| **Summary** | Diffstat, profile, risk level, review attention (blast radius), and findings by category |
+| **Top findings** | Prioritized list of significant findings (max 5 items) with examples |
+| **Large changes** | Warning for diffs exceeding 500 lines |
+| **What changed** | Files grouped by category with Primary files for small changes; Changesets separated from Documentation |
 | **Routes / API** | Route changes with methods and types |
 | **Database** | Supabase migrations with risk levels |
 | **SQL Risks** | Destructive SQL pattern warnings |
@@ -59,8 +58,10 @@ The pretty command renders the following sections when relevant findings are det
 | **CI/CD Workflows** | GitHub Actions security warnings |
 | **Cloudflare** | Wrangler configuration changes |
 | **Dependencies** | Package updates with impact levels |
-| **Suggested Test Plan** | Profile-specific commands and test gaps |
-| **Risks / Notes** | Overall risk score with evidence bullets |
+| **Suggested test plan** | Profile-specific commands with rationales and targeted test suggestions |
+| **Notes** | Risk evidence or "No elevated risks detected" message |
+
+**Note:** All output is emoji-free for clean, professional terminal output.
 
 ### Examples
 
@@ -109,6 +110,44 @@ branch-narrator pr-body [options]
 | `branch` | Compare base ref to head ref | `git diff base..head` |
 | `staged` | Index vs HEAD (staged changes) | `git diff --staged` |
 | `all` | All changes vs HEAD (staged + unstaged + untracked) | `git diff HEAD` + `git ls-files --others` |
+
+### Output Structure
+
+The PR body is organized into compact primary sections with extended information in a collapsible Details block:
+
+**Primary Sections:**
+
+| Section | Description |
+|---------|-------------|
+| **Summary** | Diffstat, review attention, and key highlights |
+| **Top findings** | Prioritized list of significant findings (max 5 items) |
+| **What changed** | Files grouped by category with Primary files for small changes |
+| **Suggested test plan** | Profile-specific commands with rationales |
+| **Notes** | Risk level and evidence bullets |
+
+**Details Block (collapsible):**
+
+Extended information is placed in a `<details>` block for reviewer convenience:
+
+- Impact Analysis (blast radius)
+- Routes / API tables
+- API Contracts
+- GraphQL Schema changes
+- Database migrations
+- SQL Risks
+- Config / Env tables
+- Configuration Changes (TypeScript, Tailwind, Vite, Monorepo)
+- Cloudflare changes
+- Dependencies tables
+- Package API exports
+- Component API (Stencil, Angular)
+- CI / Infrastructure
+- Security-Sensitive Files
+- Convention Violations
+- Test Coverage Gaps
+- Warnings
+
+**Note:** All output is emoji-free for clean, professional PR descriptions.
 
 ### Examples
 

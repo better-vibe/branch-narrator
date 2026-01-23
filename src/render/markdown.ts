@@ -1,5 +1,6 @@
 /**
  * Markdown PR body renderer.
+ * No emojis - plain text for clean PR descriptions.
  */
 
 import type {
@@ -42,7 +43,12 @@ import type {
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 import { getCategoryLabel } from "../analyzers/file-category.js";
 import { getSecurityReasonLabel } from "../analyzers/security-files.js";
-import { buildHighlights } from "../commands/facts/highlights.js";
+import {
+  buildSummaryData,
+  formatDiffstat,
+  formatRiskLevel,
+  type TopFinding,
+} from "./summary.js";
 
 /**
  * Group findings by type.
@@ -69,88 +75,127 @@ function renderContext(context: RenderContext): string {
 }
 
 /**
- * Render the Summary section using prioritized highlights.
+ * Render the Summary section with diffstat and key highlights.
  */
-function renderSummary(groups: Map<string, Finding[]>, allFindings: Finding[]): string {
+function renderSummary(
+  _context: RenderContext,
+  summaryData: ReturnType<typeof buildSummaryData>
+): string {
+  const { diffstat, reviewAttention, topFindings, hasChangesets } = summaryData;
   const bullets: string[] = [];
 
-  // Always show file count first with details
-  const fileSummary = groups.get("file-summary")?.[0] as
-    | FileSummaryFinding
-    | undefined;
-  if (fileSummary) {
-    const total =
-      fileSummary.added.length +
-      fileSummary.modified.length +
-      fileSummary.deleted.length +
-      fileSummary.renamed.length;
-    bullets.push(`${total} file(s) changed`);
+  // Files line with diffstat
+  bullets.push(`Files: ${formatDiffstat(diffstat)}`);
 
-    if (fileSummary.added.length > 0) {
-      bullets.push(`${fileSummary.added.length} file(s) added`);
-    }
-    if (fileSummary.deleted.length > 0) {
-      bullets.push(`${fileSummary.deleted.length} file(s) deleted`);
-    }
+  // Review attention (blast radius based)
+  if (reviewAttention === "HIGH" || reviewAttention === "MEDIUM") {
+    bullets.push(`Review attention: ${reviewAttention} (blast radius)`);
   }
 
-  // Use buildHighlights for consistent, prioritized summary bullets
-  const highlights = buildHighlights(allFindings);
-
-  // Add highlights (they're already priority-ordered)
-  for (const highlight of highlights) {
-    // Skip if it duplicates file-related info we already have
-    if (!highlight.includes("file(s) changed") && 
-        !highlight.includes("file(s) with") &&
-        !highlight.toLowerCase().includes("finding")) {
-      bullets.push(highlight);
-    }
+  // Key highlights from top findings (first 3)
+  for (const finding of topFindings.slice(0, 3)) {
+    bullets.push(finding.description);
   }
 
-  if (bullets.length === 0) {
-    bullets.push("Minor changes detected");
+  // Changeset mention
+  if (hasChangesets) {
+    bullets.push("Changeset added");
   }
 
-  // Limit to 8 bullets for comprehensive but readable summary
-  const limitedBullets = bullets.slice(0, 8);
-
-  return (
-    `## Summary\n\n` +
-    limitedBullets.map((b) => `- ${b}`).join("\n") +
-    "\n\n"
-  );
+  return `## Summary\n\n${bullets.map((b) => `- ${b}`).join("\n")}\n\n`;
 }
 
 /**
- * Render What Changed section (grouped by category).
+ * Render Top findings section.
+ */
+function renderTopFindings(topFindings: TopFinding[]): string {
+  if (topFindings.length === 0) {
+    return "";
+  }
+
+  let output = "## Top findings\n\n";
+
+  let index = 1;
+  for (const finding of topFindings) {
+    output += `${index}) ${finding.description}`;
+
+    if (finding.examples.length > 0) {
+      const examplesStr = finding.examples
+        .map((e) => `\`${e}\``)
+        .join(", ");
+      const moreStr = finding.moreCount > 0 ? ` (+${finding.moreCount} more)` : "";
+      output += `\n   ${examplesStr}${moreStr}`;
+    }
+
+    output += "\n\n";
+    index++;
+  }
+
+  return output;
+}
+
+/**
+ * Render What Changed section (grouped by category with Changesets separated).
  */
 function renderWhatChanged(
   categoryFinding: FileCategoryFinding | undefined,
-  fileSummary: FileSummaryFinding | undefined
+  fileSummary: FileSummaryFinding | undefined,
+  summaryData: ReturnType<typeof buildSummaryData>
 ): string {
   if (!categoryFinding || !fileSummary) {
     return "";
   }
 
   const { categories, summary } = categoryFinding;
+  const { primaryFiles, changesetFiles } = summaryData;
 
   // Skip if no meaningful categorization
-  if (summary.length <= 1) {
+  const totalFiles = summary.reduce((sum, s) => sum + s.count, 0);
+  if (totalFiles === 0) {
     return "";
   }
 
-  let output = "## What Changed\n\n";
+  let output = "## What changed\n\n";
+
+  // Primary files block (for small changes)
+  if (primaryFiles.length > 0) {
+    output += "### Primary files\n\n";
+    for (const file of primaryFiles) {
+      const status = fileSummary.added.includes(file)
+        ? " (new)"
+        : fileSummary.modified.includes(file)
+          ? " (modified)"
+          : "";
+      output += `- \`${file}\`${status}\n`;
+    }
+    output += "\n";
+  }
 
   // Order categories by count (descending)
   const orderedCategories = summary
     .filter((s) => s.count > 0)
     .sort((a, b) => b.count - a.count);
 
-  for (const { category, count } of orderedCategories) {
+  for (const { category } of orderedCategories) {
+    let files = categories[category];
     const label = getCategoryLabel(category);
-    const files = categories[category];
 
-    output += `### ${label} (${count})\n\n`;
+    // Handle docs category - separate changesets
+    if (category === "docs") {
+      const nonChangesetDocs = files.filter(
+        (f) => !f.startsWith(".changeset/")
+      );
+      if (nonChangesetDocs.length === 0 && changesetFiles.length > 0) {
+        // Only changesets, skip docs category, render changesets below
+        continue;
+      }
+      files = nonChangesetDocs;
+      if (files.length === 0) {
+        continue;
+      }
+    }
+
+    output += `### ${label} (${files.length})\n\n`;
 
     // Show up to 10 files per category
     const displayFiles = files.slice(0, 10);
@@ -172,8 +217,155 @@ function renderWhatChanged(
     output += "\n";
   }
 
+  // Changesets section (separate from docs)
+  if (changesetFiles.length > 0) {
+    output += `### Changesets (${changesetFiles.length})\n\n`;
+    for (const file of changesetFiles) {
+      const status = fileSummary.added.includes(file) ? " *(new)*" : "";
+      output += `- \`${file}\`${status}\n`;
+    }
+    output += "\n";
+  }
+
   return output;
 }
+
+/**
+ * Render Suggested test plan section with rationales.
+ */
+function renderTestPlan(
+  context: RenderContext,
+  groups: Map<string, Finding[]>
+): string {
+  const bullets: { cmd: string; rationale: string }[] = [];
+
+  // Check if test files were changed
+  const testChanges = groups.get("test-change") as
+    | TestChangeFinding[]
+    | undefined;
+  if (testChanges && testChanges.length > 0) {
+    const allTestFiles = testChanges.flatMap((t) => t.files);
+
+    // Targeted test if only one file changed
+    if (allTestFiles.length === 1) {
+      bullets.push({
+        cmd: `bun test ${allTestFiles[0]}`,
+        rationale: "targeted",
+      });
+    } else {
+      bullets.push({
+        cmd: "bun test",
+        rationale: `${allTestFiles.length} test files changed`,
+      });
+    }
+  }
+
+  // Profile-specific test commands
+  const profileCommands: Record<string, { cmd: string; rationale: string }[]> = {
+    sveltekit: [{ cmd: "bun run check", rationale: "SvelteKit profile" }],
+    next: [{ cmd: "bun run build", rationale: "Next.js profile" }],
+    vue: [{ cmd: "bun run build", rationale: "Vue profile" }],
+    astro: [{ cmd: "bun run build", rationale: "Astro profile" }],
+    stencil: [{ cmd: "bun run build", rationale: "Stencil profile" }],
+    angular: [{ cmd: "ng build", rationale: "Angular profile" }],
+    library: [{ cmd: "bun run build", rationale: "library profile" }],
+    python: [{ cmd: "pytest", rationale: "Python profile" }],
+    vite: [{ cmd: "bun run build", rationale: "Vite profile" }],
+  };
+
+  const cmds = profileCommands[context.profile] ?? [];
+  for (const { cmd, rationale } of cmds) {
+    bullets.push({ cmd, rationale });
+  }
+
+  // Route exercise suggestions
+  const routes = groups.get("route-change") as RouteChangeFinding[] | undefined;
+  if (routes) {
+    const endpoints = routes.filter((r) => r.routeType === "endpoint");
+    for (const endpoint of endpoints.slice(0, 3)) {
+      const urlPath = routeIdToUrlPath(endpoint.routeId);
+      const methods = endpoint.methods?.join("/") || "GET";
+      bullets.push({
+        cmd: `Test \`${methods} ${urlPath}\` endpoint`,
+        rationale: "route changed",
+      });
+    }
+
+    const pages = routes.filter(
+      (r) => r.routeType === "page" && r.change !== "deleted"
+    );
+    for (const page of pages.slice(0, 3)) {
+      const urlPath = routeIdToUrlPath(page.routeId);
+      bullets.push({
+        cmd: `Verify \`${urlPath}\` page renders correctly`,
+        rationale: "page changed",
+      });
+    }
+  }
+
+  // Test gaps
+  const testGaps = groups.get("test-gap") as TestGapFinding[] | undefined;
+  if (testGaps && testGaps.length > 0) {
+    const totalUntested = testGaps.reduce(
+      (sum, t) => sum + t.prodFilesChanged,
+      0
+    );
+    bullets.push({
+      cmd: `Add tests for ${totalUntested} modified file(s) lacking coverage`,
+      rationale: "test gap",
+    });
+  }
+
+  // Interactive test notes
+  if (context.interactive?.testNotes) {
+    bullets.push({
+      cmd: context.interactive.testNotes,
+      rationale: "user note",
+    });
+  }
+
+  if (bullets.length === 0) {
+    return "";
+  }
+
+  let output = "## Suggested test plan\n\n";
+  for (const { cmd, rationale } of bullets) {
+    output += `- [ ] \`${cmd}\` (${rationale})\n`;
+  }
+  output += "\n";
+
+  return output;
+}
+
+/**
+ * Render Notes section (risk summary + evidence).
+ */
+function renderNotes(context: RenderContext): string {
+  const { riskScore } = context;
+
+  let output = "## Notes\n\n";
+  output += `- Risk: ${formatRiskLevel(riskScore)}\n`;
+
+  const bullets = riskScore.evidenceBullets ?? [];
+  if (bullets.length === 0 && riskScore.level === "low") {
+    output += `- No elevated risks detected.\n`;
+  } else {
+    for (const bullet of bullets) {
+      // Remove emoji prefixes if present
+      const cleanBullet = bullet
+        .replace(/^[⚠️⚡ℹ️✅]\s*/, "")
+        .replace(/^[\u2600-\u27FF]\s*/, "");
+      output += `- ${cleanBullet}\n`;
+    }
+  }
+  output += "\n";
+
+  return output;
+}
+
+// ============================================================================
+// Details Section (Extended Information)
+// ============================================================================
 
 /**
  * Render Routes / API section.
@@ -183,7 +375,7 @@ function renderRoutes(routes: RouteChangeFinding[]): string {
     return "";
   }
 
-  let output = "## Routes / API\n\n";
+  let output = "### Routes / API\n\n";
   output += "| Route | Type | Change | Methods |\n";
   output += "|-------|------|--------|--------|\n";
 
@@ -204,7 +396,7 @@ function renderAPIContracts(contracts: APIContractChangeFinding[]): string {
     return "";
   }
 
-  let output = "## API Contracts\n\n";
+  let output = "### API Contracts\n\n";
   output += "The following API specification files have changed:\n\n";
 
   for (const contract of contracts) {
@@ -225,16 +417,10 @@ function renderDatabase(migrations: DbMigrationFinding[]): string {
     return "";
   }
 
-  let output = "## Database (Supabase)\n\n";
+  let output = "### Database (Supabase)\n\n";
 
   for (const migration of migrations) {
-    const riskEmoji =
-      migration.risk === "high"
-        ? "🔴"
-        : migration.risk === "medium"
-          ? "🟡"
-          : "🟢";
-    output += `**Risk Level:** ${riskEmoji} ${migration.risk.toUpperCase()}\n\n`;
+    output += `**Risk Level:** ${migration.risk.toUpperCase()}\n\n`;
     output += "**Files:**\n";
     for (const file of migration.files) {
       output += `- \`${file}\`\n`;
@@ -261,7 +447,7 @@ function renderEnvVars(envVars: EnvVarFinding[]): string {
     return "";
   }
 
-  let output = "## Config / Env\n\n";
+  let output = "### Config / Env\n\n";
   output += "| Variable | Status | Evidence |\n";
   output += "|----------|--------|----------|\n";
 
@@ -281,7 +467,7 @@ function renderCloudflare(changes: CloudflareChangeFinding[]): string {
     return "";
   }
 
-  let output = "## Cloudflare\n\n";
+  let output = "### Cloudflare\n\n";
 
   for (const change of changes) {
     output += `**Area:** ${change.area}\n`;
@@ -306,10 +492,10 @@ function renderDependencies(deps: DependencyChangeFinding[]): string {
   const prodDeps = deps.filter((d) => d.section === "dependencies");
   const devDeps = deps.filter((d) => d.section === "devDependencies");
 
-  let output = "## Dependencies\n\n";
+  let output = "### Dependencies\n\n";
 
   if (prodDeps.length > 0) {
-    output += "### Production\n\n";
+    output += "**Production**\n\n";
     output += "| Package | From | To | Impact |\n";
     output += "|---------|------|-----|--------|\n";
     for (const dep of prodDeps) {
@@ -319,7 +505,7 @@ function renderDependencies(deps: DependencyChangeFinding[]): string {
   }
 
   if (devDeps.length > 0) {
-    output += "### Dev Dependencies\n\n";
+    output += "**Dev Dependencies**\n\n";
     output += "| Package | From | To | Impact |\n";
     output += "|---------|------|-----|--------|\n";
     for (const dep of devDeps) {
@@ -339,8 +525,9 @@ function renderSecurityFiles(securityFiles: SecurityFileFinding[]): string {
     return "";
   }
 
-  let output = "## 🔒 Security-Sensitive Files\n\n";
-  output += "The following files touch authentication, authorization, or security-critical code:\n\n";
+  let output = "### Security-Sensitive Files\n\n";
+  output +=
+    "The following files touch authentication, authorization, or security-critical code:\n\n";
 
   // Collect all files with their reasons
   type SecurityFileReason = SecurityFileFinding["reasons"][number];
@@ -359,9 +546,13 @@ function renderSecurityFiles(securityFiles: SecurityFileFinding[]): string {
   }
 
   // Render file list with reasons
-  const sortedFiles = [...fileReasons.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const sortedFiles = [...fileReasons.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
   for (const [file, reasons] of sortedFiles.slice(0, 10)) {
-    const reasonLabels = reasons.map(r => getSecurityReasonLabel(r)).join(", ");
+    const reasonLabels = reasons
+      .map((r) => getSecurityReasonLabel(r))
+      .join(", ");
     output += `- \`${file}\` *(${reasonLabels})*\n`;
   }
 
@@ -381,12 +572,12 @@ function renderGraphQL(changes: GraphQLChangeFinding[]): string {
     return "";
   }
 
-  let output = "## GraphQL Schema\n\n";
+  let output = "### GraphQL Schema\n\n";
 
   // Check for breaking changes
   const breakingChanges = changes.filter((c) => c.isBreaking);
   if (breakingChanges.length > 0) {
-    output += "### 🔴 Breaking Changes\n\n";
+    output += "**Breaking Changes**\n\n";
     for (const change of breakingChanges) {
       output += `**File:** \`${change.file}\`\n`;
       if (change.breakingChanges.length > 0) {
@@ -401,7 +592,7 @@ function renderGraphQL(changes: GraphQLChangeFinding[]): string {
   // Show added elements
   const withAdditions = changes.filter((c) => c.addedElements.length > 0);
   if (withAdditions.length > 0) {
-    output += "### Added Elements\n\n";
+    output += "**Added Elements**\n\n";
     for (const change of withAdditions) {
       output += `**File:** \`${change.file}\`\n`;
       for (const elem of change.addedElements.slice(0, 10)) {
@@ -415,12 +606,12 @@ function renderGraphQL(changes: GraphQLChangeFinding[]): string {
   }
 
   // Summary table for all changes
-  output += "### All Schema Changes\n\n";
+  output += "**All Schema Changes**\n\n";
   output += "| File | Status | Breaking |\n";
   output += "|------|--------|----------|\n";
   for (const change of changes) {
-    const breakingEmoji = change.isBreaking ? "🔴 Yes" : "🟢 No";
-    output += `| \`${change.file}\` | ${change.status} | ${breakingEmoji} |\n`;
+    const breakingText = change.isBreaking ? "Yes" : "No";
+    output += `| \`${change.file}\` | ${change.status} | ${breakingText} |\n`;
   }
   output += "\n";
 
@@ -435,15 +626,15 @@ function renderTypeScriptConfig(configs: TypeScriptConfigFinding[]): string {
     return "";
   }
 
-  let output = "### TypeScript Configuration\n\n";
+  let output = "**TypeScript Configuration**\n\n";
 
   for (const config of configs) {
-    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
-    output += `**File:** \`${config.file}\` ${breakingEmoji}\n\n`;
+    const breakingText = config.isBreaking ? "(BREAKING)" : "";
+    output += `**File:** \`${config.file}\` ${breakingText}\n\n`;
 
     // Strictness changes
     if (config.strictnessChanges.length > 0) {
-      output += "**Strictness Changes:**\n";
+      output += "Strictness Changes:\n";
       for (const change of config.strictnessChanges) {
         output += `- ${change}\n`;
       }
@@ -475,14 +666,14 @@ function renderTailwindConfig(configs: TailwindConfigFinding[]): string {
     return "";
   }
 
-  let output = "### Tailwind Configuration\n\n";
+  let output = "**Tailwind Configuration**\n\n";
 
   for (const config of configs) {
-    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
-    output += `**File:** \`${config.file}\` (${config.configType}) ${breakingEmoji}\n\n`;
+    const breakingText = config.isBreaking ? "(BREAKING)" : "";
+    output += `**File:** \`${config.file}\` (${config.configType}) ${breakingText}\n\n`;
 
     if (config.affectedSections.length > 0) {
-      output += "**Affected Sections:**\n";
+      output += "Affected Sections:\n";
       for (const section of config.affectedSections) {
         output += `- ${section}\n`;
       }
@@ -490,7 +681,7 @@ function renderTailwindConfig(configs: TailwindConfigFinding[]): string {
     }
 
     if (config.isBreaking && config.breakingReasons.length > 0) {
-      output += "**Breaking Changes:**\n";
+      output += "Breaking Changes:\n";
       for (const reason of config.breakingReasons) {
         output += `- ${reason}\n`;
       }
@@ -509,14 +700,14 @@ function renderMonorepoConfig(configs: MonorepoConfigFinding[]): string {
     return "";
   }
 
-  let output = "### Monorepo Configuration\n\n";
+  let output = "**Monorepo Configuration**\n\n";
 
   for (const config of configs) {
     output += `**Tool:** ${config.tool}\n`;
     output += `**File:** \`${config.file}\`\n\n`;
 
     if (config.affectedFields.length > 0) {
-      output += "**Changed Fields:**\n";
+      output += "Changed Fields:\n";
       for (const field of config.affectedFields) {
         output += `- ${field}\n`;
       }
@@ -524,7 +715,7 @@ function renderMonorepoConfig(configs: MonorepoConfigFinding[]): string {
     }
 
     if (config.impacts.length > 0) {
-      output += "**Impacts:**\n";
+      output += "Impacts:\n";
       for (const impact of config.impacts) {
         output += `- ${impact}\n`;
       }
@@ -536,9 +727,6 @@ function renderMonorepoConfig(configs: MonorepoConfigFinding[]): string {
 }
 
 /**
- * Render combined Configuration section.
- */
-/**
  * Render Vite Config section.
  */
 function renderViteConfig(configs: ViteConfigFinding[]): string {
@@ -546,19 +734,19 @@ function renderViteConfig(configs: ViteConfigFinding[]): string {
     return "";
   }
 
-  let output = "### Vite Configuration\n\n";
+  let output = "**Vite Configuration**\n\n";
 
   for (const config of configs) {
-    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
-    output += `**File:** \`${config.file}\` ${breakingEmoji}\n\n`;
+    const breakingText = config.isBreaking ? "(BREAKING)" : "";
+    output += `**File:** \`${config.file}\` ${breakingText}\n\n`;
 
     // Show detected plugins
     if (config.pluginsDetected.length > 0) {
-      output += `**Plugins:** ${config.pluginsDetected.map(p => `\`${p}\``).join(", ")}\n`;
+      output += `**Plugins:** ${config.pluginsDetected.map((p) => `\`${p}\``).join(", ")}\n`;
     }
 
     if (config.affectedSections.length > 0) {
-      output += "**Affected Sections:**\n";
+      output += "Affected Sections:\n";
       for (const section of config.affectedSections.slice(0, 5)) {
         output += `- ${section}\n`;
       }
@@ -569,7 +757,7 @@ function renderViteConfig(configs: ViteConfigFinding[]): string {
     }
 
     if (config.isBreaking && config.breakingReasons.length > 0) {
-      output += "**Breaking Changes:**\n";
+      output += "Breaking Changes:\n";
       for (const reason of config.breakingReasons) {
         output += `- ${reason}\n`;
       }
@@ -580,6 +768,9 @@ function renderViteConfig(configs: ViteConfigFinding[]): string {
   return output;
 }
 
+/**
+ * Render combined Configuration section.
+ */
 function renderConfiguration(
   tsConfigs: TypeScriptConfigFinding[],
   tailwindConfigs: TailwindConfigFinding[],
@@ -595,7 +786,7 @@ function renderConfiguration(
     return "";
   }
 
-  let output = "## Configuration Changes\n\n";
+  let output = "### Configuration Changes\n\n";
 
   if (hasTsConfig) {
     output += renderTypeScriptConfig(tsConfigs);
@@ -621,33 +812,33 @@ function renderPackageExports(exports: PackageExportsFinding[]): string {
     return "";
   }
 
-  let output = "## Package API\n\n";
+  let output = "### Package API\n\n";
 
   for (const exp of exports) {
-    const breakingEmoji = exp.isBreaking ? "🔴 Breaking" : "🟢 Non-breaking";
-    output += `**Status:** ${breakingEmoji}\n\n`;
+    const breakingText = exp.isBreaking ? "Breaking" : "Non-breaking";
+    output += `**Status:** ${breakingText}\n\n`;
 
     // Removed exports (breaking)
     if (exp.removedExports.length > 0) {
-      output += "### Removed Exports\n\n";
+      output += "**Removed Exports**\n\n";
       for (const removed of exp.removedExports) {
-        output += `- 🔴 \`${removed}\`\n`;
+        output += `- \`${removed}\`\n`;
       }
       output += "\n";
     }
 
     // Added exports
     if (exp.addedExports.length > 0) {
-      output += "### Added Exports\n\n";
+      output += "**Added Exports**\n\n";
       for (const added of exp.addedExports) {
-        output += `- 🟢 \`${added}\`\n`;
+        output += `- \`${added}\`\n`;
       }
       output += "\n";
     }
 
     // Legacy field changes
     if (exp.legacyFieldChanges.length > 0) {
-      output += "### Entry Point Changes\n\n";
+      output += "**Entry Point Changes**\n\n";
       output += "| Field | From | To |\n";
       output += "|-------|------|----|\n";
       for (const change of exp.legacyFieldChanges) {
@@ -658,7 +849,7 @@ function renderPackageExports(exports: PackageExportsFinding[]): string {
 
     // Bin changes
     if (exp.binChanges.added.length > 0 || exp.binChanges.removed.length > 0) {
-      output += "### Binary Commands\n\n";
+      output += "**Binary Commands**\n\n";
       if (exp.binChanges.added.length > 0) {
         output += `**Added:** ${exp.binChanges.added.map((b) => `\`${b}\``).join(", ")}\n`;
       }
@@ -698,16 +889,19 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
     return "";
   }
 
-  let output = "## Component API (Stencil)\n\n";
+  let output = "### Component API (Stencil)\n\n";
 
   // Group all changes by component tag
-  const byTag = new Map<string, {
-    component?: StencilComponentChangeFinding;
-    props: StencilPropChangeFinding[];
-    events: StencilEventChangeFinding[];
-    methods: StencilMethodChangeFinding[];
-    slots: StencilSlotChangeFinding[];
-  }>();
+  const byTag = new Map<
+    string,
+    {
+      component?: StencilComponentChangeFinding;
+      props: StencilPropChangeFinding[];
+      events: StencilEventChangeFinding[];
+      methods: StencilMethodChangeFinding[];
+      slots: StencilSlotChangeFinding[];
+    }
+  >();
 
   // Initialize groups for all tags
   const initTag = (tag: string) => {
@@ -739,13 +933,12 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
 
   // Render each component
   for (const [tag, changes] of byTag) {
-    output += `### \`<${tag}>\`\n\n`;
+    output += `**\`<${tag}>\`**\n\n`;
 
     // Component-level changes
     if (changes.component) {
       const c = changes.component;
-      const changeEmoji = c.change === "removed" ? "🔴" : c.change === "added" ? "🟢" : "🟡";
-      output += `**Component:** ${changeEmoji} ${c.change}`;
+      output += `**Component:** ${c.change}`;
       if (c.change === "tag-changed") {
         output += ` (${c.fromTag} → ${c.toTag})`;
       }
@@ -760,12 +953,11 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
     if (changes.props.length > 0) {
       output += "**Props:**\n";
       for (const p of changes.props) {
-        const emoji = p.change === "removed" ? "🔴" : p.change === "added" ? "🟢" : "🟡";
         let detail = "";
         if (p.details?.typeText) {
           detail = `: ${p.details.typeText}`;
         }
-        output += `- ${emoji} \`${p.propName}\`${detail} (${p.change})\n`;
+        output += `- \`${p.propName}\`${detail} (${p.change})\n`;
       }
       output += "\n";
     }
@@ -774,8 +966,7 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
     if (changes.events.length > 0) {
       output += "**Events:**\n";
       for (const e of changes.events) {
-        const emoji = e.change === "removed" ? "🔴" : e.change === "added" ? "🟢" : "🟡";
-        output += `- ${emoji} \`${e.eventName}\` (${e.change})\n`;
+        output += `- \`${e.eventName}\` (${e.change})\n`;
       }
       output += "\n";
     }
@@ -784,9 +975,8 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
     if (changes.methods.length > 0) {
       output += "**Methods:**\n";
       for (const m of changes.methods) {
-        const emoji = m.change === "removed" ? "🔴" : m.change === "added" ? "🟢" : "🟡";
         const sig = m.signature ? `: ${m.signature}` : "";
-        output += `- ${emoji} \`${m.methodName}\`${sig} (${m.change})\n`;
+        output += `- \`${m.methodName}\`${sig} (${m.change})\n`;
       }
       output += "\n";
     }
@@ -795,9 +985,8 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
     if (changes.slots.length > 0) {
       output += "**Slots:**\n";
       for (const s of changes.slots) {
-        const emoji = s.change === "removed" ? "🔴" : "🟢";
         const slotName = s.slotName === "default" ? "(default)" : `"${s.slotName}"`;
-        output += `- ${emoji} ${slotName} (${s.change})\n`;
+        output += `- ${slotName} (${s.change})\n`;
       }
       output += "\n";
     }
@@ -817,7 +1006,7 @@ function renderAngularChanges(groups: Map<string, Finding[]>): string {
     return "";
   }
 
-  let output = "## Angular Components\n\n";
+  let output = "### Angular Components\n\n";
 
   // Group by component type
   const byType = new Map<string, AngularComponentChangeFinding[]>();
@@ -832,17 +1021,19 @@ function renderAngularChanges(groups: Map<string, Finding[]>): string {
   // Render table for each type
   for (const [type, changes] of byType) {
     const typeLabel = type.charAt(0).toUpperCase() + type.slice(1) + "s";
-    output += `### ${typeLabel}\n\n`;
+    output += `**${typeLabel}**\n\n`;
     output += "| File | Change | Selector | Standalone |\n";
     output += "|------|--------|----------|------------|\n";
 
     for (const change of changes) {
-      const changeEmoji =
-        change.change === "deleted" ? "🔴" :
-        change.change === "added" ? "🟢" : "🟡";
       const selector = change.selector || "-";
-      const standalone = change.standalone !== undefined ? (change.standalone ? "Yes" : "No") : "-";
-      output += `| \`${change.file}\` | ${changeEmoji} ${change.change} | \`${selector}\` | ${standalone} |\n`;
+      const standalone =
+        change.standalone !== undefined
+          ? change.standalone
+            ? "Yes"
+            : "No"
+          : "-";
+      output += `| \`${change.file}\` | ${change.change} | \`${selector}\` | ${standalone} |\n`;
     }
     output += "\n";
   }
@@ -861,15 +1052,8 @@ function renderCIWorkflow(findings: CIWorkflowFinding[]): string {
   let output = "### CI Workflows\n\n";
 
   for (const finding of findings) {
-    const riskEmoji =
-      finding.riskType === "permissions_broadened" ||
-      finding.riskType === "pull_request_target" ||
-      finding.riskType === "remote_script_download"
-        ? "🔴"
-        : "🟡";
-
     const riskLabel = finding.riskType.replace(/_/g, " ");
-    output += `${riskEmoji} **${riskLabel}**\n`;
+    output += `**${riskLabel}**\n`;
     output += `- File: \`${finding.file}\`\n`;
     output += `- ${finding.details}\n\n`;
   }
@@ -885,18 +1069,11 @@ function renderSQLRisk(findings: SQLRiskFinding[]): string {
     return "";
   }
 
-  let output = "## SQL Risk\n\n";
+  let output = "### SQL Risk\n\n";
 
   for (const finding of findings) {
-    const riskEmoji =
-      finding.riskType === "destructive"
-        ? "🔴"
-        : finding.riskType === "unscoped_modification"
-          ? "🔴"
-          : "🟡";
-
     const riskLabel = finding.riskType.replace(/_/g, " ");
-    output += `${riskEmoji} **${riskLabel}**\n`;
+    output += `**${riskLabel}**\n`;
     output += `- File: \`${finding.file}\`\n`;
     output += `- ${finding.details}\n\n`;
   }
@@ -955,7 +1132,7 @@ function renderCIInfrastructure(
     return "";
   }
 
-  let output = "## CI / Infrastructure\n\n";
+  let output = "";
   output += renderCIWorkflow(ciFindings);
   output += renderInfraChanges(infraFindings);
 
@@ -970,18 +1147,12 @@ function renderPythonMigrations(migrations: PythonMigrationFinding[]): string {
     return "";
   }
 
-  let output = "## Database (Python)\n\n";
+  let output = "### Database (Python)\n\n";
 
   for (const migration of migrations) {
-    const riskEmoji =
-      migration.risk === "high"
-        ? "🔴"
-        : migration.risk === "medium"
-          ? "🟡"
-          : "🟢";
     const toolLabel = migration.tool === "alembic" ? "Alembic" : "Django";
     output += `**Tool:** ${toolLabel}\n`;
-    output += `**Risk Level:** ${riskEmoji} ${migration.risk.toUpperCase()}\n\n`;
+    output += `**Risk Level:** ${migration.risk.toUpperCase()}\n\n`;
     output += "**Files:**\n";
     for (const file of migration.files) {
       output += `- \`${file}\`\n`;
@@ -1008,14 +1179,14 @@ function renderPythonConfig(configs: PythonConfigFinding[]): string {
     return "";
   }
 
-  let output = "### Python Configuration\n\n";
+  let output = "**Python Configuration**\n\n";
 
   for (const config of configs) {
-    const breakingEmoji = config.isBreaking ? "🔴" : "🟢";
-    output += `**File:** \`${config.file}\` (${config.configType}) ${breakingEmoji}\n\n`;
+    const breakingText = config.isBreaking ? "(BREAKING)" : "";
+    output += `**File:** \`${config.file}\` (${config.configType}) ${breakingText}\n\n`;
 
     if (config.affectedSections.length > 0) {
-      output += "**Affected Sections:**\n";
+      output += "Affected Sections:\n";
       for (const section of config.affectedSections.slice(0, 5)) {
         output += `- ${section}\n`;
       }
@@ -1026,7 +1197,7 @@ function renderPythonConfig(configs: PythonConfigFinding[]): string {
     }
 
     if (config.isBreaking && config.breakingReasons.length > 0) {
-      output += "**Breaking Changes:**\n";
+      output += "Breaking Changes:\n";
       for (const reason of config.breakingReasons) {
         output += `- ${reason}\n`;
       }
@@ -1041,12 +1212,10 @@ function renderPythonConfig(configs: PythonConfigFinding[]): string {
  * Render Warnings section (large-diff, lockfile-mismatch, test-gap).
  */
 function renderWarnings(groups: Map<string, Finding[]>): string {
-  const largeDiff =
-    (groups.get("large-diff") as LargeDiffFinding[]) ?? [];
+  const largeDiff = (groups.get("large-diff") as LargeDiffFinding[]) ?? [];
   const lockfileMismatch =
     (groups.get("lockfile-mismatch") as LockfileFinding[]) ?? [];
-  const testGap =
-    (groups.get("test-gap") as TestGapFinding[]) ?? [];
+  const testGap = (groups.get("test-gap") as TestGapFinding[]) ?? [];
 
   const hasWarnings =
     largeDiff.length > 0 || lockfileMismatch.length > 0 || testGap.length > 0;
@@ -1055,7 +1224,7 @@ function renderWarnings(groups: Map<string, Finding[]>): string {
     return "";
   }
 
-  let output = "## ⚠️ Warnings\n\n";
+  let output = "### Warnings\n\n";
 
   // Large diff warning
   for (const ld of largeDiff) {
@@ -1081,91 +1250,30 @@ function renderWarnings(groups: Map<string, Finding[]>): string {
 }
 
 /**
- * Render Suggested test plan section.
+ * Render Impact Analysis section.
  */
-function renderTestPlan(
-  context: RenderContext,
-  groups: Map<string, Finding[]>
+function renderImpactAnalysis(
+  impacts: ImpactAnalysisFinding[]
 ): string {
-  const bullets: string[] = [];
+  if (impacts.length === 0) {
+    return "";
+  }
 
-  // Check if vitest tests exist
-  const testChanges = groups.get("test-change") as
-    | TestChangeFinding[]
-    | undefined;
-  if (testChanges && testChanges.length > 0) {
-    const addedCount = testChanges.reduce((sum, t) => sum + t.added.length, 0);
-    const modifiedCount = testChanges.reduce((sum, t) => sum + t.modified.length, 0);
+  // Sort by blast radius priority: high first, medium second, low last
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const sortedImpacts = [...impacts].sort(
+    (a, b) => priorityOrder[a.blastRadius] - priorityOrder[b.blastRadius]
+  );
 
-    let testSummary = "`bun test` - Run test suite";
-    if (addedCount > 0 || modifiedCount > 0) {
-      const parts: string[] = [];
-      if (addedCount > 0) parts.push(`${addedCount} new`);
-      if (modifiedCount > 0) parts.push(`${modifiedCount} updated`);
-      testSummary += ` (${parts.join(", ")} test file(s))`;
+  let output = "### Impact Analysis\n\n";
+  for (const impact of sortedImpacts) {
+    output += `**\`${impact.sourceFile}\`** - Blast Radius: ${impact.blastRadius.toUpperCase()} (${impact.affectedFiles.length} files)\n\n`;
+    output += "Affected files:\n";
+    for (const f of impact.affectedFiles.slice(0, 5)) {
+      output += `- \`${f}\`\n`;
     }
-    bullets.push(testSummary);
-  }
-
-  // SvelteKit check
-  if (context.profile === "sveltekit") {
-    bullets.push("`bun run check` - Run SvelteKit type check");
-  }
-
-  // Route exercise suggestions
-  const routes = groups.get("route-change") as RouteChangeFinding[] | undefined;
-  if (routes) {
-    const endpoints = routes.filter((r) => r.routeType === "endpoint");
-    for (const endpoint of endpoints.slice(0, 3)) {
-      const urlPath = routeIdToUrlPath(endpoint.routeId);
-      const methods = endpoint.methods?.join("/") || "GET";
-      bullets.push(`Test \`${methods} ${urlPath}\` endpoint`);
-    }
-
-    const pages = routes.filter(
-      (r) => r.routeType === "page" && r.change !== "deleted"
-    );
-    for (const page of pages.slice(0, 3)) {
-      const urlPath = routeIdToUrlPath(page.routeId);
-      bullets.push(`Verify \`${urlPath}\` page renders correctly`);
-    }
-  }
-
-  // Interactive test notes
-  if (context.interactive?.testNotes) {
-    bullets.push(context.interactive.testNotes);
-  }
-
-  if (bullets.length === 0) {
-    bullets.push("No specific test suggestions");
-  }
-
-  let output = "## Suggested Test Plan\n\n";
-  output += bullets.map((b) => `- [ ] ${b}`).join("\n") + "\n\n";
-
-  return output;
-}
-
-/**
- * Render Risks / Notes section.
- */
-function renderRisks(context: RenderContext): string {
-  const { riskScore } = context;
-
-  const levelEmoji =
-    riskScore.level === "high"
-      ? "🔴"
-      : riskScore.level === "medium"
-        ? "🟡"
-        : "🟢";
-
-  let output = "## Risks / Notes\n\n";
-  output += `**Overall Risk:** ${levelEmoji} ${riskScore.level.toUpperCase()} (score: ${riskScore.score}/100)\n\n`;
-
-  const bullets = riskScore.evidenceBullets ?? [];
-  if (bullets.length > 0) {
-    for (const bullet of bullets) {
-      output += `- ${bullet}\n`;
+    if (impact.affectedFiles.length > 5) {
+      output += `- ...and ${impact.affectedFiles.length - 5} more\n`;
     }
     output += "\n";
   }
@@ -1174,59 +1282,104 @@ function renderRisks(context: RenderContext): string {
 }
 
 /**
- * Render findings into a Markdown PR body.
+ * Render Convention Violations.
  */
-export function renderMarkdown(context: RenderContext): string {
-  const groups = groupFindings(context.findings);
+function renderConventionViolations(
+  violations: ConventionViolationFinding[]
+): string {
+  if (violations.length === 0) {
+    return "";
+  }
 
-  let output = "";
+  let output = "### Conventions\n\n";
+  for (const v of violations) {
+    output += `- **${v.message}**\n`;
+    for (const file of v.files.slice(0, 5)) {
+      output += `  - \`${file}\`\n`;
+    }
+    if (v.files.length > 5) {
+      output += `  - ...and ${v.files.length - 5} more\n`;
+    }
+  }
+  output += "\n";
 
-  // Context (interactive only)
-  output += renderContext(context);
+  return output;
+}
 
-  // Summary (using prioritized highlights)
-  output += renderSummary(groups, context.findings);
+/**
+ * Render Test Parity Violations.
+ */
+function renderTestParityViolations(
+  violations: TestParityViolationFinding[]
+): string {
+  if (violations.length === 0) {
+    return "";
+  }
 
-  // What Changed (grouped by category)
-  const categoryFinding = groups.get("file-category")?.[0] as
-    | FileCategoryFinding
-    | undefined;
-  const fileSummary = groups.get("file-summary")?.[0] as
-    | FileSummaryFinding
-    | undefined;
-  output += renderWhatChanged(categoryFinding, fileSummary);
+  let output = "### Test Coverage Gaps\n\n";
+  output += `Found ${violations.length} source file(s) without corresponding tests:\n\n`;
+  for (const v of violations.slice(0, 10)) {
+    const confidenceLabel =
+      v.confidence === "high"
+        ? "[high]"
+        : v.confidence === "medium"
+          ? "[medium]"
+          : "[low]";
+    output += `- ${confidenceLabel} \`${v.sourceFile}\`\n`;
+  }
+  if (violations.length > 10) {
+    output += `- ...and ${violations.length - 10} more\n`;
+  }
+  output += "\n";
+
+  return output;
+}
+
+/**
+ * Render the Details section (collapsible extended information).
+ */
+function renderDetails(
+  _context: RenderContext,
+  groups: Map<string, Finding[]>
+): string {
+  let detailsContent = "";
+
+  // Impact Analysis
+  const impacts =
+    (groups.get("impact-analysis") as ImpactAnalysisFinding[]) ?? [];
+  detailsContent += renderImpactAnalysis(impacts);
 
   // Routes / API
   const routes = (groups.get("route-change") as RouteChangeFinding[]) ?? [];
-  output += renderRoutes(routes);
+  detailsContent += renderRoutes(routes);
 
   // API Contracts
   const apiContracts =
     (groups.get("api-contract-change") as APIContractChangeFinding[]) ?? [];
-  output += renderAPIContracts(apiContracts);
+  detailsContent += renderAPIContracts(apiContracts);
 
   // GraphQL Schema
   const graphqlChanges =
     (groups.get("graphql-change") as GraphQLChangeFinding[]) ?? [];
-  output += renderGraphQL(graphqlChanges);
+  detailsContent += renderGraphQL(graphqlChanges);
 
   // Database (Supabase)
   const migrations =
     (groups.get("db-migration") as DbMigrationFinding[]) ?? [];
-  output += renderDatabase(migrations);
+  detailsContent += renderDatabase(migrations);
 
   // Database (Python - Alembic/Django)
   const pythonMigrations =
     (groups.get("python-migration") as PythonMigrationFinding[]) ?? [];
-  output += renderPythonMigrations(pythonMigrations);
+  detailsContent += renderPythonMigrations(pythonMigrations);
 
   // SQL Risk
   const sqlRisks = (groups.get("sql-risk") as SQLRiskFinding[]) ?? [];
-  output += renderSQLRisk(sqlRisks);
+  detailsContent += renderSQLRisk(sqlRisks);
 
   // Config / Env
   const envVars = (groups.get("env-var") as EnvVarFinding[]) ?? [];
-  output += renderEnvVars(envVars);
+  detailsContent += renderEnvVars(envVars);
 
   // Configuration Changes (TypeScript, Tailwind, Vite, Monorepo, Python)
   const tsConfigs =
@@ -1239,113 +1392,107 @@ export function renderMarkdown(context: RenderContext): string {
     (groups.get("vite-config") as ViteConfigFinding[]) ?? [];
   const pythonConfigs =
     (groups.get("python-config") as PythonConfigFinding[]) ?? [];
-  output += renderConfiguration(tsConfigs, tailwindConfigs, monorepoConfigs, viteConfigs);
-  output += renderPythonConfig(pythonConfigs);
+  detailsContent += renderConfiguration(
+    tsConfigs,
+    tailwindConfigs,
+    monorepoConfigs,
+    viteConfigs
+  );
+  detailsContent += renderPythonConfig(pythonConfigs);
 
   // Cloudflare
   const cloudflare =
     (groups.get("cloudflare-change") as CloudflareChangeFinding[]) ?? [];
-  output += renderCloudflare(cloudflare);
+  detailsContent += renderCloudflare(cloudflare);
 
   // Dependencies
   const deps =
     (groups.get("dependency-change") as DependencyChangeFinding[]) ?? [];
-  output += renderDependencies(deps);
+  detailsContent += renderDependencies(deps);
 
   // Package API (exports)
   const packageExports =
     (groups.get("package-exports") as PackageExportsFinding[]) ?? [];
-  output += renderPackageExports(packageExports);
+  detailsContent += renderPackageExports(packageExports);
 
   // Component API (Stencil)
-  output += renderStencilChanges(groups);
+  detailsContent += renderStencilChanges(groups);
 
   // Angular Components
-  output += renderAngularChanges(groups);
+  detailsContent += renderAngularChanges(groups);
 
   // CI / Infrastructure
   const ciWorkflows =
     (groups.get("ci-workflow") as CIWorkflowFinding[]) ?? [];
   const infraChanges =
     (groups.get("infra-change") as InfraChangeFinding[]) ?? [];
-  output += renderCIInfrastructure(ciWorkflows, infraChanges);
+  detailsContent += renderCIInfrastructure(ciWorkflows, infraChanges);
 
   // Security-Sensitive Files
   const securityFiles =
     (groups.get("security-file") as SecurityFileFinding[]) ?? [];
-  output += renderSecurityFiles(securityFiles);
-
-  // Note: Tests are shown in "What Changed > Tests" and "Suggested Test Plan"
-  // No dedicated section needed to avoid redundancy
+  detailsContent += renderSecurityFiles(securityFiles);
 
   // Convention Violations
   const violations =
     (groups.get("convention-violation") as ConventionViolationFinding[]) ?? [];
-  if (violations.length > 0) {
-    output += "## ⚠️ Conventions\n\n";
-    for (const v of violations) {
-      output += `- **${v.message}**\n`;
-      for (const file of v.files.slice(0, 5)) {
-        output += `  - \`${file}\`\n`;
-      }
-      if (v.files.length > 5) {
-        output += `  - ...and ${v.files.length - 5} more\n`;
-      }
-    }
-    output += "\n";
-  }
+  detailsContent += renderConventionViolations(violations);
 
   // Test Parity Violations
   const testParityViolations =
     (groups.get("test-parity-violation") as TestParityViolationFinding[]) ?? [];
-  if (testParityViolations.length > 0) {
-    output += "## 🧪 Test Coverage Gaps\n\n";
-    output += `Found ${testParityViolations.length} source file(s) without corresponding tests:\n\n`;
-    for (const v of testParityViolations.slice(0, 10)) {
-      const confidenceLabel = v.confidence === "high" ? "🔴" : v.confidence === "medium" ? "🟡" : "⚪";
-      output += `- ${confidenceLabel} \`${v.sourceFile}\`\n`;
-    }
-    if (testParityViolations.length > 10) {
-      output += `- ...and ${testParityViolations.length - 10} more\n`;
-    }
-    output += "\n";
+  detailsContent += renderTestParityViolations(testParityViolations);
+
+  // Warnings
+  detailsContent += renderWarnings(groups);
+
+  // If no details content, skip the section
+  if (detailsContent.trim() === "") {
+    return "";
   }
 
-  // Impact Analysis
-  const impacts =
-    (groups.get("impact-analysis") as ImpactAnalysisFinding[]) ?? [];
-  if (impacts.length > 0) {
-    // Sort by blast radius priority: high first, medium second, low last
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    const sortedImpacts = [...impacts].sort((a, b) => 
-      priorityOrder[a.blastRadius] - priorityOrder[b.blastRadius]
-    );
+  return `<details>\n<summary>Details</summary>\n\n${detailsContent}</details>\n`;
+}
 
-    output += "## 🧨 Impact Analysis\n\n";
-    for (const impact of sortedImpacts) {
-      const radiusEmoji = impact.blastRadius === "high" ? "🔴" : impact.blastRadius === "medium" ? "🟡" : "🟢";
-      output += `### \`${impact.sourceFile}\` ${radiusEmoji}\n\n`;
-      output += `**Blast Radius:** ${impact.blastRadius.toUpperCase()} (${impact.affectedFiles.length} files)\n\n`;
-      output += "Affected files:\n";
-      for (const f of impact.affectedFiles.slice(0, 5)) {
-        output += `- \`${f}\`\n`;
-      }
-      if (impact.affectedFiles.length > 5) {
-        output += `- ...and ${impact.affectedFiles.length - 5} more\n`;
-      }
-      output += "\n";
-    }
-  }
+/**
+ * Render findings into a Markdown PR body.
+ * No emojis, compact by default, extended info in details block.
+ */
+export function renderMarkdown(context: RenderContext): string {
+  const groups = groupFindings(context.findings);
+  const summaryData = buildSummaryData(context.findings);
 
-  // Warnings (large-diff, lockfile-mismatch, test-gap)
-  output += renderWarnings(groups);
+  let output = "";
+
+  // Hidden metadata comment
+  output += `<!-- branch-narrator: profile=${context.profile} -->\n`;
+
+  // Context (interactive only)
+  output += renderContext(context);
+
+  // Summary
+  output += renderSummary(context, summaryData);
+
+  // Top findings
+  output += renderTopFindings(summaryData.topFindings);
+
+  // What Changed (grouped by category with changesets separated)
+  const categoryFinding = groups.get("file-category")?.[0] as
+    | FileCategoryFinding
+    | undefined;
+  const fileSummary = groups.get("file-summary")?.[0] as
+    | FileSummaryFinding
+    | undefined;
+  output += renderWhatChanged(categoryFinding, fileSummary, summaryData);
 
   // Suggested test plan
   output += renderTestPlan(context, groups);
 
-  // Risks / Notes
-  output += renderRisks(context);
+  // Notes
+  output += renderNotes(context);
+
+  // Details (collapsible extended information)
+  output += renderDetails(context, groups);
 
   return output.trim() + "\n";
 }
-

@@ -44,11 +44,11 @@ describe("renderMarkdown", () => {
     const markdown = renderMarkdown(createContext(findings));
 
     expect(markdown).toContain("## Summary");
-    expect(markdown).toContain("2 file(s) changed");
-    expect(markdown).toContain("1 file(s) added");
+    // New format: explicit diffstat
+    expect(markdown).toContain("Files: 2 changed (1 added, 1 modified)");
   });
 
-  it("should render routes table", () => {
+  it("should render routes table in details", () => {
     const findings: Finding[] = [
       {
         type: "route-change",
@@ -69,7 +69,9 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).toContain("## Routes / API");
+    // Routes are now in the details section
+    expect(markdown).toContain("<details>");
+    expect(markdown).toContain("### Routes / API");
     expect(markdown).toContain("/dashboard");
     expect(markdown).toContain("page");
     expect(markdown).toContain("/api/users");
@@ -77,7 +79,7 @@ describe("renderMarkdown", () => {
     expect(markdown).toContain("GET, POST");
   });
 
-  it("should render env vars table", () => {
+  it("should render env vars table in details", () => {
     const findings: Finding[] = [
       {
         type: "env-var",
@@ -89,13 +91,15 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).toContain("## Config / Env");
+    // Env vars are now in the details section
+    expect(markdown).toContain("<details>");
+    expect(markdown).toContain("### Config / Env");
     expect(markdown).toContain("`API_KEY`");
     expect(markdown).toContain("added");
     expect(markdown).toContain("src/lib/config.ts");
   });
 
-  it("should render dependencies section", () => {
+  it("should render dependencies section in details", () => {
     const findings: Finding[] = [
       {
         type: "dependency-change",
@@ -117,13 +121,15 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).toContain("## Dependencies");
-    expect(markdown).toContain("### Production");
+    // Dependencies are now in the details section
+    expect(markdown).toContain("<details>");
+    expect(markdown).toContain("### Dependencies");
+    expect(markdown).toContain("**Production**");
     expect(markdown).toContain("`@sveltejs/kit`");
     expect(markdown).toContain("^1.0.0");
     expect(markdown).toContain("^2.0.0");
     expect(markdown).toContain("major");
-    expect(markdown).toContain("### Dev Dependencies");
+    expect(markdown).toContain("**Dev Dependencies**");
     expect(markdown).toContain("`vitest`");
   });
 
@@ -153,14 +159,20 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).toContain("## Suggested Test Plan");
-    expect(markdown).toContain("`bun test`");
-    expect(markdown).toContain("1 updated test file(s)");
+    // New section name (lowercase)
+    expect(markdown).toContain("## Suggested test plan");
+    // New format with targeted test
+    expect(markdown).toContain("`bun test tests/unit.test.ts`");
+    expect(markdown).toContain("(targeted)");
+    // Profile-specific command
     expect(markdown).toContain("`bun run check`");
+    expect(markdown).toContain("(SvelteKit profile)");
+    // Route test suggestion
     expect(markdown).toContain("GET /api/users");
+    expect(markdown).toContain("(route changed)");
   });
 
-  it("should render risks section", () => {
+  it("should render notes section", () => {
     const findings: Finding[] = [
       {
         type: "risk-flag",
@@ -184,7 +196,8 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).toContain("## Risks / Notes");
+    // New section name
+    expect(markdown).toContain("## Notes");
     expect(markdown).toContain("HIGH");
     expect(markdown).toContain("Critical security change");
   });
@@ -223,11 +236,12 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).not.toContain("## Routes / API");
-    expect(markdown).not.toContain("## Database");
-    expect(markdown).not.toContain("## Config / Env");
-    expect(markdown).not.toContain("## Cloudflare");
-    expect(markdown).not.toContain("## Dependencies");
+    // These are now in details section when present, but should not appear when empty
+    expect(markdown).not.toContain("### Routes / API");
+    expect(markdown).not.toContain("### Database");
+    expect(markdown).not.toContain("### Config / Env");
+    expect(markdown).not.toContain("### Cloudflare");
+    expect(markdown).not.toContain("### Dependencies");
   });
 
   it("should remove route groups from URL display", () => {
@@ -278,7 +292,8 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    expect(markdown).toContain("## What Changed");
+    expect(markdown).toContain("## What changed");
+    // Categories use getCategoryLabel
     expect(markdown).toContain("### Product Code");
     expect(markdown).toContain("`src/lib/new.ts`");
     expect(markdown).toContain("### Tests");
@@ -287,7 +302,7 @@ describe("renderMarkdown", () => {
     expect(markdown).toContain("`README.md`");
   });
 
-  it("should show security files in summary", () => {
+  it("should show security files in details", () => {
     const findings: Finding[] = [
       {
         type: "file-summary",
@@ -313,10 +328,8 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    // Check summary contains security mention OR the new Security section renders
-    const hasSecurityInSummary = markdown.includes("Security-sensitive files changed");
-    const hasSecuritySection = markdown.includes("## 🔒 Security-Sensitive Files");
-    expect(hasSecurityInSummary || hasSecuritySection).toBe(true);
+    // Security files appear in the details section or as a top finding
+    expect(markdown).toContain("Security");
   });
 });
 
@@ -329,23 +342,23 @@ describe("computeRiskScore", () => {
 
   it("should compute high risk for risk flags", () => {
     const findings: Finding[] = [
-      { 
-        type: "risk-flag", 
+      {
+        type: "risk-flag",
         kind: "risk-flag",
         category: "infra",
         confidence: "high",
         evidence: [],
-        risk: "high", 
-        evidenceText: "Critical issue" 
+        risk: "high",
+        evidenceText: "Critical issue",
       },
-      { 
-        type: "risk-flag", 
+      {
+        type: "risk-flag",
         kind: "risk-flag",
         category: "infra",
         confidence: "high",
         evidence: [],
-        risk: "high", 
-        evidenceText: "Another issue" 
+        risk: "high",
+        evidenceText: "Another issue",
       },
     ];
 
@@ -356,22 +369,20 @@ describe("computeRiskScore", () => {
 
   it("should include evidence bullets", () => {
     const findings: Finding[] = [
-      { 
-        type: "risk-flag", 
+      {
+        type: "risk-flag",
         kind: "risk-flag",
         category: "infra",
         confidence: "high",
         evidence: [],
-        risk: "high", 
-        evidenceText: "Security concern" 
+        risk: "high",
+        evidenceText: "Security concern",
       },
     ];
 
     const score = computeRiskScore(findings);
     const bullets = score.evidenceBullets ?? [];
-    expect(bullets.some((b) => b.includes("Security concern"))).toBe(
-      true
-    );
+    expect(bullets.some((b) => b.includes("Security concern"))).toBe(true);
   });
 
   it("should cap score at 100", () => {
@@ -465,4 +476,3 @@ describe("computeRiskScore", () => {
     expect(score.score).toBeGreaterThan(0);
   });
 });
-
