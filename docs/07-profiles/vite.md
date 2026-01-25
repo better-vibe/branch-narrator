@@ -32,7 +32,6 @@ The Vite profile has lower priority than framework-specific profiles. For exampl
 | `typescript-config` | Detect TypeScript config changes |
 | `large-diff` | Detect large changesets |
 | `lockfiles` | Detect lockfile/manifest mismatches |
-| `test-gaps` | Detect production code changes without tests |
 | `sql-risks` | Detect risky SQL in migrations |
 | `ci-workflows` | Detect CI/CD workflow changes |
 | `infra` | Detect infrastructure changes |

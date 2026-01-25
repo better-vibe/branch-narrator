@@ -254,20 +254,6 @@ export interface ConventionViolationFinding {
   findingId?: string; // Stable ID, format: "finding.convention-violation#<hash>"
 }
 
-export interface TestParityViolationFinding {
-  type: "test-parity-violation";
-  kind: "test-parity-violation";
-  category: "tests";
-  confidence: Confidence;
-  evidence: Evidence[];
-  /** The source file that lacks test coverage */
-  sourceFile: string;
-  /** Where we looked for test files */
-  expectedTestLocations: string[];
-  tags?: string[];
-  findingId?: string; // Stable ID, format: "finding.test-parity-violation#<hash>"
-}
-
 export interface ImpactAnalysisFinding {
   type: "impact-analysis";
   kind: "impact-analysis";
@@ -370,18 +356,6 @@ export interface LockfileFinding {
   lockfileChanged: boolean;
   tags?: string[];
   findingId?: string; // Stable ID, format: "finding.lockfile-mismatch#<hash>"
-}
-
-export interface TestGapFinding {
-  type: "test-gap";
-  kind: "test-gap";
-  category: Category;
-  confidence: Confidence;
-  evidence: Evidence[];
-  prodFilesChanged: number;
-  testFilesChanged: number;
-  tags?: string[];
-  findingId?: string; // Stable ID, format: "finding.test-gap#<hash>"
 }
 
 export interface StencilComponentChangeFinding {
@@ -682,7 +656,6 @@ export type Finding =
   | FileCategoryFinding
   | SecurityFileFinding
   | ConventionViolationFinding
-  | TestParityViolationFinding
   | ImpactAnalysisFinding
   | CIWorkflowFinding
   | SQLRiskFinding
@@ -690,7 +663,6 @@ export type Finding =
   | APIContractChangeFinding
   | LargeDiffFinding
   | LockfileFinding
-  | TestGapFinding
   | StencilComponentChangeFinding
   | StencilPropChangeFinding
   | StencilEventChangeFinding
@@ -762,25 +734,6 @@ export type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next" | 
 export interface Profile {
   name: ProfileName;
   analyzers: Analyzer[];
-}
-
-// ============================================================================
-// Test Parity Configuration
-// ============================================================================
-
-/**
- * Configuration for the test parity analyzer.
- * Allows customization of test file patterns and exclusions.
- */
-export interface TestParityConfig {
-  /** Test file extensions to look for (e.g., [".test.ts", ".spec.tsx"]) */
-  testPatterns?: string[];
-  /** Additional file patterns to exclude from parity checking */
-  excludePatterns?: RegExp[];
-  /** Directories where test files are located (e.g., ["tests", "__tests__"]) */
-  testDirectories?: string[];
-  /** Source directories to check (e.g., ["src", "lib"]) */
-  sourceDirectories?: string[];
 }
 
 // ============================================================================

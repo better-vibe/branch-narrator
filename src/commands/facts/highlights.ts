@@ -57,7 +57,6 @@ export const HIGHLIGHT_PRIORITY = {
 
   // Test coverage
   TEST_CHANGES: 50,
-  TEST_GAPS: 50,
   CONVENTION_VIOLATIONS: 50,
 
   // Fallback / informational
@@ -347,13 +346,6 @@ export function buildHighlights(findings: Finding[]): string[] {
       `${totalFiles} source file(s) missing corresponding tests`,
       HIGHLIGHT_PRIORITY.CONVENTION_VIOLATIONS
     );
-  }
-
-  // Test gaps (explicit)
-  const testGaps = findings.filter(f => f.type === "test-gap");
-  if (testGaps.length > 0) {
-    const totalUntested = testGaps.reduce((sum, t) => sum + t.prodFilesChanged, 0);
-    add(`${totalUntested} modified file(s) lack test coverage`, HIGHLIGHT_PRIORITY.TEST_GAPS);
   }
 
   // -------------------------------------------------------------------------

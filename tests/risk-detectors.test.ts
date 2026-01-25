@@ -19,8 +19,6 @@ import type {
   LockfileFinding,
   SQLRiskFinding,
   TestChangeFinding,
-  TestGapFinding,
-  TestParityViolationFinding,
 } from "../src/core/types.js";
 
 describe("findingsToFlags", () => {
@@ -178,35 +176,6 @@ describe("findingsToFlags", () => {
 
     expect(flags.find((f) => f.ruleKey === "db.migrations_changed")?.relatedFindingIds).toEqual([a.findingId]);
     expect(flags.find((f) => f.ruleKey === "tests.changed")?.relatedFindingIds).toEqual([b.findingId]);
-  });
-
-  it("should convert test-gap and test-parity-violation findings into tests flags", () => {
-    const gap: TestGapFinding = {
-      type: "test-gap",
-      kind: "test-gap",
-      category: "quality",
-      confidence: "medium",
-      evidence: [createEvidence("src/a.ts", "No corresponding test changes")],
-      prodFilesChanged: 3,
-      testFilesChanged: 0,
-    };
-
-    const parity: TestParityViolationFinding = {
-      type: "test-parity-violation",
-      kind: "test-parity-violation",
-      category: "tests",
-      confidence: "high",
-      evidence: [createEvidence("src/a.ts", "No test file found")],
-      sourceFile: "src/a.ts",
-      expectedTestLocations: ["tests/a.test.ts"],
-    };
-
-    const a = assignFindingId(gap);
-    const b = assignFindingId(parity);
-    const flags = findingsToFlags([a, b]);
-
-    expect(flags.find((f) => f.ruleKey === "tests.possible_gap")?.relatedFindingIds).toEqual([a.findingId]);
-    expect(flags.find((f) => f.ruleKey === "tests.missing_parity")?.relatedFindingIds).toEqual([b.findingId]);
   });
 
   it("should ensure all emitted flags have ruleKey/flagId and non-empty relatedFindingIds", () => {

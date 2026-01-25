@@ -29,6 +29,16 @@ coverage/
 .test-data/
 test-delta-manual.js
 
+# branch-narrator cache
+.branch-narrator/
+
 # Website build output
 website/dist/
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
 

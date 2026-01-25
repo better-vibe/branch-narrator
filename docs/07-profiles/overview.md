@@ -79,7 +79,6 @@ These analyzers are included in all frontend profiles (SvelteKit, Next.js, React
 | `impact` | Analyze blast radius of changes |
 | `large-diff` | Detect large changesets |
 | `lockfiles` | Detect lockfile/manifest mismatches |
-| `test-gaps` | Detect missing test coverage |
 | `sql-risks` | Detect risky SQL in migrations |
 | `ci-workflows` | Detect CI/CD changes |
 | `infra` | Detect infrastructure changes |
@@ -192,7 +191,6 @@ branch-narrator pr-body --profile sveltekit
 | impact | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | large-diff | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | lockfiles | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| test-gaps | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | sql-risks | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
 | ci-workflows | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | infra | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |

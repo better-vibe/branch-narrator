@@ -26,8 +26,6 @@ export interface RiskReportOptions {
   cwd?: string;
   /** Original CLI mode used to generate this output */
   mode?: DiffMode;
-  /** Enable test parity checking (opt-in, may be slow on large repos) */
-  testParity?: boolean;
 }
 
 /**
@@ -47,7 +45,6 @@ export async function generateRiskReport(
     profile: requestedProfile = "auto",
     cwd = process.cwd(),
     mode,
-    testParity = false,
   } = options;
 
   // Track skipped files
@@ -70,13 +67,6 @@ export async function generateRiskReport(
 
   // Run analyzers in parallel for better performance
   const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
-
-  // Run test parity analyzer if explicitly enabled (opt-in)
-  if (testParity) {
-    const { testParityAnalyzer } = await import("../../analyzers/test-parity.js");
-    const testParityFindings = await testParityAnalyzer.analyze(changeSet);
-    rawFindings.push(...testParityFindings);
-  }
 
   // Assign findingIds to all findings
   const findings = rawFindings.map(assignFindingId);

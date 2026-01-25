@@ -304,8 +304,6 @@ Use JSDoc for:
 
 **Testing:**
 - `vitest` - Vitest config changes
-- `test-parity` - Test coverage parity
-- `test-gaps` - Missing test coverage
 
 **API & Data:**
 - `api-contracts` - API endpoint changes
@@ -747,7 +745,6 @@ chore: bump version to 1.6.0
    - `infra` - Infrastructure as code detection
    - `api-contracts` - API endpoint change detection
    - `sql-risks` - Destructive SQL pattern detection
-   - `test-gaps` - Missing test coverage detection
    - `large-diff` - Large change detection
    - `monorepo` - Monorepo detection
    - `package-exports` - Package.json exports field analysis

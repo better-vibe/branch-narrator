@@ -15,6 +15,7 @@ import {
 } from "../core/errors.js";
 import type { ChangeSet, DiffMode } from "../core/types.js";
 import { batchGetFileContent } from "./batch.js";
+import { getCache, computeHash } from "../cache/index.js";
 
 /**
  * Check if the current directory is inside a git repository.
@@ -60,19 +61,67 @@ export async function getDefaultBranch(cwd: string = process.cwd()): Promise<str
 
 /**
  * Validate that a git reference exists.
+ * Uses cache to avoid redundant git calls.
  */
 export async function refExists(
   ref: string,
   cwd: string = process.cwd()
 ): Promise<boolean> {
+  const cache = getCache(cwd);
+
+  // Check cache first
+  const cached = cache.getRefSha(ref);
+  if (cached !== null) {
+    return cached.exists;
+  }
+
   try {
     const result = await execa("git", ["rev-parse", "--verify", ref], {
       cwd,
       reject: false,
     });
-    return result.exitCode === 0;
+    const exists = result.exitCode === 0;
+    const sha = exists ? result.stdout.trim() : "";
+
+    // Store in cache
+    await cache.setRefSha(ref, sha, exists);
+
+    return exists;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Get the SHA for a git reference.
+ * Uses cache to avoid redundant git calls.
+ */
+export async function getRefSha(
+  ref: string,
+  cwd: string = process.cwd()
+): Promise<string | null> {
+  const cache = getCache(cwd);
+
+  // Check cache first
+  const cached = cache.getRefSha(ref);
+  if (cached !== null) {
+    return cached.exists ? cached.sha : null;
+  }
+
+  try {
+    const result = await execa("git", ["rev-parse", "--verify", ref], {
+      cwd,
+      reject: false,
+    });
+    const exists = result.exitCode === 0;
+    const sha = exists ? result.stdout.trim() : "";
+
+    // Store in cache
+    await cache.setRefSha(ref, sha, exists);
+
+    return exists ? sha : null;
+  } catch {
+    return null;
   }
 }
 
@@ -442,6 +491,8 @@ export interface CollectChangeSetOptionsV2 {
   head?: string;
   cwd?: string;
   includeUntracked?: boolean;
+  /** Skip cache lookup (default: false) */
+  noCache?: boolean;
 }
 
 /**
@@ -517,17 +568,24 @@ export async function collectChangeSet(
 
 /**
  * Collect all git diff data and build a ChangeSet using mode-based options.
+ * Supports caching for improved performance on repeated runs.
  */
 async function collectChangeSetByMode(
   options: CollectChangeSetOptionsV2
 ): Promise<ChangeSet> {
   const cwd = options.cwd ?? process.cwd();
   const includeUntracked = options.includeUntracked ?? (options.mode === "all" || options.mode === "unstaged");
+  const useCache = !options.noCache;
+  const cache = useCache ? getCache(cwd) : null;
 
   // Validate git repo
   if (!(await isGitRepo(cwd))) {
     throw new NotAGitRepoError(cwd);
   }
+
+  // Get SHAs for cache key computation
+  let baseSha = "";
+  let headSha = "";
 
   // Validate refs only for branch mode
   if (options.mode === "branch") {
@@ -537,22 +595,77 @@ async function collectChangeSetByMode(
     if (!options.head) {
       throw new InvalidRefError("head (required for branch mode)");
     }
-    if (!(await refExists(options.base, cwd))) {
+
+    // Get SHAs while validating refs
+    const baseRefSha = await getRefSha(options.base, cwd);
+    if (baseRefSha === null) {
       throw new InvalidRefError(options.base);
     }
-    if (!(await refExists(options.head, cwd))) {
+    baseSha = baseRefSha;
+
+    const headRefSha = await getRefSha(options.head, cwd);
+    if (headRefSha === null) {
       throw new InvalidRefError(options.head);
     }
+    headSha = headRefSha;
   }
 
   // For non-branch modes that reference HEAD, validate HEAD exists
   if (options.mode === "staged" || options.mode === "all") {
-    if (!(await refExists("HEAD", cwd))) {
+    const headRefSha = await getRefSha("HEAD", cwd);
+    if (headRefSha === null) {
       throw new InvalidRefError("HEAD");
+    }
+    headSha = headRefSha;
+  }
+
+  // For unstaged mode, get HEAD SHA for cache key
+  if (options.mode === "unstaged") {
+    const headRefSha = await getRefSha("HEAD", cwd);
+    headSha = headRefSha ?? "";
+  }
+
+  // Try cache lookup
+  if (cache?.enabled) {
+    let cacheKeyHash: string | null = null;
+
+    if (options.mode === "branch") {
+      // For branch mode, use base/head SHAs
+      const diffKey = cache.buildDiffCacheKeyObject({
+        base: options.base!,
+        head: options.head!,
+        baseSha,
+        headSha,
+        mode: options.mode,
+      });
+      const packageJsonHash = computeHash(JSON.stringify({
+        base: options.base,
+        head: options.head,
+      }));
+      cacheKeyHash = cache.buildChangeSetCacheKey(computeHash(diffKey), packageJsonHash);
+    } else {
+      // For non-branch modes, use worktree signature
+      const worktreeSignature = await cache.computeWorktreeSignature();
+      const diffKey = cache.buildDiffCacheKeyObject({
+        base: options.mode === "unstaged" ? "INDEX" : "HEAD",
+        head: options.mode === "staged" ? "INDEX" : "WORKING",
+        baseSha: headSha, // Use HEAD SHA as base for non-branch
+        headSha: worktreeSignature.statusHash,
+        mode: options.mode,
+        worktreeSignature,
+      });
+      const packageJsonHash = worktreeSignature.statusHash;
+      cacheKeyHash = cache.buildChangeSetCacheKey(computeHash(diffKey), packageJsonHash);
+    }
+
+    // Check for cached ChangeSet
+    const cachedChangeSet = await cache.getChangeSet(cacheKeyHash);
+    if (cachedChangeSet) {
+      return cachedChangeSet;
     }
   }
 
-  // Collect data based on mode
+  // Collect data based on mode (cache miss or cache disabled)
   const [nameStatusOutput, unifiedDiff] = await Promise.all([
     getNameStatusByMode(options, cwd),
     getUnifiedDiffByMode(options, cwd),
@@ -637,7 +750,7 @@ async function collectChangeSetByMode(
   }
 
   // Build ChangeSet
-  return buildChangeSet({
+  const changeSet = buildChangeSet({
     base,
     head,
     nameStatusOutput: finalNameStatus,
@@ -645,6 +758,45 @@ async function collectChangeSetByMode(
     basePackageJson,
     headPackageJson,
   });
+
+  // Store in cache using same key components as lookup
+  if (cache?.enabled) {
+    let diffHash: string;
+    let packageJsonHash: string;
+
+    if (options.mode === "branch") {
+      const diffKey = cache.buildDiffCacheKeyObject({
+        base: options.base!,
+        head: options.head!,
+        baseSha,
+        headSha,
+        mode: options.mode,
+      });
+      diffHash = computeHash(diffKey);
+      packageJsonHash = computeHash(JSON.stringify({
+        base: options.base,
+        head: options.head,
+      }));
+    } else {
+      const worktreeSignature = await cache.computeWorktreeSignature();
+      const diffKey = cache.buildDiffCacheKeyObject({
+        base: options.mode === "unstaged" ? "INDEX" : "HEAD",
+        head: options.mode === "staged" ? "INDEX" : "WORKING",
+        baseSha: headSha,
+        headSha: worktreeSignature.statusHash,
+        mode: options.mode,
+        worktreeSignature,
+      });
+      diffHash = computeHash(diffKey);
+      packageJsonHash = worktreeSignature.statusHash;
+    }
+
+    // Store using same key structure as lookup
+    const cacheKey = { diffHash, packageJsonHash };
+    await cache.setChangeSet(cacheKey, changeSet);
+  }
+
+  return changeSet;
 }
 
 /**

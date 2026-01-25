@@ -16,7 +16,8 @@
 | [08-rendering](./08-rendering/) | Output generation and risk scoring |
 | [09-stable-ids](./09-stable-ids/) | Stable IDs for findings and flags |
 | [10-snapshots](./10-snapshots/) | Local workspace snapshots for agent iteration |
-| [11-delta-mode](./11-delta-mode/) | Delta mode for comparing runs |
+| [11-caching](./11-caching.md) | Global caching system for performance |
+| [12-delta-mode](./12-delta-mode/) | Delta mode for comparing runs |
 
 ---
 

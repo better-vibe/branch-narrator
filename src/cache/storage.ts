@@ -8,7 +8,8 @@
 import { mkdir, readFile, writeFile, stat, rm, readdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
-import type { CacheIndex, CacheEntryMeta } from "./types.js";
+import type { CacheIndex, CacheEntryMeta, RefsCache } from "./types.js";
+import { CACHE_SCHEMA_VERSION } from "./types.js";
 
 // ============================================================================
 // Constants
@@ -18,7 +19,11 @@ const CACHE_DIR = "cache";
 const INDEX_FILE = "index.json";
 const GIT_DIR = "git";
 const DIFFS_DIR = "diffs";
+const REFS_FILE = "refs.json";
+const FILES_DIR = "files";
+const CHANGESET_DIR = "changeset";
 const ANALYSIS_DIR = "analysis";
+const PER_ANALYZER_DIR = "per-analyzer";
 
 // ============================================================================
 // Path Helpers
@@ -73,6 +78,55 @@ export function getAnalysisCachePath(hash: string, cwd: string = process.cwd()):
   return join(getAnalysisCacheDir(cwd), hash, "findings.json");
 }
 
+/**
+ * Get the refs cache file path.
+ */
+export function getRefsCachePath(cwd: string = process.cwd()): string {
+  return join(getGitCacheDir(cwd), REFS_FILE);
+}
+
+/**
+ * Get the files cache directory.
+ */
+export function getFilesCacheDir(cwd: string = process.cwd()): string {
+  return join(getGitCacheDir(cwd), FILES_DIR);
+}
+
+/**
+ * Get path for a specific file list cache entry.
+ */
+export function getFileListCachePath(hash: string, cwd: string = process.cwd()): string {
+  return join(getFilesCacheDir(cwd), `${hash}.json`);
+}
+
+/**
+ * Get the changeset cache directory.
+ */
+export function getChangeSetCacheDir(cwd: string = process.cwd()): string {
+  return join(getCacheDir(cwd), CHANGESET_DIR);
+}
+
+/**
+ * Get path for a specific changeset cache entry.
+ */
+export function getChangeSetCachePath(hash: string, cwd: string = process.cwd()): string {
+  return join(getChangeSetCacheDir(cwd), `${hash}.json`);
+}
+
+/**
+ * Get the per-analyzer cache directory.
+ */
+export function getPerAnalyzerCacheDir(cwd: string = process.cwd()): string {
+  return join(getCacheDir(cwd), PER_ANALYZER_DIR);
+}
+
+/**
+ * Get path for a specific per-analyzer cache entry.
+ */
+export function getPerAnalyzerCachePath(hash: string, cwd: string = process.cwd()): string {
+  return join(getPerAnalyzerCacheDir(cwd), `${hash}.json`);
+}
+
 // ============================================================================
 // Hash Utilities
 // ============================================================================
@@ -110,8 +164,13 @@ function sortKeys(obj: unknown): unknown {
  * Ensure the cache directory structure exists.
  */
 export async function ensureCacheDirs(cwd: string = process.cwd()): Promise<void> {
-  await mkdir(getDiffsCacheDir(cwd), { recursive: true });
-  await mkdir(getAnalysisCacheDir(cwd), { recursive: true });
+  await Promise.all([
+    mkdir(getDiffsCacheDir(cwd), { recursive: true }),
+    mkdir(getFilesCacheDir(cwd), { recursive: true }),
+    mkdir(getChangeSetCacheDir(cwd), { recursive: true }),
+    mkdir(getAnalysisCacheDir(cwd), { recursive: true }),
+    mkdir(getPerAnalyzerCacheDir(cwd), { recursive: true }),
+  ]);
 }
 
 /**
@@ -145,10 +204,10 @@ export async function clearCache(cwd: string = process.cwd()): Promise<void> {
 /**
  * Create an empty cache index.
  */
-export function createEmptyIndex(): CacheIndex {
+export function createEmptyIndex(cliVersion?: string): CacheIndex {
   const now = new Date().toISOString();
   return {
-    schemaVersion: "1.0",
+    schemaVersion: CACHE_SCHEMA_VERSION,
     created: now,
     lastAccess: now,
     git: {
@@ -166,7 +225,49 @@ export function createEmptyIndex(): CacheIndex {
       newestEntry: null,
     },
     entries: [],
+    cliVersion,
   };
+}
+
+/**
+ * Create an empty refs cache.
+ */
+export function createEmptyRefsCache(): RefsCache {
+  return {
+    schemaVersion: CACHE_SCHEMA_VERSION,
+    lastUpdated: new Date().toISOString(),
+    refs: {},
+  };
+}
+
+/**
+ * Read the refs cache.
+ */
+export async function readRefsCache(cwd: string = process.cwd()): Promise<RefsCache> {
+  try {
+    const content = await readFile(getRefsCachePath(cwd), "utf-8");
+    const cache = JSON.parse(content) as RefsCache;
+    // Invalidate if schema version changed
+    if (cache.schemaVersion !== CACHE_SCHEMA_VERSION) {
+      return createEmptyRefsCache();
+    }
+    return cache;
+  } catch {
+    return createEmptyRefsCache();
+  }
+}
+
+/**
+ * Write the refs cache atomically.
+ */
+export async function writeRefsCache(cache: RefsCache, cwd: string = process.cwd()): Promise<void> {
+  await ensureCacheDirs(cwd);
+  cache.lastUpdated = new Date().toISOString();
+  const cachePath = getRefsCachePath(cwd);
+  const tempPath = `${cachePath}.tmp`;
+  await writeFile(tempPath, JSON.stringify(cache, null, 2), "utf-8");
+  const { rename } = await import("node:fs/promises");
+  await rename(tempPath, cachePath);
 }
 
 /**
@@ -278,6 +379,54 @@ export async function cacheEntryExists(path: string): Promise<boolean> {
 // ============================================================================
 
 /**
+ * Get the cache file path for a given entry type and hash.
+ */
+export function getCacheEntryPath(
+  type: CacheEntryMeta["type"],
+  hash: string,
+  cwd: string = process.cwd()
+): string {
+  switch (type) {
+    case "diff":
+      return getDiffCachePath(hash, cwd);
+    case "changeset":
+      return getChangeSetCachePath(hash, cwd);
+    case "analysis":
+      return getAnalysisCachePath(hash, cwd);
+    case "filelist":
+      return getFileListCachePath(hash, cwd);
+    case "per-analyzer":
+      return getPerAnalyzerCachePath(hash, cwd);
+    case "ref":
+      // Refs are stored in a single file, not individually
+      return getRefsCachePath(cwd);
+    default:
+      return getDiffCachePath(hash, cwd);
+  }
+}
+
+/**
+ * Delete a cache entry file and its containing directory if applicable.
+ */
+export async function deleteCacheEntry(
+  type: CacheEntryMeta["type"],
+  hash: string,
+  cwd: string = process.cwd()
+): Promise<void> {
+  const path = getCacheEntryPath(type, hash, cwd);
+
+  try {
+    await rm(path, { force: true });
+    // For analysis entries, also remove the containing directory
+    if (type === "analysis") {
+      await rm(dirname(path), { recursive: true, force: true });
+    }
+  } catch {
+    // Ignore errors during deletion
+  }
+}
+
+/**
  * Prune cache entries older than maxAge days.
  */
 export async function pruneOldEntries(
@@ -291,21 +440,12 @@ export async function pruneOldEntries(
   const toRemove = index.entries.filter((e) => e.created < cutoff);
 
   for (const entry of toRemove) {
-    try {
-      const path =
-        entry.type === "diff"
-          ? getDiffCachePath(entry.hash, cwd)
-          : getAnalysisCachePath(entry.hash, cwd);
-      await rm(path, { force: true });
-      if (entry.type === "analysis") {
-        // Remove analysis directory
-        await rm(dirname(path), { recursive: true, force: true });
-      }
-      removeEntry(index, entry.hash);
-      removed++;
-    } catch {
-      // Ignore errors during pruning
-    }
+    // Skip ref entries - they're handled separately
+    if (entry.type === "ref") continue;
+
+    await deleteCacheEntry(entry.type, entry.hash, cwd);
+    removeEntry(index, entry.hash);
+    removed++;
   }
 
   if (removed > 0) {

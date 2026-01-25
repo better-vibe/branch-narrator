@@ -395,32 +395,32 @@ describe("Zoom Command", () => {
 
     it("should render flag output as text", () => {
       const flag: RiskFlag = {
-        ruleKey: "tests.test_gap",
-        flagId: "flag.tests.test_gap#abc987654321",
-        relatedFindingIds: ["finding.test-gap#abc987654321"],
+        ruleKey: "tests.changed",
+        flagId: "flag.tests.changed#abc987654321",
+        relatedFindingIds: ["finding.test-change#abc987654321"],
         category: "tests",
-        score: 20,
+        score: 5,
         confidence: 0.8,
-        title: "Test coverage gap",
-        summary: "Production files changed without tests",
+        title: "Test files changed",
+        summary: "Test configuration or test files were modified",
         evidence: [],
-        suggestedChecks: ["Add tests"],
-        effectiveScore: 16,
+        suggestedChecks: ["Run tests"],
+        effectiveScore: 4,
       };
 
       const output = {
         schemaVersion: "1.0" as const,
         range: { base: "main", head: "HEAD" },
         itemType: "flag" as const,
-        flagId: "flag.tests.test_gap#abc987654321",
+        flagId: "flag.tests.changed#abc987654321",
         flag,
         evidence: flag.evidence,
       };
 
       const text = renderZoomText(output);
-      expect(text).toContain("Flag: flag.tests.test_gap#abc987654321");
-      expect(text).toContain("Rule: tests.test_gap");
-      expect(text).toContain("Test coverage gap");
+      expect(text).toContain("Flag: flag.tests.changed#abc987654321");
+      expect(text).toContain("Rule: tests.changed");
+      expect(text).toContain("Test files changed");
     });
   });
 

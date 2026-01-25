@@ -27,13 +27,11 @@ type Finding =
   | RiskFlagFinding
   | SecurityFileFinding
   | ConventionViolationFinding
-  | TestParityViolationFinding  // Opt-in via --test-parity flag
   | ImpactAnalysisFinding
   | SQLRiskFinding
   | CIWorkflowFinding
   | InfraChangeFinding
-  | APIContractChangeFinding
-  | TestGapFinding;
+  | APIContractChangeFinding;
 ```
 
 ## Class Diagram
@@ -337,54 +335,6 @@ interface ConventionViolationFinding {
   type: "convention-violation";
   message: string;
   files: string[];
-}
-```
-
----
-
-## TestParityViolationFinding
-
-Emitted when a source file is modified/added without a corresponding test file. This finding is only generated when the `--test-parity` flag is used (opt-in).
-
-```typescript
-interface TestParityViolationFinding {
-  type: "test-parity-violation";
-  kind: "test-parity-violation";
-  category: "tests";
-  confidence: "high" | "medium" | "low";
-  evidence: Evidence[];
-  sourceFile: string;
-  expectedTestLocations: string[];
-  findingId?: string;
-}
-```
-
-### Confidence Levels
-
-- **high**: Core business logic files (services, handlers, commands)
-- **medium**: Utility/helper files
-- **low**: Small changes or edge cases
-
-### Example
-
-```json
-{
-  "type": "test-parity-violation",
-  "kind": "test-parity-violation",
-  "category": "tests",
-  "confidence": "high",
-  "sourceFile": "src/services/auth.ts",
-  "expectedTestLocations": [
-    "src/services/auth.test.ts",
-    "tests/services/auth.test.ts",
-    "tests/auth.test.ts"
-  ],
-  "evidence": [
-    {
-      "file": "src/services/auth.ts",
-      "excerpt": "Source file modified without corresponding test: src/services/auth.ts"
-    }
-  ]
 }
 ```
 

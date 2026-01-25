@@ -42,8 +42,16 @@
     "supabase",
     "cloudflare"
   ],
-  "author": "",
+  "author": "Better Vibe",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/better-vibe/branch-narrator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/better-vibe/branch-narrator/issues"
+  },
+  "homepage": "https://github.com/better-vibe/branch-narrator#readme",
   "dependencies": {
     "@babel/parser": "^7.26.3",
     "@babel/traverse": "^7.26.5",

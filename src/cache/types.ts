@@ -5,6 +5,41 @@
 import type { ChangeSet, DiffMode, Finding, ProfileName } from "../core/types.js";
 
 // ============================================================================
+// Version Tracking
+// ============================================================================
+
+/**
+ * Cache schema version - bump when cache structure changes.
+ */
+export const CACHE_SCHEMA_VERSION = "1.1";
+
+/**
+ * Analyzer version signature for cache invalidation.
+ * Combines CLI version with schema version.
+ */
+export interface AnalyzerVersionSignature {
+  cliVersion: string;
+  schemaVersion: string;
+}
+
+// ============================================================================
+// Worktree Signature (for staged/unstaged/all modes)
+// ============================================================================
+
+/**
+ * Worktree signature for cache keys in non-branch modes.
+ * Captures the working directory state to avoid stale caches.
+ */
+export interface WorktreeSignature {
+  /** Hash of `git status --porcelain -z` output */
+  statusHash: string;
+  /** Hash of index tree (`git write-tree`) */
+  indexTreeHash: string;
+  /** HEAD commit SHA */
+  headSha: string;
+}
+
+// ============================================================================
 // Cache Keys
 // ============================================================================
 
@@ -17,6 +52,27 @@ export interface DiffCacheKey {
   baseSha: string;
   headSha: string;
   mode: DiffMode;
+  /** Worktree signature for staged/unstaged/all modes */
+  worktreeSignature?: WorktreeSignature;
+}
+
+/**
+ * Key for caching ref SHA resolution.
+ */
+export interface RefCacheKey {
+  ref: string;
+}
+
+/**
+ * Key for caching git ls-files output.
+ */
+export interface FileListCacheKey {
+  /** Directories queried (empty = all files) */
+  directories: string[];
+  /** Include untracked files */
+  includeUntracked: boolean;
+  /** Worktree signature for freshness */
+  worktreeSignature: WorktreeSignature;
 }
 
 /**
@@ -33,7 +89,19 @@ export interface ChangeSetCacheKey {
 export interface AnalysisCacheKey {
   changeSetHash: string;
   profile: ProfileName;
-  analyzerVersions: Record<string, string>;
+  /** CLI and schema version for invalidation */
+  versionSignature: AnalyzerVersionSignature;
+  /** Diff mode used */
+  mode: DiffMode;
+}
+
+/**
+ * Key for caching per-analyzer results (incremental analysis).
+ */
+export interface PerAnalyzerCacheKey {
+  analyzerName: string;
+  changeSetHash: string;
+  versionSignature: AnalyzerVersionSignature;
 }
 
 // ============================================================================
@@ -53,6 +121,25 @@ export interface CachedDiff {
 }
 
 /**
+ * Cached ref SHA resolution.
+ */
+export interface CachedRef {
+  key: RefCacheKey;
+  created: string;
+  sha: string;
+  exists: boolean;
+}
+
+/**
+ * Cached file listing.
+ */
+export interface CachedFileList {
+  key: FileListCacheKey;
+  created: string;
+  files: string[];
+}
+
+/**
  * Cached ChangeSet.
  */
 export interface CachedChangeSet {
@@ -68,6 +155,17 @@ export interface CachedAnalysis {
   key: AnalysisCacheKey;
   created: string;
   findings: Finding[];
+}
+
+/**
+ * Cached per-analyzer findings (for incremental analysis).
+ */
+export interface CachedPerAnalyzerFindings {
+  key: PerAnalyzerCacheKey;
+  created: string;
+  findings: Finding[];
+  /** File paths this analyzer processed */
+  processedFiles: string[];
 }
 
 // ============================================================================
@@ -104,27 +202,54 @@ export interface CacheStats {
 }
 
 /**
+ * Cache entry type.
+ */
+export type CacheEntryType =
+  | "diff"
+  | "changeset"
+  | "analysis"
+  | "ref"
+  | "filelist"
+  | "per-analyzer";
+
+/**
  * Individual cache entry metadata.
  */
 export interface CacheEntryMeta {
   hash: string;
-  type: "diff" | "changeset" | "analysis";
+  type: CacheEntryType;
   created: string;
   lastAccess: string;
   size: number;
+  /** For per-analyzer entries, the analyzer name */
+  analyzerName?: string;
+}
+
+/**
+ * Refs cache structure (all refs in one file).
+ */
+export interface RefsCache {
+  /** Schema version */
+  schemaVersion: string;
+  /** Last updated timestamp */
+  lastUpdated: string;
+  /** Map of ref name to cached data */
+  refs: Record<string, { sha: string; exists: boolean; timestamp: string }>;
 }
 
 /**
  * Main cache index structure.
  */
 export interface CacheIndex {
-  schemaVersion: "1.0";
+  schemaVersion: typeof CACHE_SCHEMA_VERSION;
   created: string;
   lastAccess: string;
   git: CachedGitState;
   profile: CachedProfileState | null;
   stats: CacheStats;
   entries: CacheEntryMeta[];
+  /** CLI version when cache was created */
+  cliVersion?: string;
 }
 
 // ============================================================================

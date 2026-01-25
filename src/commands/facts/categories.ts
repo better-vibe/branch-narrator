@@ -43,11 +43,11 @@ function riskFactorKindToCategory(kind: string): Category {
     return "ci";
   }
   // Test-related (actual test file changes)
-  if (kind.includes("test") && !kind.includes("test-gap") && !kind.includes("test-coverage")) {
+  if (kind.includes("test") && !kind.includes("test-coverage")) {
     return "tests";
   }
-  // Quality-related (test gaps, coverage issues)
-  if (kind.includes("test-gap") || kind.includes("test-coverage") || kind.includes("quality")) {
+  // Quality-related (coverage issues)
+  if (kind.includes("test-coverage") || kind.includes("quality")) {
     return "quality";
   }
   // API-related

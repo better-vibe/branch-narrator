@@ -1,6 +1,6 @@
 # CLI Commands
 
-branch-narrator provides eight commands for different use cases.
+branch-narrator provides nine commands for different use cases.
 
 ## pretty
 
@@ -809,7 +809,7 @@ branch-narrator zoom --flag "flag.security.workflow_permissions_broadened#def789
 branch-narrator zoom --finding "finding.route-change#abc123" --out zoom-output.md
 
 # Deterministic output for testing
-branch-narrator zoom --finding "finding.test-gap#xyz789" --no-timestamp --format json
+branch-narrator zoom --finding "finding.lockfile-mismatch#xyz789" --no-timestamp --format json
 
 # Text format for simple terminal output
 branch-narrator zoom --finding "finding.sql-risk#abc456" --format text
@@ -1138,6 +1138,106 @@ See [Snapshots Documentation](../10-snapshots/overview.md) for detailed informat
 
 ---
 
+## cache
+
+Manage the global cache for improved performance.
+
+```bash
+branch-narrator cache <subcommand> [options]
+```
+
+### Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `stats` | Show cache statistics |
+| `clear` | Clear all cached data |
+| `prune` | Remove old cache entries |
+
+### cache stats
+
+Show cache statistics including hit rate, size, and entry count.
+
+```bash
+branch-narrator cache stats
+branch-narrator cache stats --pretty
+```
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--pretty` | false | Pretty-print JSON with 2-space indentation |
+
+#### Example Output
+
+```json
+{
+  "hits": 42,
+  "misses": 5,
+  "hitRate": 89,
+  "entries": 12,
+  "sizeBytes": 1048576,
+  "sizeHuman": "1 MB",
+  "oldestEntry": "2026-01-20T10:00:00Z",
+  "newestEntry": "2026-01-23T12:00:00Z"
+}
+```
+
+### cache clear
+
+Clear all cached data.
+
+```bash
+branch-narrator cache clear
+```
+
+This removes all cached diffs, ChangeSets, analysis results, and ref SHA lookups.
+
+### cache prune
+
+Remove old cache entries based on age.
+
+```bash
+branch-narrator cache prune
+branch-narrator cache prune --max-age 7
+```
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--max-age <days>` | 30 | Remove entries older than N days |
+
+### Global Cache Options
+
+These options can be used with any command:
+
+| Option | Description |
+|--------|-------------|
+| `--no-cache` | Disable caching entirely (bypass lookup and don't store) |
+| `--clear-cache` | Clear cache before running |
+
+### Examples
+
+```bash
+# Check cache status
+branch-narrator cache stats --pretty
+
+# Clear cache and run analysis
+branch-narrator --clear-cache facts --mode branch --base main
+
+# Run without caching
+branch-narrator --no-cache pretty
+
+# Clean up old entries
+branch-narrator cache prune --max-age 7
+```
+
+See [Caching Documentation](../11-caching.md) for detailed information.
+
+---
+
 ## Exit Codes
 
 | Code | Description |
@@ -1166,6 +1266,10 @@ branch-narrator snap list --help
 branch-narrator snap show --help
 branch-narrator snap diff --help
 branch-narrator snap restore --help
+branch-narrator cache --help
+branch-narrator cache stats --help
+branch-narrator cache clear --help
+branch-narrator cache prune --help
 
 # Show version
 branch-narrator --version

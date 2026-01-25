@@ -10,18 +10,31 @@ import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
 import { getVersion } from "./core/version.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
-import { runAnalyzersInParallel } from "./core/analyzer-runner.js";
+import { runAnalyzersInParallel, runAnalyzersWithCache } from "./core/analyzer-runner.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
 import { getProfile, resolveProfileName, detectProfileWithReasons } from "./profiles/index.js";
 import { renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
 import { configureLogger, error as logError, warn, info } from "./core/logger.js";
+import { initCache, getCache, clearCache } from "./cache/index.js";
 
 const program = new Command();
 
 // Load version from package.json
 const version = await getVersion();
+
+// Initialize global cache early
+let cacheInitialized = false;
+async function ensureCacheInit(noCache = false): Promise<void> {
+  if (cacheInitialized) return;
+  if (!noCache) {
+    await initCache(process.cwd(), { enabled: true });
+    const cache = getCache();
+    await cache.init(version);
+  }
+  cacheInitialized = true;
+}
 
 program
   .name("branch-narrator")
@@ -31,13 +44,27 @@ program
   .version(version)
   .option("--quiet", "Suppress all non-fatal diagnostic output (warnings, info)")
   .option("--debug", "Show debug diagnostics on stderr")
-  .hook("preAction", (thisCommand) => {
+  .option("--no-cache", "Disable caching (bypass and don't store)")
+  .option("--clear-cache", "Clear cache before running")
+  .hook("preAction", async (thisCommand) => {
     // Configure logger from global options
     const opts = thisCommand.opts();
     configureLogger({
       quiet: opts.quiet,
       debug: opts.debug,
     });
+
+    // Handle cache options
+    const noCache = opts.cache === false;
+    const clearCacheFlag = opts.clearCache;
+
+    if (clearCacheFlag) {
+      await clearCache(process.cwd());
+      info("Cache cleared.");
+    }
+
+    // Initialize cache unless disabled
+    await ensureCacheInit(noCache);
   });
 
 /**
@@ -93,6 +120,7 @@ async function resolveDiffOptions(options: {
 
 /**
  * Run analysis with mode-based options.
+ * Uses cached analysis when available for improved performance.
  */
 async function runAnalysisWithMode(options: {
   mode: DiffMode;
@@ -100,7 +128,8 @@ async function runAnalysisWithMode(options: {
   head?: string;
   profile: ProfileName;
   showSpinner?: boolean;
-}): Promise<{ findings: Finding[]; resolvedProfile: ProfileName }> {
+  noCache?: boolean;
+}): Promise<{ findings: Finding[]; resolvedProfile: ProfileName; changeSet: ReturnType<typeof collectChangeSet> extends Promise<infer T> ? T : never }> {
   const spinner = options.showSpinner
     ? ora({
         text: "Collecting git changes...",
@@ -108,12 +137,13 @@ async function runAnalysisWithMode(options: {
       }).start()
     : null;
 
-  // Collect git data using mode-based options
+  // Collect git data using mode-based options (caching handled internally)
   const changeSet = await collectChangeSet({
     mode: options.mode,
     base: options.base,
     head: options.head,
     includeUntracked: options.mode === "all" || options.mode === "unstaged",
+    noCache: options.noCache,
   });
 
   if (spinner) {
@@ -132,8 +162,14 @@ async function runAnalysisWithMode(options: {
     spinner.text = `Running analyzers (${profile.analyzers.length})...`;
   }
 
-  // Run analyzers in parallel for better performance
-  const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers with caching for better performance
+  const findings = await runAnalyzersWithCache({
+    changeSet,
+    analyzers: profile.analyzers,
+    profile: resolvedProfile,
+    mode: options.mode,
+    noCache: options.noCache,
+  });
 
   if (spinner) {
     spinner.succeed(
@@ -141,7 +177,7 @@ async function runAnalysisWithMode(options: {
     );
   }
 
-  return { findings, resolvedProfile };
+  return { findings, resolvedProfile, changeSet };
 }
 
 // pretty command - colorized terminal output for humans
@@ -162,6 +198,8 @@ program
   )
   .action(async (options) => {
     try {
+      const startTime = Date.now();
+
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
@@ -192,6 +230,10 @@ program
       };
 
       console.log(renderTerminal(renderContext));
+
+      // Show duration (greyish color for subtlety)
+      const durationMs = Date.now() - startTime;
+      console.error(chalk.gray(`[${durationMs}ms]`));
       return;
     } catch (error) {
       handleError(error);
@@ -217,6 +259,7 @@ program
   .option("--interactive", "Prompt for additional context", false)
   .action(async (options) => {
     try {
+      const startTime = Date.now();
       const mode = options.mode as DiffMode;
 
       // Validate mode
@@ -265,6 +308,10 @@ program
       };
 
       console.log(renderMarkdown(renderContext));
+
+      // Show duration (greyish color for subtlety)
+      const durationMs = Date.now() - startTime;
+      console.error(chalk.gray(`[${durationMs}ms]`));
       return;
     } catch (error) {
       handleError(error);
@@ -320,7 +367,6 @@ program
   .option("--no-timestamp", "Omit generatedAt for deterministic output")
   .option("--since <path>", "Compare current output to a previous JSON file")
   .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
-  .option("--test-parity", "Enable test parity checking (opt-in, may be slow on large repos)", false)
   .action(async (options) => {
     try {
       // Import executeFacts dynamically to avoid circular dependencies
@@ -390,13 +436,6 @@ program
 
       // Run analyzers in parallel for better performance
       const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
-
-      // Run test parity analyzer if explicitly enabled (opt-in)
-      if (options.testParity) {
-        const { testParityAnalyzer } = await import("./analyzers/test-parity.js");
-        const testParityFindings = await testParityAnalyzer.analyze(changeSet);
-        findings.push(...testParityFindings);
-      }
 
       // Compute risk
       const riskScore = computeRiskScore(findings);
@@ -631,7 +670,6 @@ program
   .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
   .option("--since <path>", "Compare current output to a previous JSON file")
   .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
-  .option("--test-parity", "Enable test parity checking (opt-in, may be slow on large repos)", false)
   .action(async (options) => {
     try {
       // Import risk report command dynamically
@@ -697,7 +735,6 @@ program
         explainScore: options.explainScore,
         noTimestamp: options.timestamp === false,
         mode,
-        testParity: options.testParity,
       });
 
       // If --since is provided, compute delta and force JSON format
@@ -1001,6 +1038,85 @@ snap
       handleError(error);
     }
   });
+
+// ============================================================================
+// Cache Command
+// ============================================================================
+
+const cache = program
+  .command("cache")
+  .description("Manage the global cache");
+
+cache
+  .command("stats")
+  .description("Show cache statistics")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .action(async (options: { pretty: boolean }) => {
+    try {
+      const cacheManager = getCache();
+      await cacheManager.init(version);
+      const stats = await cacheManager.stats();
+
+      const output = {
+        hits: stats.hits,
+        misses: stats.misses,
+        hitRate: stats.hits + stats.misses > 0
+          ? Math.round((stats.hits / (stats.hits + stats.misses)) * 100)
+          : 0,
+        entries: stats.entries,
+        sizeBytes: stats.size,
+        sizeHuman: formatBytes(stats.size),
+        oldestEntry: stats.oldestEntry,
+        newestEntry: stats.newestEntry,
+      };
+
+      console.log(options.pretty ? JSON.stringify(output, null, 2) : JSON.stringify(output));
+      return;
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+cache
+  .command("clear")
+  .description("Clear all cache data")
+  .action(async () => {
+    try {
+      await clearCache(process.cwd());
+      info("Cache cleared.");
+      return;
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+cache
+  .command("prune")
+  .description("Remove old cache entries")
+  .option("--max-age <days>", "Remove entries older than N days", "30")
+  .action(async (options: { maxAge: string }) => {
+    try {
+      const cacheManager = getCache();
+      await cacheManager.init(version);
+      const maxAge = parseInt(options.maxAge, 10);
+      const removed = await cacheManager.prune(maxAge);
+      info(`Removed ${removed} cache entries older than ${maxAge} days.`);
+      return;
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+/**
+ * Format bytes to human-readable string.
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
 
 /**
  * Handle errors and exit with appropriate code.

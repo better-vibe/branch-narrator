@@ -17,7 +17,6 @@ This document analyzes the current optimization and caching efforts in branch-na
 | Mechanism | Location | Scope | Persisted? |
 |-----------|----------|-------|-----------|
 | File Existence Cache | `src/profiles/index.ts:37-65` | Profile detection | No (in-memory) |
-| Directory File Cache | `src/analyzers/test-parity.ts:57-68` | Test parity analyzer | No (in-memory) |
 | Batch Git Operations | `src/git/batch.ts` | Multiple file fetch | N/A (optimization) |
 | Snapshot Storage | `src/commands/snap/storage.ts` | Delta comparisons | Yes (disk) |
 
@@ -64,7 +63,6 @@ git rev-parse --verify <ref>            5-10 (×2)
 git diff --name-status                  20-100
 git diff --unified=3                    50-500
 git cat-file --batch (package.json)    10-20
-git ls-files (test-parity)             50-200
 ─────────────────────────────────────────────────────
 Total Git I/O                          145-850ms
 ```

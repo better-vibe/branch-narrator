@@ -35,7 +35,6 @@ branch-narrator --profile library
 | `monorepo` | Monorepo configuration |
 | `large-diff` | Large changeset warnings |
 | `lockfiles` | Lockfile mismatch detection |
-| `test-gaps` | Test coverage gaps |
 | `ci-workflows` | CI/CD security |
 | `api-contracts` | API contract changes |
 

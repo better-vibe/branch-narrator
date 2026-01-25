@@ -1213,35 +1213,6 @@ describe("SARIF renderer", () => {
     expect(results[0].message.text).toContain("Kubernetes");
   });
 
-  test("should map test-gap to BNR016 with note level", () => {
-    const findings: Finding[] = [
-      {
-        type: "test-gap",
-        kind: "test-gap",
-        category: "tests",
-        confidence: "high",
-        evidence: [{ file: "src/utils.ts", excerpt: "" }],
-        prodFilesChanged: 5,
-        testFilesChanged: 0,
-        findingId: "finding.test-gap#gap",
-      },
-    ];
-
-    const facts: FactsOutput = {
-      ...baseFactsOutput,
-      findings,
-    };
-
-    const changeSet = createTestChangeSet();
-    const sarif = renderSarif(facts, changeSet);
-
-    const results = sarif.runs[0].results;
-    expect(results).toHaveLength(1);
-    expect(results[0].ruleId).toBe("BNR016");
-    expect(results[0].level).toBe("note");
-    expect(results[0].message.text).toContain("Test coverage gap");
-    expect(results[0].message.text).toContain("5 production files");
-  });
 
   test("should map large-diff to BNR017 with note level", () => {
     const findings: Finding[] = [
@@ -1294,7 +1265,6 @@ describe("SARIF rules", () => {
       "BNR013",
       "BNR014",
       "BNR015",
-      "BNR016",
       "BNR017",
     ]);
   });

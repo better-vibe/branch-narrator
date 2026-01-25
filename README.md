@@ -241,7 +241,6 @@ branch-narrator facts [options]
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 | `--since <path>` | (none) | Compare current output to a previous JSON file |
 | `--since-strict` | `false` | Exit with code 1 on scope mismatch |
-| `--test-parity` | `false` | Enable test parity checks |
 
 Examples:
 
@@ -344,7 +343,6 @@ branch-narrator risk-report [options]
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 | `--since <path>` | (none) | Compare current output to a previous JSON file |
 | `--since-strict` | `false` | Exit with code 1 on scope mismatch |
-| `--test-parity` | `false` | Enable test parity checks |
 
 Risk levels:
 

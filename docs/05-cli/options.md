@@ -273,39 +273,30 @@ Shows file lists, estimated sizes, and chunk counts.
 
 ---
 
-## --test-parity
+## Cache Options
 
-Enable test parity checking. Available on `facts` and `risk-report` commands.
+### --no-cache
 
-```bash
-branch-narrator facts --mode branch --base main --test-parity
-branch-narrator risk-report --mode branch --base main --test-parity
-```
-
-### Behavior
-
-When enabled, the test parity analyzer checks if modified/added source files have corresponding test files. This is an opt-in feature because it requires git file system operations that can be slow on large repositories.
-
-### Output
-
-Produces `test-parity-violation` findings for each source file without a corresponding test. In risk reports, these are aggregated into a `tests.missing_parity` flag.
-
-### Example
+Disable caching entirely. Bypasses cache lookup and does not store results.
 
 ```bash
-# Check for test coverage gaps
-branch-narrator risk-report --mode branch --base main --test-parity --format text
+branch-narrator facts --mode branch --base main --no-cache
+branch-narrator pretty --mode all --no-cache
 ```
 
-Output:
-```
-tests.missing_parity (score: 18, confidence: 0.75)
-  Source files modified without corresponding tests
-  - src/services/auth.ts: No test file found
-  - src/utils/helpers.ts: No test file found
+**Default:** Cache is enabled
+
+---
+
+### --clear-cache
+
+Clear the cache before running the command.
+
+```bash
+branch-narrator --clear-cache facts --mode branch --base main
 ```
 
-**Default:** Disabled (opt-in only)
+This clears all cached data (diffs, ChangeSets, analysis results) before running.
 
 ---
 
