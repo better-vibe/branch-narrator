@@ -182,6 +182,7 @@ Keep `.branch-narrator/` local and do not share snapshot directories.
 - Snapshot IDs are deterministic for identical workspace state
 - `snap diff` output uses stable, sorted ordering
 - Embedded analysis omits timestamps for comparability
+- Internal `.branch-narrator/` data is excluded from untracked capture
 
 ### HEAD Requirements
 

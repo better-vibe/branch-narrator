@@ -193,7 +193,11 @@ export async function applyPatchFromBuffer(
  */
 export async function getUntrackedFiles(cwd: string = process.cwd()): Promise<string[]> {
   try {
-    const result = await execa("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd });
+    const result = await execa(
+      "git",
+      ["ls-files", "--others", "--exclude-standard", "--exclude=.branch-narrator", "-z"],
+      { cwd }
+    );
     const output = result.stdout;
     if (!output) {
       return [];

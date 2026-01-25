@@ -334,7 +334,7 @@ export async function getUntrackedFiles(
   try {
     const result = await execa(
       "git",
-      ["ls-files", "--others", "--exclude-standard"],
+      ["ls-files", "--others", "--exclude-standard", "--exclude=.branch-narrator"],
       { cwd }
     );
     return result.stdout.trim().split("\n").filter(Boolean);
