@@ -156,6 +156,15 @@ function detectImpactfulChanges(
 
 export const monorepoAnalyzer: Analyzer = {
   name: "monorepo",
+  cacheScope: "files",
+  filePatterns: [
+    "pnpm-workspace.yaml",
+    "lerna.json",
+    "rush.json",
+    "nx.json",
+    "turbo.json",
+    "**/package.json",
+  ],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

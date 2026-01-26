@@ -5,11 +5,11 @@
  * and atomic file operations.
  */
 
-import { mkdir, readFile, writeFile, stat, rm, readdir } from "node:fs/promises";
+import { mkdir, readFile, stat, rm, readdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import type { CacheIndex, CacheEntryMeta, RefsCache } from "./types.js";
-import { CACHE_SCHEMA_VERSION } from "./types.js";
+import { CACHE_SCHEMA_VERSION, MAX_ENTRIES_PER_ANALYZER, MAX_CHANGESET_ENTRIES } from "./types.js";
 
 // ============================================================================
 // Constants
@@ -18,11 +18,8 @@ import { CACHE_SCHEMA_VERSION } from "./types.js";
 const CACHE_DIR = "cache";
 const INDEX_FILE = "index.json";
 const GIT_DIR = "git";
-const DIFFS_DIR = "diffs";
 const REFS_FILE = "refs.json";
-const FILES_DIR = "files";
 const CHANGESET_DIR = "changeset";
-const ANALYSIS_DIR = "analysis";
 const PER_ANALYZER_DIR = "per-analyzer";
 
 // ============================================================================
@@ -51,52 +48,10 @@ export function getGitCacheDir(cwd: string = process.cwd()): string {
 }
 
 /**
- * Get the diffs cache directory.
- */
-export function getDiffsCacheDir(cwd: string = process.cwd()): string {
-  return join(getGitCacheDir(cwd), DIFFS_DIR);
-}
-
-/**
- * Get path for a specific diff cache entry.
- */
-export function getDiffCachePath(hash: string, cwd: string = process.cwd()): string {
-  return join(getDiffsCacheDir(cwd), `${hash}.json`);
-}
-
-/**
- * Get the analysis cache directory.
- */
-export function getAnalysisCacheDir(cwd: string = process.cwd()): string {
-  return join(getCacheDir(cwd), ANALYSIS_DIR);
-}
-
-/**
- * Get path for a specific analysis cache entry.
- */
-export function getAnalysisCachePath(hash: string, cwd: string = process.cwd()): string {
-  return join(getAnalysisCacheDir(cwd), hash, "findings.json");
-}
-
-/**
  * Get the refs cache file path.
  */
 export function getRefsCachePath(cwd: string = process.cwd()): string {
   return join(getGitCacheDir(cwd), REFS_FILE);
-}
-
-/**
- * Get the files cache directory.
- */
-export function getFilesCacheDir(cwd: string = process.cwd()): string {
-  return join(getGitCacheDir(cwd), FILES_DIR);
-}
-
-/**
- * Get path for a specific file list cache entry.
- */
-export function getFileListCachePath(hash: string, cwd: string = process.cwd()): string {
-  return join(getFilesCacheDir(cwd), `${hash}.json`);
 }
 
 /**
@@ -164,11 +119,13 @@ function sortKeys(obj: unknown): unknown {
  * Ensure the cache directory structure exists.
  */
 export async function ensureCacheDirs(cwd: string = process.cwd()): Promise<void> {
+  // First ensure the base cache directory exists
+  await mkdir(getCacheDir(cwd), { recursive: true });
+  
+  // Then create subdirectories in parallel (only those actually used)
   await Promise.all([
-    mkdir(getDiffsCacheDir(cwd), { recursive: true }),
-    mkdir(getFilesCacheDir(cwd), { recursive: true }),
+    mkdir(getGitCacheDir(cwd), { recursive: true }),
     mkdir(getChangeSetCacheDir(cwd), { recursive: true }),
-    mkdir(getAnalysisCacheDir(cwd), { recursive: true }),
     mkdir(getPerAnalyzerCacheDir(cwd), { recursive: true }),
   ]);
 }
@@ -265,9 +222,11 @@ export async function writeRefsCache(cache: RefsCache, cwd: string = process.cwd
   cache.lastUpdated = new Date().toISOString();
   const cachePath = getRefsCachePath(cwd);
   const tempPath = `${cachePath}.tmp`;
-  await writeFile(tempPath, JSON.stringify(cache, null, 2), "utf-8");
-  const { rename } = await import("node:fs/promises");
-  await rename(tempPath, cachePath);
+  
+  // Use synchronous write for reliability (bun has issues with async write + rename)
+  const { writeFileSync, renameSync } = await import("node:fs");
+  writeFileSync(tempPath, JSON.stringify(cache, null, 2), "utf-8");
+  renameSync(tempPath, cachePath);
 }
 
 /**
@@ -290,10 +249,12 @@ export async function writeIndex(index: CacheIndex, cwd: string = process.cwd())
   index.lastAccess = new Date().toISOString();
   const indexPath = getIndexPath(cwd);
   const tempPath = `${indexPath}.tmp`;
-  await writeFile(tempPath, JSON.stringify(index, null, 2), "utf-8");
-  // Atomic rename
-  const { rename } = await import("node:fs/promises");
-  await rename(tempPath, indexPath);
+  const content = JSON.stringify(index, null, 2);
+  
+  // Use synchronous write for reliability
+  const { writeFileSync, renameSync } = await import("node:fs");
+  writeFileSync(tempPath, content, "utf-8");
+  renameSync(tempPath, indexPath);
 }
 
 /**
@@ -330,6 +291,16 @@ export function removeEntry(index: CacheIndex, hash: string): void {
   index.stats.entries = index.entries.length;
 }
 
+/**
+ * Update the lastAccess timestamp for a cache entry.
+ */
+export function updateEntryAccess(index: CacheIndex, hash: string): void {
+  const entry = index.entries.find((e) => e.hash === hash);
+  if (entry) {
+    entry.lastAccess = new Date().toISOString();
+  }
+}
+
 // ============================================================================
 // Cache Entry Operations
 // ============================================================================
@@ -344,9 +315,11 @@ export async function writeCacheEntry<T>(
   await mkdir(dirname(path), { recursive: true });
   const content = JSON.stringify(data, null, 2);
   const tempPath = `${path}.tmp`;
-  await writeFile(tempPath, content, "utf-8");
-  const { rename } = await import("node:fs/promises");
-  await rename(tempPath, path);
+  
+  // Use synchronous write for reliability (bun has issues with async write + rename)
+  const { writeFileSync, renameSync } = await import("node:fs");
+  writeFileSync(tempPath, content, "utf-8");
+  renameSync(tempPath, path);
   return Buffer.byteLength(content, "utf-8");
 }
 
@@ -387,26 +360,20 @@ export function getCacheEntryPath(
   cwd: string = process.cwd()
 ): string {
   switch (type) {
-    case "diff":
-      return getDiffCachePath(hash, cwd);
     case "changeset":
       return getChangeSetCachePath(hash, cwd);
-    case "analysis":
-      return getAnalysisCachePath(hash, cwd);
-    case "filelist":
-      return getFileListCachePath(hash, cwd);
     case "per-analyzer":
       return getPerAnalyzerCachePath(hash, cwd);
     case "ref":
       // Refs are stored in a single file, not individually
       return getRefsCachePath(cwd);
     default:
-      return getDiffCachePath(hash, cwd);
+      return getChangeSetCachePath(hash, cwd);
   }
 }
 
 /**
- * Delete a cache entry file and its containing directory if applicable.
+ * Delete a cache entry file.
  */
 export async function deleteCacheEntry(
   type: CacheEntryMeta["type"],
@@ -417,10 +384,6 @@ export async function deleteCacheEntry(
 
   try {
     await rm(path, { force: true });
-    // For analysis entries, also remove the containing directory
-    if (type === "analysis") {
-      await rm(dirname(path), { recursive: true, force: true });
-    }
   } catch {
     // Ignore errors during deletion
   }
@@ -443,6 +406,134 @@ export async function pruneOldEntries(
     // Skip ref entries - they're handled separately
     if (entry.type === "ref") continue;
 
+    await deleteCacheEntry(entry.type, entry.hash, cwd);
+    removeEntry(index, entry.hash);
+    removed++;
+  }
+
+  if (removed > 0) {
+    await writeIndex(index, cwd);
+  }
+
+  return removed;
+}
+
+/**
+ * Prune cache entries using LRU eviction to stay under maxSize bytes.
+ * Removes least recently accessed entries first until total size is under limit.
+ * 
+ * @param maxSize - Maximum allowed cache size in bytes
+ * @param cwd - Working directory
+ * @returns Number of entries removed
+ */
+export async function pruneBySizeLRU(
+  maxSize: number,
+  cwd: string = process.cwd()
+): Promise<number> {
+  const index = await readIndex(cwd);
+  
+  // Calculate current total size from entries
+  let currentSize = index.entries.reduce((sum, e) => sum + e.size, 0);
+  
+  if (currentSize <= maxSize) {
+    return 0;
+  }
+
+  // Sort entries by lastAccess (oldest first = least recently used)
+  const sortedEntries = [...index.entries]
+    .filter((e) => e.type !== "ref") // Don't evict ref entries
+    .sort((a, b) => a.lastAccess.localeCompare(b.lastAccess));
+
+  let removed = 0;
+  
+  for (const entry of sortedEntries) {
+    if (currentSize <= maxSize) {
+      break;
+    }
+
+    await deleteCacheEntry(entry.type, entry.hash, cwd);
+    removeEntry(index, entry.hash);
+    currentSize -= entry.size;
+    removed++;
+  }
+
+  if (removed > 0) {
+    await writeIndex(index, cwd);
+  }
+
+  return removed;
+}
+
+/**
+ * Prune excess per-analyzer cache entries for a specific analyzer.
+ * Keeps only the N most recent entries (default: MAX_ENTRIES_PER_ANALYZER).
+ *
+ * @param analyzerName - The analyzer name to prune entries for
+ * @param cwd - Working directory
+ * @param maxEntries - Maximum entries to keep (default: MAX_ENTRIES_PER_ANALYZER)
+ * @returns Number of entries removed
+ */
+export async function pruneExcessPerAnalyzerEntries(
+  analyzerName: string,
+  cwd: string = process.cwd(),
+  maxEntries: number = MAX_ENTRIES_PER_ANALYZER
+): Promise<number> {
+  const index = await readIndex(cwd);
+
+  // Get all per-analyzer entries for this specific analyzer
+  const analyzerEntries = index.entries
+    .filter((e) => e.type === "per-analyzer" && e.analyzerName === analyzerName)
+    .sort((a, b) => b.created.localeCompare(a.created)); // Newest first
+
+  if (analyzerEntries.length <= maxEntries) {
+    return 0;
+  }
+
+  // Remove entries beyond the limit (oldest ones)
+  const toRemove = analyzerEntries.slice(maxEntries);
+  let removed = 0;
+
+  for (const entry of toRemove) {
+    await deleteCacheEntry(entry.type, entry.hash, cwd);
+    removeEntry(index, entry.hash);
+    removed++;
+  }
+
+  if (removed > 0) {
+    await writeIndex(index, cwd);
+  }
+
+  return removed;
+}
+
+/**
+ * Prune excess changeset cache entries.
+ * Keeps only the N most recent entries (default: MAX_CHANGESET_ENTRIES).
+ *
+ * @param cwd - Working directory
+ * @param maxEntries - Maximum entries to keep (default: MAX_CHANGESET_ENTRIES)
+ * @returns Number of entries removed
+ */
+export async function pruneExcessChangeSetEntries(
+  cwd: string = process.cwd(),
+  maxEntries: number = MAX_CHANGESET_ENTRIES
+): Promise<number> {
+  const index = await readIndex(cwd);
+
+  // Get all changeset entries
+  const changesetEntries = index.entries
+    .filter((e) => e.type === "changeset")
+    .sort((a, b) => b.created.localeCompare(a.created)); // Newest first
+
+  if (changesetEntries.length <= maxEntries) {
+    return 0;
+  }
+
+  // Remove entries beyond the limit (oldest ones)
+  const toRemove = changesetEntries.slice(maxEntries);
+  let removed = 0;
+
+  for (const entry of toRemove) {
     await deleteCacheEntry(entry.type, entry.hash, cwd);
     removeEntry(index, entry.hash);
     removed++;

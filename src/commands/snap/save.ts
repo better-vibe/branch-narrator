@@ -47,7 +47,7 @@ import { buildFacts } from "../facts/builder.js";
 import { generateRiskReport } from "../risk/index.js";
 import type { ProfileName } from "../../core/types.js";
 import { getRepoRoot, isWorkingDirDirty } from "../../git/collector.js";
-import { runAnalyzersInParallel } from "../../core/analyzer-runner.js";
+import { runAnalyzersIncremental } from "../../core/analyzer-runner.js";
 
 /**
  * Execute the snap save command.
@@ -130,8 +130,15 @@ export async function executeSnapSave(options: SnapSaveOptions = {}): Promise<Sn
   const detectedProfile = detection.profile;
   const profile = getProfile(detectedProfile);
 
-  // Run analyzers in parallel for better performance
-  const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers with incremental caching for better performance
+  const findings = await runAnalyzersIncremental({
+    changeSet,
+    analyzers: profile.analyzers,
+    profile: detectedProfile,
+    mode: "all",
+    noCache: false,
+    cwd,
+  });
 
   // Compute risk score
   const riskScore = computeRiskScore(findings);

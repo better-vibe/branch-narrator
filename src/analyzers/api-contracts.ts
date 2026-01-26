@@ -26,6 +26,20 @@ function isAPIContractFile(path: string): boolean {
  */
 export const analyzeAPIContracts: Analyzer = {
   name: "api-contracts",
+  cacheScope: "files",
+  filePatterns: [
+    "**/openapi*.yaml",
+    "**/openapi*.yml",
+    "**/openapi*.json",
+    "**/swagger*.yaml",
+    "**/swagger*.yml",
+    "**/swagger*.json",
+    "*.proto",
+    "**/*.proto",
+    "**/api/*.yaml",
+    "**/api/*.yml",
+    "**/api/*.json",
+  ],
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: APIContractChangeFinding[] = [];
 

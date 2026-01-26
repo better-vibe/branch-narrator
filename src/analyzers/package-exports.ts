@@ -140,6 +140,8 @@ function compareBinField(
 
 export const packageExportsAnalyzer: Analyzer = {
   name: "package-exports",
+  cacheScope: "files",
+  filePatterns: ["package.json", "**/package.json"],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

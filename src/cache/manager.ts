@@ -1,8 +1,8 @@
 /**
  * Global Cache Manager.
  *
- * Provides a unified interface for caching git operations,
- * changesets, and analysis results across executions.
+ * Provides a unified interface for caching changesets and
+ * per-analyzer results across executions.
  */
 
 import { execa } from "execa";
@@ -11,15 +11,9 @@ import type {
   CacheOptions,
   CacheStats,
   CacheEntryMeta,
-  CachedDiff,
-  CachedAnalysis,
   CachedChangeSet,
-  CachedFileList,
   CachedPerAnalyzerFindings,
-  DiffCacheKey,
-  AnalysisCacheKey,
   ChangeSetCacheKey,
-  FileListCacheKey,
   PerAnalyzerCacheKey,
   WorktreeSignature,
   AnalyzerVersionSignature,
@@ -33,12 +27,12 @@ import {
   ensureCacheDirs,
   clearCache as clearCacheStorage,
   pruneOldEntries,
+  pruneBySizeLRU,
+  pruneExcessPerAnalyzerEntries,
+  pruneExcessChangeSetEntries,
   calculateCacheSize,
   computeHash,
-  getDiffCachePath,
-  getAnalysisCachePath,
   getChangeSetCachePath,
-  getFileListCachePath,
   getPerAnalyzerCachePath,
   writeCacheEntry,
   readCacheEntry,
@@ -48,6 +42,7 @@ import {
   deleteCacheEntry,
   readRefsCache,
   writeRefsCache,
+  updateEntryAccess,
 } from "./storage.js";
 import type { ChangeSet, DiffMode, Finding, ProfileName } from "../core/types.js";
 
@@ -118,6 +113,27 @@ export class CacheManager {
 
     // Check if git state has changed
     await this.validateGitState();
+
+    // Auto-prune: first by age, then by size (LRU)
+    await this.autoPrune();
+  }
+
+  /**
+   * Automatically prune cache entries based on age and size limits.
+   * Removes entries older than maxAge first, then uses LRU eviction
+   * to stay under maxSize.
+   */
+  private async autoPrune(): Promise<void> {
+    if (!this.options.enabled) return;
+
+    // Prune old entries first
+    await pruneOldEntries(this.options.maxAge, this.cwd);
+
+    // Then prune by size using LRU if still over limit
+    await pruneBySizeLRU(this.options.maxSize, this.cwd);
+
+    // Reload index after pruning
+    this.index = await readIndex(this.cwd);
   }
 
   /**
@@ -228,7 +244,18 @@ export class CacheManager {
   }
 
   /**
-   * Validate git state and invalidate cache if necessary.
+   * Validate git state and update tracking.
+   * 
+   * NOTE: We intentionally do NOT invalidate content-addressed caches
+   * (diff, changeset, analysis, per-analyzer) on git state changes.
+   * These caches are keyed by content hashes that naturally become
+   * stale when the content changes. This allows cache reuse across
+   * git state changes for entries that are still valid.
+   * 
+   * We only:
+   * - Refresh refs cache when HEAD changes (ref SHAs may have changed)
+   * - Clear worktree signature (forces recomputation)
+   * - Update tracked git state
    */
   private async validateGitState(): Promise<void> {
     if (!this.index || !this.options.enabled) return;
@@ -238,19 +265,22 @@ export class CacheManager {
       this.isWorkingDirDirty(),
     ]);
 
-    const gitStateChanged =
-      this.index.git.headSha !== currentSha || this.index.git.isDirty !== isDirty;
+    const headChanged = this.index.git.headSha !== currentSha;
+    const dirtyChanged = this.index.git.isDirty !== isDirty;
 
-    if (gitStateChanged) {
-      // Invalidate caches that depend on git state
-      await this.invalidateGitDependentCaches();
+    if (headChanged || dirtyChanged) {
+      // Only refresh refs cache when HEAD changes (refs may point to new SHAs)
+      if (headChanged && this.refsCache) {
+        this.refsCache.refs = {};
+        await writeRefsCache(this.refsCache, this.cwd);
+      }
 
-      // Update git state
+      // Update git state tracking
       this.index.git.headSha = currentSha;
       this.index.git.isDirty = isDirty;
       this.index.git.lastChecked = new Date().toISOString();
 
-      // Clear cached worktree signature
+      // Clear cached worktree signature (forces recomputation on next use)
       this.invalidateWorktreeSignature();
 
       await this.saveIndex();
@@ -258,13 +288,14 @@ export class CacheManager {
   }
 
   /**
-   * Invalidate caches that depend on git state.
-   * Deletes cache files in addition to removing index entries.
+   * Forcefully invalidate all git-dependent caches.
+   * This is a destructive operation that clears all cached entries.
+   * Use sparingly - prefer content-addressed cache keys for natural invalidation.
    */
-  private async invalidateGitDependentCaches(): Promise<void> {
+  async forceInvalidateAllCaches(): Promise<void> {
     if (!this.index) return;
 
-    // Types that depend on git state and should be invalidated
+    // Types that can be forcefully invalidated
     const gitDependentTypes = new Set(["diff", "changeset", "filelist", "analysis", "per-analyzer"]);
 
     const toRemove = this.index.entries.filter((e) => gitDependentTypes.has(e.type));
@@ -282,36 +313,17 @@ export class CacheManager {
       this.refsCache.refs = {};
       await writeRefsCache(this.refsCache, this.cwd);
     }
+
+    await this.saveIndex();
   }
 
   // ==========================================================================
-  // Diff Cache Operations
+  // Internal Key Building (for ChangeSet cache)
   // ==========================================================================
 
   /**
-   * Build a cache key for a git diff operation.
-   */
-  buildDiffCacheKey(options: {
-    base: string;
-    head: string;
-    baseSha: string;
-    headSha: string;
-    mode: DiffMode;
-    worktreeSignature?: WorktreeSignature;
-  }): string {
-    const key: DiffCacheKey = {
-      base: options.base,
-      head: options.head,
-      baseSha: options.baseSha,
-      headSha: options.headSha,
-      mode: options.mode,
-      worktreeSignature: options.worktreeSignature,
-    };
-    return computeHash(key);
-  }
-
-  /**
-   * Build a diff cache key object (for storing).
+   * Build a diff-based key object for ChangeSet caching.
+   * Used internally to compute stable cache keys.
    */
   buildDiffCacheKeyObject(options: {
     base: string;
@@ -320,7 +332,14 @@ export class CacheManager {
     headSha: string;
     mode: DiffMode;
     worktreeSignature?: WorktreeSignature;
-  }): DiffCacheKey {
+  }): {
+    base: string;
+    head: string;
+    baseSha: string;
+    headSha: string;
+    mode: DiffMode;
+    worktreeSignature?: WorktreeSignature;
+  } {
     return {
       base: options.base,
       head: options.head,
@@ -329,147 +348,6 @@ export class CacheManager {
       mode: options.mode,
       worktreeSignature: options.worktreeSignature,
     };
-  }
-
-  /**
-   * Get cached diff data.
-   */
-  async getDiff(hash: string): Promise<CachedDiff | null> {
-    if (!this.enabled || !this.index) {
-      return null;
-    }
-
-    const path = getDiffCachePath(hash, this.cwd);
-    const cached = await readCacheEntry<CachedDiff>(path);
-
-    if (cached) {
-      updateStats(this.index, true);
-      await this.saveIndex();
-      return cached;
-    }
-
-    updateStats(this.index, false);
-    await this.saveIndex();
-    return null;
-  }
-
-  /**
-   * Store diff data in cache.
-   */
-  async setDiff(
-    key: DiffCacheKey,
-    data: { nameStatus: string; unifiedDiff: string }
-  ): Promise<void> {
-    if (!this.enabled || !this.index) return;
-
-    const hash = computeHash(key);
-    const cached: CachedDiff = {
-      key,
-      created: new Date().toISOString(),
-      data,
-    };
-
-    const path = getDiffCachePath(hash, this.cwd);
-    const size = await writeCacheEntry(path, cached);
-
-    const entry: CacheEntryMeta = {
-      hash,
-      type: "diff",
-      created: cached.created,
-      lastAccess: cached.created,
-      size,
-    };
-    addEntry(this.index, entry);
-    await this.saveIndex();
-  }
-
-  // ==========================================================================
-  // Analysis Cache Operations
-  // ==========================================================================
-
-  /**
-   * Build a cache key for analysis results.
-   */
-  buildAnalysisCacheKey(options: {
-    changeSetHash: string;
-    profile: ProfileName;
-    mode: DiffMode;
-  }): string {
-    const key: AnalysisCacheKey = {
-      changeSetHash: options.changeSetHash,
-      profile: options.profile,
-      versionSignature: this.getVersionSignature(),
-      mode: options.mode,
-    };
-    return computeHash(key);
-  }
-
-  /**
-   * Build an analysis cache key object (for storing).
-   */
-  buildAnalysisCacheKeyObject(options: {
-    changeSetHash: string;
-    profile: ProfileName;
-    mode: DiffMode;
-  }): AnalysisCacheKey {
-    return {
-      changeSetHash: options.changeSetHash,
-      profile: options.profile,
-      versionSignature: this.getVersionSignature(),
-      mode: options.mode,
-    };
-  }
-
-  /**
-   * Get cached analysis findings.
-   */
-  async getFindings(hash: string): Promise<Finding[] | null> {
-    if (!this.enabled || !this.index) {
-      return null;
-    }
-
-    const path = getAnalysisCachePath(hash, this.cwd);
-    const cached = await readCacheEntry<CachedAnalysis>(path);
-
-    if (cached) {
-      updateStats(this.index, true);
-      await this.saveIndex();
-      return cached.findings;
-    }
-
-    updateStats(this.index, false);
-    await this.saveIndex();
-    return null;
-  }
-
-  /**
-   * Store analysis findings in cache.
-   */
-  async setFindings(
-    key: AnalysisCacheKey,
-    findings: Finding[]
-  ): Promise<void> {
-    if (!this.enabled || !this.index) return;
-
-    const hash = computeHash(key);
-    const cached: CachedAnalysis = {
-      key,
-      created: new Date().toISOString(),
-      findings,
-    };
-
-    const path = getAnalysisCachePath(hash, this.cwd);
-    const size = await writeCacheEntry(path, cached);
-
-    const entry: CacheEntryMeta = {
-      hash,
-      type: "analysis",
-      created: cached.created,
-      lastAccess: cached.created,
-      size,
-    };
-    addEntry(this.index, entry);
-    await this.saveIndex();
   }
 
   // ==========================================================================
@@ -534,6 +412,7 @@ export class CacheManager {
 
     if (cached) {
       updateStats(this.index, true);
+      updateEntryAccess(this.index, hash);
       await this.saveIndex();
       return cached.changeSet;
     }
@@ -545,6 +424,7 @@ export class CacheManager {
 
   /**
    * Store ChangeSet in cache.
+   * Automatically prunes excess entries to maintain the 2-file limit.
    */
   async setChangeSet(
     key: ChangeSetCacheKey,
@@ -571,78 +451,11 @@ export class CacheManager {
     };
     addEntry(this.index, entry);
     await this.saveIndex();
-  }
 
-  // ==========================================================================
-  // File List Cache Operations
-  // ==========================================================================
-
-  /**
-   * Build a cache key for file listings.
-   */
-  buildFileListCacheKey(
-    directories: string[],
-    includeUntracked: boolean,
-    worktreeSignature: WorktreeSignature
-  ): string {
-    const key: FileListCacheKey = {
-      directories: [...directories].sort(),
-      includeUntracked,
-      worktreeSignature,
-    };
-    return computeHash(key);
-  }
-
-  /**
-   * Get cached file list.
-   */
-  async getFileList(hash: string): Promise<string[] | null> {
-    if (!this.enabled || !this.index) {
-      return null;
-    }
-
-    const path = getFileListCachePath(hash, this.cwd);
-    const cached = await readCacheEntry<CachedFileList>(path);
-
-    if (cached) {
-      updateStats(this.index, true);
-      await this.saveIndex();
-      return cached.files;
-    }
-
-    updateStats(this.index, false);
-    await this.saveIndex();
-    return null;
-  }
-
-  /**
-   * Store file list in cache.
-   */
-  async setFileList(
-    key: FileListCacheKey,
-    files: string[]
-  ): Promise<void> {
-    if (!this.enabled || !this.index) return;
-
-    const hash = computeHash(key);
-    const cached: CachedFileList = {
-      key,
-      created: new Date().toISOString(),
-      files,
-    };
-
-    const path = getFileListCachePath(hash, this.cwd);
-    const size = await writeCacheEntry(path, cached);
-
-    const entry: CacheEntryMeta = {
-      hash,
-      type: "filelist",
-      created: cached.created,
-      lastAccess: cached.created,
-      size,
-    };
-    addEntry(this.index, entry);
-    await this.saveIndex();
+    // Prune excess changeset entries (keep only 2)
+    await pruneExcessChangeSetEntries(this.cwd);
+    // Reload index after pruning
+    this.index = await readIndex(this.cwd);
   }
 
   // ==========================================================================
@@ -651,17 +464,48 @@ export class CacheManager {
 
   /**
    * Build a cache key for per-analyzer results.
+   * Uses stable ref names (not SHAs) to enable reuse across git state changes.
    */
-  buildPerAnalyzerCacheKey(
-    analyzerName: string,
-    changeSetHash: string
-  ): string {
+  buildPerAnalyzerCacheKey(options: {
+    analyzerName: string;
+    profile: ProfileName;
+    mode: DiffMode;
+    baseRef: string;
+    headRef: string;
+    filesHash: string;
+  }): string {
     const key: PerAnalyzerCacheKey = {
-      analyzerName,
-      changeSetHash,
+      analyzerName: options.analyzerName,
+      profile: options.profile,
+      mode: options.mode,
+      baseRef: options.baseRef,
+      headRef: options.headRef,
+      filesHash: options.filesHash,
       versionSignature: this.getVersionSignature(),
     };
     return computeHash(key);
+  }
+
+  /**
+   * Build a per-analyzer cache key object (for storing).
+   */
+  buildPerAnalyzerCacheKeyObject(options: {
+    analyzerName: string;
+    profile: ProfileName;
+    mode: DiffMode;
+    baseRef: string;
+    headRef: string;
+    filesHash: string;
+  }): PerAnalyzerCacheKey {
+    return {
+      analyzerName: options.analyzerName,
+      profile: options.profile,
+      mode: options.mode,
+      baseRef: options.baseRef,
+      headRef: options.headRef,
+      filesHash: options.filesHash,
+      versionSignature: this.getVersionSignature(),
+    };
   }
 
   /**
@@ -677,6 +521,7 @@ export class CacheManager {
 
     if (cached) {
       updateStats(this.index, true);
+      updateEntryAccess(this.index, hash);
       await this.saveIndex();
       return cached;
     }
@@ -688,6 +533,7 @@ export class CacheManager {
 
   /**
    * Store per-analyzer findings in cache.
+   * Automatically prunes excess entries for this analyzer to maintain the 2-file limit.
    */
   async setPerAnalyzerFindings(
     key: PerAnalyzerCacheKey,
@@ -717,6 +563,11 @@ export class CacheManager {
     };
     addEntry(this.index, entry);
     await this.saveIndex();
+
+    // Prune excess entries for this specific analyzer (keep only 2)
+    await pruneExcessPerAnalyzerEntries(key.analyzerName, this.cwd);
+    // Reload index after pruning
+    this.index = await readIndex(this.cwd);
   }
 
   // ==========================================================================

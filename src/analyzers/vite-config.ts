@@ -206,6 +206,11 @@ function detectPluginChanges(
 
 export const viteConfigAnalyzer: Analyzer = {
   name: "vite-config",
+  cacheScope: "files",
+  filePatterns: [
+    "vite.config.*",
+    "vitest.config.*",
+  ],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

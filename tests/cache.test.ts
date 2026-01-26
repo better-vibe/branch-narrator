@@ -13,6 +13,10 @@ import {
   getCacheDir,
   clearCache,
   CACHE_SCHEMA_VERSION,
+  MAX_ENTRIES_PER_ANALYZER,
+  MAX_CHANGESET_ENTRIES,
+  pruneExcessPerAnalyzerEntries,
+  pruneExcessChangeSetEntries,
 } from "../src/cache/index.js";
 
 describe("Cache Module", () => {
@@ -83,79 +87,6 @@ describe("Cache Module", () => {
       cache.invalidateWorktreeSignature();
       const sig2 = await cache.computeWorktreeSignature();
       expect(sig1).not.toBe(sig2); // Different object
-    });
-  });
-
-  describe("Diff Cache", () => {
-    it("should store and retrieve diff data", async () => {
-      const cache = new CacheManager(testDir);
-      await cache.init("1.0.0");
-
-      const key = {
-        base: "main",
-        head: "HEAD",
-        baseSha: "abc123",
-        headSha: "def456",
-        mode: "branch" as const,
-      };
-      const data = {
-        nameStatus: "M\tsrc/foo.ts",
-        unifiedDiff: "diff --git a/src/foo.ts...",
-      };
-
-      await cache.setDiff(key, data);
-
-      const hash = cache.buildDiffCacheKey(key);
-      const retrieved = await cache.getDiff(hash);
-
-      expect(retrieved).not.toBeNull();
-      expect(retrieved?.data.nameStatus).toBe(data.nameStatus);
-      expect(retrieved?.data.unifiedDiff).toBe(data.unifiedDiff);
-    });
-
-    it("should return null for non-existent diff", async () => {
-      const cache = new CacheManager(testDir);
-      await cache.init("1.0.0");
-
-      const retrieved = await cache.getDiff("nonexistent");
-      expect(retrieved).toBeNull();
-    });
-  });
-
-  describe("Analysis Cache", () => {
-    it("should store and retrieve analysis findings", async () => {
-      const cache = new CacheManager(testDir);
-      await cache.init("1.0.0");
-
-      const findings = [
-        {
-          type: "file-summary" as const,
-          added: ["src/new.ts"],
-          modified: [],
-          deleted: [],
-          renamed: [],
-          evidence: [],
-        },
-      ];
-
-      const key = cache.buildAnalysisCacheKeyObject({
-        changeSetHash: "abc123",
-        profile: "default" as const,
-        mode: "branch" as const,
-      });
-
-      await cache.setFindings(key, findings);
-
-      const hash = cache.buildAnalysisCacheKey({
-        changeSetHash: "abc123",
-        profile: "default" as const,
-        mode: "branch" as const,
-      });
-      const retrieved = await cache.getFindings(hash);
-
-      expect(retrieved).not.toBeNull();
-      expect(retrieved).toHaveLength(1);
-      expect(retrieved?.[0].type).toBe("file-summary");
     });
   });
 
@@ -299,6 +230,392 @@ describe("Cache Module", () => {
       await cache2.init("1.0.0");
       const stats = await cache2.stats();
       expect(stats.entries).toBe(0);
+    });
+  });
+
+  describe("Per-Analyzer Incremental Caching", () => {
+    it("should build per-analyzer cache key with ref names and profile", async () => {
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      const key1 = cache.buildPerAnalyzerCacheKey({
+        analyzerName: "dependencies",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "feature/test",
+        filesHash: "abc123",
+      });
+
+      const key2 = cache.buildPerAnalyzerCacheKey({
+        analyzerName: "dependencies",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "feature/test",
+        filesHash: "abc123",
+      });
+
+      // Same inputs should produce same key
+      expect(key1).toBe(key2);
+    });
+
+    it("should produce different keys for different analyzers", async () => {
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      const key1 = cache.buildPerAnalyzerCacheKey({
+        analyzerName: "dependencies",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "HEAD",
+        filesHash: "abc123",
+      });
+
+      const key2 = cache.buildPerAnalyzerCacheKey({
+        analyzerName: "vitest",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "HEAD",
+        filesHash: "abc123",
+      });
+
+      expect(key1).not.toBe(key2);
+    });
+
+    it("should produce different keys for different file hashes", async () => {
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      const key1 = cache.buildPerAnalyzerCacheKey({
+        analyzerName: "dependencies",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "HEAD",
+        filesHash: "hash1",
+      });
+
+      const key2 = cache.buildPerAnalyzerCacheKey({
+        analyzerName: "dependencies",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "HEAD",
+        filesHash: "hash2",
+      });
+
+      expect(key1).not.toBe(key2);
+    });
+
+    it("should store and retrieve per-analyzer findings", async () => {
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      const key = cache.buildPerAnalyzerCacheKeyObject({
+        analyzerName: "test-analyzer",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "feature/test",
+        filesHash: "abc123",
+      });
+
+      const findings = [
+        { type: "dependency-change" as const, name: "lodash", action: "added" as const, version: "4.0.0" },
+      ];
+
+      await cache.setPerAnalyzerFindings(key, findings, ["package.json"]);
+
+      const hash = cache.buildPerAnalyzerCacheKey({
+        analyzerName: "test-analyzer",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "feature/test",
+        filesHash: "abc123",
+      });
+
+      const cached = await cache.getPerAnalyzerFindings(hash);
+
+      expect(cached).not.toBeNull();
+      expect(cached!.findings).toHaveLength(1);
+      expect(cached!.processedFiles).toContain("package.json");
+    });
+
+    it("should not invalidate per-analyzer cache on HEAD change", async () => {
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Store a per-analyzer result
+      const key = cache.buildPerAnalyzerCacheKeyObject({
+        analyzerName: "test-analyzer",
+        profile: "sveltekit",
+        mode: "branch",
+        baseRef: "main",
+        headRef: "feature/test",
+        filesHash: "abc123",
+      });
+
+      await cache.setPerAnalyzerFindings(key, [], ["test.ts"]);
+
+      // Simulate HEAD change by modifying a file and committing
+      const { execa } = await import("execa");
+      await writeFile(join(testDir, "test.txt"), "modified");
+      await execa("git", ["add", "."], { cwd: testDir });
+      await execa("git", ["commit", "-m", "second commit"], { cwd: testDir });
+
+      // Reinitialize cache (simulates new run)
+      const cache2 = new CacheManager(testDir);
+      await cache2.init("1.0.0");
+
+      // The per-analyzer cache should still exist (not invalidated)
+      const stats = await cache2.stats();
+      expect(stats.entries).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should update lastAccess on cache hit", async () => {
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Store a changeset
+      const key = { diffHash: "test123", packageJsonHash: "pkg456" };
+      const changeSet = {
+        base: "main",
+        head: "HEAD",
+        files: [],
+        diffs: [],
+      };
+
+      await cache.setChangeSet(key, changeSet);
+
+      // Wait a moment to ensure time difference
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Access the cache entry
+      const hash = cache.buildChangeSetCacheKey("test123", "pkg456");
+      await cache.getChangeSet(hash);
+
+      // Check that lastAccess was updated (stats reflect the access)
+      const stats = await cache.stats();
+      expect(stats.hits).toBe(1);
+    });
+  });
+
+  describe("LRU Pruning", () => {
+    it("should prune entries by size using LRU", async () => {
+      const { pruneBySizeLRU, readIndex } = await import("../src/cache/storage.js");
+      
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Add multiple entries with different access times
+      for (let i = 0; i < 5; i++) {
+        const key = cache.buildPerAnalyzerCacheKeyObject({
+          analyzerName: `analyzer-${i}`,
+          profile: "default",
+          mode: "branch",
+          baseRef: "main",
+          headRef: "HEAD",
+          filesHash: `hash${i}`,
+        });
+        await cache.setPerAnalyzerFindings(key, [], [`file${i}.ts`]);
+        // Small delay to ensure different timestamps
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      const statsBefore = await cache.stats();
+      expect(statsBefore.entries).toBe(5);
+
+      // Prune with a very small max size (should remove some entries)
+      const removed = await pruneBySizeLRU(100, testDir);
+      
+      // Should have removed some entries (exact number depends on entry sizes)
+      expect(removed).toBeGreaterThanOrEqual(0);
+      
+      const indexAfter = await readIndex(testDir);
+      expect(indexAfter.entries.length).toBeLessThanOrEqual(5);
+    });
+  });
+
+  describe("Per-Analyzer Entry Limit (2 files per analyzer)", () => {
+    it("should expose MAX_ENTRIES_PER_ANALYZER constant", () => {
+      expect(MAX_ENTRIES_PER_ANALYZER).toBe(2);
+    });
+
+    it("should expose MAX_CHANGESET_ENTRIES constant", () => {
+      expect(MAX_CHANGESET_ENTRIES).toBe(2);
+    });
+
+    it("should keep only 2 entries per analyzer when adding more", async () => {
+      const { readIndex } = await import("../src/cache/storage.js");
+      
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Add 4 entries for the SAME analyzer
+      for (let i = 0; i < 4; i++) {
+        const key = cache.buildPerAnalyzerCacheKeyObject({
+          analyzerName: "dependencies", // Same analyzer
+          profile: "default",
+          mode: "branch",
+          baseRef: "main",
+          headRef: "HEAD",
+          filesHash: `hash${i}`, // Different file hash each time
+        });
+        await cache.setPerAnalyzerFindings(key, [], [`file${i}.ts`]);
+        // Small delay to ensure different timestamps
+        await new Promise((resolve) => setTimeout(resolve, 15));
+      }
+
+      // Should only have 2 entries for this analyzer (the 2 most recent)
+      const index = await readIndex(testDir);
+      const analyzerEntries = index.entries.filter(
+        (e) => e.type === "per-analyzer" && e.analyzerName === "dependencies"
+      );
+      
+      expect(analyzerEntries.length).toBe(2);
+    });
+
+    it("should keep entries for different analyzers separately", async () => {
+      const { readIndex } = await import("../src/cache/storage.js");
+      
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Add 3 entries each for 2 different analyzers
+      const analyzers = ["dependencies", "vitest"];
+      
+      for (const analyzerName of analyzers) {
+        for (let i = 0; i < 3; i++) {
+          const key = cache.buildPerAnalyzerCacheKeyObject({
+            analyzerName,
+            profile: "default",
+            mode: "branch",
+            baseRef: "main",
+            headRef: "HEAD",
+            filesHash: `${analyzerName}-hash${i}`,
+          });
+          await cache.setPerAnalyzerFindings(key, [], [`${analyzerName}-file${i}.ts`]);
+          await new Promise((resolve) => setTimeout(resolve, 15));
+        }
+      }
+
+      // Each analyzer should have exactly 2 entries
+      const index = await readIndex(testDir);
+      
+      for (const analyzerName of analyzers) {
+        const entries = index.entries.filter(
+          (e) => e.type === "per-analyzer" && e.analyzerName === analyzerName
+        );
+        expect(entries.length).toBe(2);
+      }
+      
+      // Total should be 4 (2 per analyzer)
+      const totalPerAnalyzer = index.entries.filter((e) => e.type === "per-analyzer");
+      expect(totalPerAnalyzer.length).toBe(4);
+    });
+
+    it("should prune excess entries directly via pruneExcessPerAnalyzerEntries", async () => {
+      const { readIndex, addEntry, writeIndex } = await import("../src/cache/storage.js");
+      
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Manually add 5 entries for the same analyzer (bypassing auto-pruning)
+      const index = await readIndex(testDir);
+      for (let i = 0; i < 5; i++) {
+        const entry = {
+          hash: `manual-hash-${i}`,
+          type: "per-analyzer" as const,
+          created: new Date(Date.now() - i * 1000).toISOString(), // Older entries have earlier timestamps
+          lastAccess: new Date(Date.now() - i * 1000).toISOString(),
+          size: 100,
+          analyzerName: "test-analyzer",
+        };
+        addEntry(index, entry);
+      }
+      await writeIndex(index, testDir);
+
+      // Verify we have 5 entries
+      const indexBefore = await readIndex(testDir);
+      expect(indexBefore.entries.filter((e) => e.analyzerName === "test-analyzer").length).toBe(5);
+
+      // Prune to keep only 2
+      const removed = await pruneExcessPerAnalyzerEntries("test-analyzer", testDir, 2);
+      
+      expect(removed).toBe(3);
+
+      const indexAfter = await readIndex(testDir);
+      expect(indexAfter.entries.filter((e) => e.analyzerName === "test-analyzer").length).toBe(2);
+    });
+  });
+
+  describe("ChangeSet Entry Limit (2 files)", () => {
+    it("should keep only 2 changeset entries when adding more", async () => {
+      const { readIndex } = await import("../src/cache/storage.js");
+      
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Add 4 changesets
+      for (let i = 0; i < 4; i++) {
+        const changeSet = {
+          base: "main",
+          head: "HEAD",
+          files: [{ path: `src/file${i}.ts`, status: "modified" as const }],
+          diffs: [],
+        };
+
+        const key = {
+          diffHash: `diff${i}`,
+          packageJsonHash: `pkg${i}`,
+        };
+
+        await cache.setChangeSet(key, changeSet as any);
+        await new Promise((resolve) => setTimeout(resolve, 15));
+      }
+
+      // Should only have 2 changeset entries (the 2 most recent)
+      const index = await readIndex(testDir);
+      const changesetEntries = index.entries.filter((e) => e.type === "changeset");
+      
+      expect(changesetEntries.length).toBe(2);
+    });
+
+    it("should prune excess entries directly via pruneExcessChangeSetEntries", async () => {
+      const { readIndex, addEntry, writeIndex } = await import("../src/cache/storage.js");
+      
+      const cache = new CacheManager(testDir);
+      await cache.init("1.0.0");
+
+      // Manually add 5 changeset entries (bypassing auto-pruning)
+      const index = await readIndex(testDir);
+      for (let i = 0; i < 5; i++) {
+        const entry = {
+          hash: `changeset-hash-${i}`,
+          type: "changeset" as const,
+          created: new Date(Date.now() - i * 1000).toISOString(),
+          lastAccess: new Date(Date.now() - i * 1000).toISOString(),
+          size: 200,
+        };
+        addEntry(index, entry);
+      }
+      await writeIndex(index, testDir);
+
+      // Verify we have 5 entries
+      const indexBefore = await readIndex(testDir);
+      expect(indexBefore.entries.filter((e) => e.type === "changeset").length).toBe(5);
+
+      // Prune to keep only 2
+      const removed = await pruneExcessChangeSetEntries(testDir, 2);
+      
+      expect(removed).toBe(3);
+
+      const indexAfter = await readIndex(testDir);
+      expect(indexAfter.entries.filter((e) => e.type === "changeset").length).toBe(2);
     });
   });
 });

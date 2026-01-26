@@ -41,6 +41,19 @@ export function isVitestConfig(path: string): boolean {
 
 export const vitestAnalyzer: Analyzer = {
   name: "vitest",
+  cacheScope: "files",
+  filePatterns: [
+    "*.test.ts",
+    "*.test.tsx",
+    "*.test.js",
+    "*.test.jsx",
+    "*.spec.ts",
+    "*.spec.tsx",
+    "*.spec.js",
+    "*.spec.jsx",
+    "vitest.config.*",
+    "vite.config.*",
+  ],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const testFiles: string[] = [];

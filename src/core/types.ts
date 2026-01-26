@@ -720,9 +720,30 @@ export interface ChangeSet {
 // Analyzer Interface
 // ============================================================================
 
+/**
+ * Cache scope for an analyzer.
+ * - 'global': Analyzer depends on overall changeset state, always reruns when changeset changes
+ * - 'files': Analyzer only depends on specific files, can be incrementally cached
+ */
+export type AnalyzerCacheScope = "global" | "files";
+
 export interface Analyzer {
   name: string;
   analyze(changeSet: ChangeSet): Finding[] | Promise<Finding[]>;
+  
+  /**
+   * Cache scope for incremental analysis.
+   * - 'global' (default): Rerun when any file changes
+   * - 'files': Only rerun when matched files change
+   */
+  cacheScope?: AnalyzerCacheScope;
+  
+  /**
+   * File patterns this analyzer cares about.
+   * Used for incremental caching when cacheScope is 'files'.
+   * Can be glob patterns (e.g., ['*.ts', 'package.json']).
+   */
+  filePatterns?: string[];
 }
 
 // ============================================================================

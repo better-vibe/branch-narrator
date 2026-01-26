@@ -147,6 +147,23 @@ function extractAffectedSections(content: string): string[] {
 
 export const pythonConfigAnalyzer: Analyzer = {
   name: "python-config",
+  cacheScope: "files",
+  filePatterns: [
+    "pyproject.toml",
+    "setup.cfg",
+    "setup.py",
+    "tox.ini",
+    "pytest.ini",
+    "conftest.py",
+    ".mypy.ini",
+    "mypy.ini",
+    ".flake8",
+    ".pylintrc",
+    ".ruff.toml",
+    "ruff.toml",
+    ".pre-commit-config.yaml",
+    ".python-version",
+  ],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

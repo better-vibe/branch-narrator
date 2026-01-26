@@ -44,6 +44,15 @@ export function workflowMentionsCloudflare(content: string): boolean {
 
 export const cloudflareAnalyzer: Analyzer = {
   name: "cloudflare",
+  cacheScope: "files",
+  filePatterns: [
+    "wrangler.toml",
+    "wrangler.json",
+    "**/wrangler.toml",
+    "**/wrangler.json",
+    ".github/workflows/*.yml",
+    ".github/workflows/*.yaml",
+  ],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

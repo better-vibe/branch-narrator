@@ -202,6 +202,8 @@ export function compareDependencies(
 
 export const dependencyAnalyzer: Analyzer = {
   name: "dependencies",
+  cacheScope: "files",
+  filePatterns: ["package.json", "**/package.json"],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

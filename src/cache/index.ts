@@ -1,8 +1,8 @@
 /**
  * Global Caching System.
  *
- * Provides persistent caching of git operations, changesets,
- * and analysis results to improve performance across executions.
+ * Provides persistent caching of changesets and per-analyzer
+ * results to improve performance across executions.
  *
  * @module cache
  */
@@ -13,24 +13,23 @@ export type {
   CacheIndex,
   CacheEntryMeta,
   CacheEntryType,
-  CachedDiff,
-  CachedAnalysis,
   CachedChangeSet,
   CachedRef,
-  CachedFileList,
   CachedPerAnalyzerFindings,
-  DiffCacheKey,
-  AnalysisCacheKey,
   ChangeSetCacheKey,
   RefCacheKey,
-  FileListCacheKey,
   PerAnalyzerCacheKey,
   WorktreeSignature,
   AnalyzerVersionSignature,
   RefsCache,
 } from "./types.js";
 
-export { DEFAULT_CACHE_OPTIONS, CACHE_SCHEMA_VERSION } from "./types.js";
+export {
+  DEFAULT_CACHE_OPTIONS,
+  CACHE_SCHEMA_VERSION,
+  MAX_ENTRIES_PER_ANALYZER,
+  MAX_CHANGESET_ENTRIES,
+} from "./types.js";
 
 export {
   CacheManager,
@@ -46,10 +45,12 @@ export {
   getPerAnalyzerCacheDir,
   getPerAnalyzerCachePath,
   getRefsCachePath,
-  getFilesCacheDir,
-  getFileListCachePath,
+  getGitCacheDir,
   clearCache,
   pruneOldEntries,
+  pruneBySizeLRU,
+  pruneExcessPerAnalyzerEntries,
+  pruneExcessChangeSetEntries,
   calculateCacheSize,
   computeHash,
   deleteCacheEntry,
@@ -58,4 +59,5 @@ export {
   writeRefsCache,
   createEmptyRefsCache,
   createEmptyIndex,
+  updateEntryAccess,
 } from "./storage.js";

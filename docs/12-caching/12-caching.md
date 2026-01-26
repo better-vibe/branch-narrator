@@ -6,11 +6,9 @@ branch-narrator includes a global caching system that significantly improves per
 
 The caching system stores:
 
-- **Git diff data** - Raw diff output from git commands
-- **ChangeSet data** - Parsed and structured change information  
-- **Analysis findings** - Results from running analyzers
+- **ChangeSet data** - Parsed and structured change information
+- **Per-analyzer findings** - Results from each analyzer for incremental caching
 - **Ref SHA lookups** - Git reference resolution results
-- **File listings** - Results from `git ls-files` operations
 
 ## Cache Location
 
@@ -21,11 +19,8 @@ Cache data is stored in `.branch-narrator/cache/` within your project directory.
 ├── cache/
 │   ├── index.json              # Cache metadata and statistics
 │   ├── git/
-│   │   ├── refs.json           # Validated ref SHA cache
-│   │   ├── diffs/              # Cached diff data
-│   │   └── files/              # Cached file listings
+│   │   └── refs.json           # Validated ref SHA cache
 │   ├── changeset/              # Cached ChangeSets
-│   ├── analysis/               # Cached analysis results
 │   └── per-analyzer/           # Per-analyzer incremental cache
 └── snapshots/                  # Existing snapshot system
 ```
@@ -58,28 +53,59 @@ branch-narrator cache prune --max-age 7  # Custom max age in days
 
 ## Cache Invalidation
 
-The cache automatically invalidates when:
+The cache uses a smart invalidation strategy that maximizes reuse while ensuring correctness.
 
-1. **HEAD changes** - When you switch branches or make commits
-2. **Working directory changes** - When files are modified (for non-branch modes)
-3. **CLI version changes** - When you upgrade branch-narrator
-4. **Schema version changes** - When cache format changes
+### Content-Addressed Caching
+
+Cache entries are **content-addressed** - they are keyed by the content they represent, not just git state. This means:
+
+- Cache hits occur when the same content is analyzed again, even across different branches
+- Automatic cache file limits prevent unbounded growth
+
+### Two-File Cache Strategy
+
+To prevent cache churn while enabling undo scenarios, the cache maintains at most **2 files per category**:
+
+- **Per-analyzer**: 2 cache files per analyzer (current + previous state)
+- **ChangeSets**: 2 changeset cache files total
+
+When a new cache entry is created and the limit would be exceeded, the oldest entry is automatically deleted. This allows you to:
+
+1. Hit the cache on repeated runs with no changes
+2. Revert changes and still hit the previous cache entry
+3. Avoid unbounded cache growth over time
+
+### What Gets Refreshed
+
+| Git State Change | What Gets Refreshed |
+|-----------------|---------------------|
+| HEAD changes | Refs cache (SHA lookups) |
+| Working directory changes | Worktree signature |
+| CLI version upgrade | All caches (via version signature) |
 
 ### Mode-Specific Behavior
 
 | Mode | Cache Key Includes |
 |------|-------------------|
-| `branch` | Base SHA, Head SHA |
-| `staged` | HEAD SHA, Worktree signature |
-| `unstaged` | HEAD SHA, Worktree signature |
-| `all` | HEAD SHA, Worktree signature |
+| `branch` | Base ref, Head ref, File patterns hash |
+| `staged` | HEAD ref, Worktree signature, File patterns hash |
+| `unstaged` | HEAD ref, Worktree signature, File patterns hash |
+| `all` | HEAD ref, Worktree signature, File patterns hash |
 
 For `staged`, `unstaged`, and `all` modes, the worktree signature includes:
 - Hash of `git status --porcelain -z` output
 - Hash of index tree (`git write-tree`)
 - HEAD commit SHA
 
-This ensures cached data is invalidated whenever working directory state changes.
+### Incremental Analyzer Caching
+
+Each analyzer's results are cached separately. When a cached result exists:
+
+1. The cache checks if any files the analyzer processed have changed
+2. If no processed files changed, cached findings are reused
+3. Otherwise, the analyzer runs fresh and results are cached
+
+This enables significant performance improvements when making small changes to large repositories.
 
 ## Performance Impact
 
@@ -117,16 +143,16 @@ The `cache stats` command returns:
 2. **HEAD is changing** - Frequent commits or rebases will invalidate cache
 3. **Different profiles** - Each profile maintains separate cache entries
 
-### Cache size is growing
+### Manual cache cleanup
 
-Use `cache prune` to remove old entries:
+If you need to remove old entries manually:
 
 ```bash
 # Remove entries older than 7 days
 branch-narrator cache prune --max-age 7
 ```
 
-Default maximum cache age is 30 days.
+Note: Cache files are automatically limited (2 per category), so manual cleanup is rarely needed.
 
 ### Need fresh results
 
@@ -144,13 +170,26 @@ branch-narrator --clear-cache facts --mode branch --base main
 
 ## Configuration
 
-Cache behavior is controlled via CLI options. Future versions may support configuration file settings.
+Cache behavior is controlled via CLI options.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Cache enabled | `true` | Set `--no-cache` to disable |
-| Max cache size | 100 MB | Automatic LRU eviction (planned) |
+| Max files per analyzer | 2 | Current + previous state |
 | Max entry age | 30 days | `--max-age` for `cache prune` |
+
+## Cache File Limits
+
+The cache automatically maintains file limits when writing new entries:
+
+- **Per-analyzer**: Maximum 2 cache files per analyzer (enforced per analyzer name)
+- **ChangeSets**: Maximum 2 changeset files total
+
+When adding a new entry would exceed these limits, the oldest entry in that category is automatically deleted. This ensures:
+
+1. **Bounded cache size** - No unbounded growth over time
+2. **Undo support** - Previous state is retained for one change cycle
+3. **No manual cleanup needed** - Limits are enforced automatically
 
 ## Technical Details
 

@@ -10,7 +10,7 @@ import { sortRiskFlagEvidence } from "../../core/sorting.js";
 import { getProfile, resolveProfileName } from "../../profiles/index.js";
 import { assignFindingId } from "../../core/ids.js";
 import { findingsToFlags } from "./findings-to-flags.js";
-import { runAnalyzersInParallel } from "../../core/analyzer-runner.js";
+import { runAnalyzersIncremental } from "../../core/analyzer-runner.js";
 
 /**
  * Options for generating risk report.
@@ -26,6 +26,8 @@ export interface RiskReportOptions {
   cwd?: string;
   /** Original CLI mode used to generate this output */
   mode?: DiffMode;
+  /** Skip caching */
+  noCache?: boolean;
 }
 
 /**
@@ -45,6 +47,7 @@ export async function generateRiskReport(
     profile: requestedProfile = "auto",
     cwd = process.cwd(),
     mode,
+    noCache = false,
   } = options;
 
   // Track skipped files
@@ -65,8 +68,15 @@ export async function generateRiskReport(
   const profileName = resolveProfileName(requestedProfile, changeSet, cwd);
   const profile = getProfile(profileName);
 
-  // Run analyzers in parallel for better performance
-  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers with incremental caching for better performance
+  const rawFindings = await runAnalyzersIncremental({
+    changeSet,
+    analyzers: profile.analyzers,
+    profile: profileName,
+    mode: mode || "branch",
+    noCache,
+    cwd,
+  });
 
   // Assign findingIds to all findings
   const findings = rawFindings.map(assignFindingId);

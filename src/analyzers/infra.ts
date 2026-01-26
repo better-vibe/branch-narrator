@@ -14,6 +14,22 @@ import type {
  */
 export const analyzeInfra: Analyzer = {
   name: "infra",
+  cacheScope: "files",
+  filePatterns: [
+    "**/Dockerfile",
+    "**/Dockerfile.*",
+    "*.tf",
+    "*.tfvars",
+    "**/*.tf",
+    "**/*.tfvars",
+    "**/kubernetes/**/*.yaml",
+    "**/kubernetes/**/*.yml",
+    "**/k8s/**/*.yaml",
+    "**/k8s/**/*.yml",
+    "**/deployment*.yaml",
+    "**/service*.yaml",
+    "**/ingress*.yaml",
+  ],
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: InfraChangeFinding[] = [];
 

@@ -10,7 +10,7 @@ import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
 import { getVersion } from "./core/version.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
-import { runAnalyzersInParallel, runAnalyzersWithCache } from "./core/analyzer-runner.js";
+import { runAnalyzersIncremental } from "./core/analyzer-runner.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
 import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
 import { getProfile, resolveProfileName, detectProfileWithReasons } from "./profiles/index.js";
@@ -162,8 +162,8 @@ async function runAnalysisWithMode(options: {
     spinner.text = `Running analyzers (${profile.analyzers.length})...`;
   }
 
-  // Run analyzers with caching for better performance
-  const findings = await runAnalyzersWithCache({
+  // Run analyzers with incremental caching for better performance
+  const findings = await runAnalyzersIncremental({
     changeSet,
     analyzers: profile.analyzers,
     profile: resolvedProfile,
@@ -434,8 +434,14 @@ program
 
       const profile = getProfile(detectedProfile);
 
-      // Run analyzers in parallel for better performance
-      const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+      // Run analyzers with incremental caching for better performance
+      const findings = await runAnalyzersIncremental({
+        changeSet,
+        analyzers: profile.analyzers,
+        profile: detectedProfile,
+        mode,
+        noCache: options.noCache,
+      });
 
       // Compute risk
       const riskScore = computeRiskScore(findings);

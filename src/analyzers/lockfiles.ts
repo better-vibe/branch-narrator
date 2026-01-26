@@ -159,6 +159,15 @@ function hasDependencyChanges(diff: FileDiff): boolean {
  */
 export const analyzeLockfiles: Analyzer = {
   name: "lockfiles",
+  cacheScope: "files",
+  filePatterns: [
+    "package.json",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "bun.lockb",
+    "bun.lock",
+  ],
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: LockfileFinding[] = [];
 

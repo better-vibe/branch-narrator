@@ -18,7 +18,7 @@ import type {
 } from "../../core/types.js";
 import { BranchNarratorError } from "../../core/errors.js";
 import { getProfile, resolveProfileName } from "../../profiles/index.js";
-import { runAnalyzersInParallel } from "../../core/analyzer-runner.js";
+import { runAnalyzersIncremental } from "../../core/analyzer-runner.js";
 import { assignFindingId } from "../../core/ids.js";
 import { generateRiskReport } from "../risk/index.js";
 import { redactSecrets } from "../../core/evidence.js";
@@ -38,6 +38,7 @@ export interface ZoomOptions {
   maxEvidenceLines: number;
   redact: boolean;
   noTimestamp: boolean;
+  noCache?: boolean;
 }
 
 /**
@@ -83,8 +84,14 @@ async function executeZoomFinding(
   const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
   const profile = getProfile(profileName);
 
-  // Run analyzers in parallel for better performance
-  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers with incremental caching for better performance
+  const rawFindings = await runAnalyzersIncremental({
+    changeSet,
+    analyzers: profile.analyzers,
+    profile: profileName,
+    mode: options.mode,
+    noCache: options.noCache,
+  });
 
   // Assign IDs to all findings
   const findings = rawFindings.map(assignFindingId);
@@ -143,8 +150,14 @@ async function executeZoomFlag(
   const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
   const profile = getProfile(profileName);
 
-  // Run analyzers in parallel for better performance
-  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers with incremental caching for better performance
+  const rawFindings = await runAnalyzersIncremental({
+    changeSet,
+    analyzers: profile.analyzers,
+    profile: profileName,
+    mode: options.mode,
+    noCache: options.noCache,
+  });
 
   // Assign findingIds to all findings
   const allFindings = rawFindings.map(assignFindingId);
@@ -155,6 +168,8 @@ async function executeZoomFlag(
     redact: options.redact,
     maxEvidenceLines: options.maxEvidenceLines,
     noTimestamp: options.noTimestamp,
+    mode: options.mode,
+    noCache: options.noCache,
   });
 
   // Find the requested flag

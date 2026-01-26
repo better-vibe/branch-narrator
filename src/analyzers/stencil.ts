@@ -298,6 +298,11 @@ export function extractStencilComponents(
 
 export const stencilAnalyzer: Analyzer = {
   name: "stencil",
+  cacheScope: "files",
+  filePatterns: [
+    "src/components/**/*.tsx",
+    "**/components/**/*.tsx",
+  ],
 
   async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];

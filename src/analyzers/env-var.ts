@@ -165,6 +165,8 @@ export function extractEnvVars(content: string): Set<string> {
 
 export const envVarAnalyzer: Analyzer = {
   name: "env-var",
+  cacheScope: "files",
+  filePatterns: [".env", ".env.*", "**/.env", "**/.env.*"],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

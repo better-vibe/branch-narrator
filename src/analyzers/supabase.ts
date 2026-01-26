@@ -127,6 +127,12 @@ export function determineMigrationRisk(
 
 export const supabaseAnalyzer: Analyzer = {
   name: "supabase",
+  cacheScope: "files",
+  filePatterns: [
+    "supabase/**",
+    "**/supabase/migrations/**",
+    "**/supabase/functions/**",
+  ],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

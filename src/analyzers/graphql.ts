@@ -118,6 +118,8 @@ function analyzeAdditions(additions: string[]): string[] {
 
 export const graphqlAnalyzer: Analyzer = {
   name: "graphql",
+  cacheScope: "files",
+  filePatterns: ["*.graphql", "*.gql", "**/*.graphql", "**/*.gql", "schema.graphql", "**/schema.graphql"],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

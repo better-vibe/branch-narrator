@@ -193,6 +193,12 @@ function determineMigrationRisk(
 
 export const pythonMigrationsAnalyzer: Analyzer = {
   name: "python-migrations",
+  cacheScope: "files",
+  filePatterns: [
+    "**/alembic/versions/*.py",
+    "**/migrations/*.py",
+    "**/migrations/**/[0-9]*_*.py",
+  ],
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

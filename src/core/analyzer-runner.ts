@@ -6,7 +6,7 @@
  */
 
 import type { Analyzer, ChangeSet, DiffMode, Finding, ProfileName } from "./types.js";
-import { getCache, type AnalysisCacheKey } from "../cache/index.js";
+import { getCache, computeHash } from "../cache/index.js";
 
 /**
  * Options for running analyzers with caching.
@@ -50,15 +50,20 @@ export async function runAnalyzersInParallel(
 }
 
 /**
- * Run analyzers with caching support.
+ * Run analyzers with incremental caching support.
  *
- * This function checks the cache for existing analysis results and returns
- * them if available. Otherwise, it runs all analyzers and caches the results.
+ * This function attempts to reuse cached per-analyzer results when possible,
+ * only re-running analyzers that have been affected by file changes.
+ *
+ * Cache reuse strategy:
+ * - Analyzers with cacheScope='files' are cached based on which files they process
+ * - Analyzers with cacheScope='global' (or unset) always rerun when changeset differs
+ * - Cache keys use ref names (not SHAs) to enable reuse across git state changes
  *
  * @param options - Options for cached analysis
  * @returns Promise resolving to findings array
  */
-export async function runAnalyzersWithCache(
+export async function runAnalyzersIncremental(
   options: CachedAnalysisOptions
 ): Promise<Finding[]> {
   const {
@@ -72,87 +77,45 @@ export async function runAnalyzersWithCache(
 
   const cache = noCache ? null : getCache(cwd);
 
-  // Try cache lookup
-  if (cache?.enabled) {
-    const changeSetHash = cache.computeChangeSetHash(changeSet);
-    const cacheKeyHash = cache.buildAnalysisCacheKey({
-      changeSetHash,
-      profile,
-      mode,
-    });
-
-    const cachedFindings = await cache.getFindings(cacheKeyHash);
-    if (cachedFindings !== null) {
-      return cachedFindings;
-    }
-  }
-
-  // Cache miss - run analyzers
-  const findings = await runAnalyzersInParallel(analyzers, changeSet);
-
-  // Store in cache
-  if (cache?.enabled) {
-    const changeSetHash = cache.computeChangeSetHash(changeSet);
-    const cacheKey: AnalysisCacheKey = cache.buildAnalysisCacheKeyObject({
-      changeSetHash,
-      profile,
-      mode,
-    });
-    await cache.setFindings(cacheKey, findings);
-  }
-
-  return findings;
-}
-
-/**
- * Run analyzers with incremental caching support.
- *
- * This function attempts to reuse cached per-analyzer results when possible,
- * only re-running analyzers that have been affected by file changes.
- *
- * For analyzers without cached results or where affected files changed,
- * the analyzer is re-run and results are cached.
- *
- * @param options - Options for cached analysis
- * @returns Promise resolving to findings array
- */
-export async function runAnalyzersIncremental(
-  options: CachedAnalysisOptions
-): Promise<Finding[]> {
-  const {
-    changeSet,
-    analyzers,
-    noCache = false,
-    cwd = process.cwd(),
-  } = options;
-
-  const cache = noCache ? null : getCache(cwd);
-
   // If cache disabled, fall back to parallel execution
   if (!cache?.enabled) {
     return runAnalyzersInParallel(analyzers, changeSet);
   }
 
-  const changeSetHash = cache.computeChangeSetHash(changeSet);
-  const changedFiles = new Set(changeSet.files.map(f => f.path));
+  const changedFilePaths = changeSet.files.map(f => f.path);
+  const changedFilesSet = new Set(changedFilePaths);
 
   // Run each analyzer, using cache when possible
   const findingsArrays = await Promise.all(
     analyzers.map(async (analyzer) => {
-      const cacheKeyHash = cache.buildPerAnalyzerCacheKey(
-        analyzer.name,
-        changeSetHash
-      );
+      // Determine which files this analyzer cares about
+      const relevantFiles = getRelevantFiles(analyzer, changedFilePaths);
+      const filesHash = computeHash(relevantFiles.sort());
+
+      // Build cache key using stable refs (not SHAs)
+      const cacheKeyHash = cache.buildPerAnalyzerCacheKey({
+        analyzerName: analyzer.name,
+        profile,
+        mode,
+        baseRef: changeSet.base,
+        headRef: changeSet.head,
+        filesHash,
+      });
 
       // Check per-analyzer cache
       const cached = await cache.getPerAnalyzerFindings(cacheKeyHash);
 
       if (cached) {
-        // Check if any processed files have changed
-        const needsRerun = cached.processedFiles.some(f => changedFiles.has(f));
-
-        if (!needsRerun) {
-          // Use cached findings
+        // For file-scoped analyzers, check if any processed files changed
+        if (analyzer.cacheScope === "files") {
+          const needsRerun = cached.processedFiles.some(f => changedFilesSet.has(f));
+          if (!needsRerun) {
+            // No relevant files changed - reuse cached findings
+            return cached.findings;
+          }
+        } else {
+          // Global analyzers: if filesHash matches, the changeset is identical
+          // for this analyzer's perspective - reuse cache
           return cached.findings;
         }
       }
@@ -161,16 +124,16 @@ export async function runAnalyzersIncremental(
       const findings = await analyzer.analyze(changeSet);
 
       // Store per-analyzer results
-      const processedFiles = extractProcessedFiles(findings);
-      await cache.setPerAnalyzerFindings(
-        {
-          analyzerName: analyzer.name,
-          changeSetHash,
-          versionSignature: cache.getVersionSignature(),
-        },
-        findings,
-        processedFiles
-      );
+      const processedFiles = extractProcessedFiles(findings, analyzer, changedFilePaths);
+      const cacheKey = cache.buildPerAnalyzerCacheKeyObject({
+        analyzerName: analyzer.name,
+        profile,
+        mode,
+        baseRef: changeSet.base,
+        headRef: changeSet.head,
+        filesHash,
+      });
+      await cache.setPerAnalyzerFindings(cacheKey, findings, processedFiles);
 
       return findings;
     })
@@ -180,11 +143,95 @@ export async function runAnalyzersIncremental(
 }
 
 /**
- * Extract file paths from findings for caching.
+ * Get the files relevant to an analyzer based on its configuration.
  */
-function extractProcessedFiles(findings: Finding[]): string[] {
+function getRelevantFiles(analyzer: Analyzer, allFiles: string[]): string[] {
+  // If analyzer specifies file patterns, filter to matching files
+  if (analyzer.filePatterns && analyzer.filePatterns.length > 0) {
+    return allFiles.filter(file => matchesPatterns(file, analyzer.filePatterns!));
+  }
+  
+  // Default: all files are relevant
+  return allFiles;
+}
+
+/**
+ * Simple pattern matching for file paths.
+ * Supports: extension patterns, directory patterns, recursive patterns, exact matches
+ */
+function matchesPatterns(filePath: string, patterns: string[]): boolean {
+  for (const pattern of patterns) {
+    if (matchPattern(filePath, pattern)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Match a single pattern against a file path.
+ */
+function matchPattern(filePath: string, pattern: string): boolean {
+  // Exact match
+  if (pattern === filePath) {
+    return true;
+  }
+
+  // Handle **/ prefix (match anywhere)
+  if (pattern.startsWith("**/")) {
+    const suffix = pattern.slice(3);
+    if (filePath.endsWith(suffix) || filePath.includes("/" + suffix)) {
+      return true;
+    }
+    // Also try matching just the filename
+    const fileName = filePath.split("/").pop() || "";
+    if (matchPattern(fileName, suffix)) {
+      return true;
+    }
+  }
+
+  // Handle *.ext patterns
+  if (pattern.startsWith("*.")) {
+    const ext = pattern.slice(1); // Get ".ext"
+    return filePath.endsWith(ext);
+  }
+
+  // Handle path/* patterns
+  if (pattern.endsWith("/*")) {
+    const prefix = pattern.slice(0, -2);
+    return filePath.startsWith(prefix + "/") && !filePath.slice(prefix.length + 1).includes("/");
+  }
+
+  // Handle path/** patterns (recursive)
+  if (pattern.endsWith("/**")) {
+    const prefix = pattern.slice(0, -3);
+    return filePath.startsWith(prefix + "/");
+  }
+
+  return false;
+}
+
+/**
+ * Extract file paths from findings for caching.
+ * If the analyzer specifies file patterns, also includes files matching those patterns.
+ */
+function extractProcessedFiles(
+  findings: Finding[],
+  analyzer: Analyzer,
+  changedFilePaths: string[]
+): string[] {
   const files = new Set<string>();
 
+  // If analyzer has file patterns, include matching files
+  if (analyzer.filePatterns && analyzer.filePatterns.length > 0) {
+    for (const filePath of changedFilePaths) {
+      if (matchesPatterns(filePath, analyzer.filePatterns)) {
+        files.add(filePath);
+      }
+    }
+  }
+
+  // Extract files from findings
   for (const finding of findings) {
     // Extract files from evidence
     if (finding.evidence) {

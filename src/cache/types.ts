@@ -11,7 +11,18 @@ import type { ChangeSet, DiffMode, Finding, ProfileName } from "../core/types.js
 /**
  * Cache schema version - bump when cache structure changes.
  */
-export const CACHE_SCHEMA_VERSION = "1.1";
+export const CACHE_SCHEMA_VERSION = "1.2";
+
+/**
+ * Maximum number of cache entries to keep per analyzer.
+ * Keeps current + previous state to support undo scenarios.
+ */
+export const MAX_ENTRIES_PER_ANALYZER = 2;
+
+/**
+ * Maximum number of changeset cache entries to keep.
+ */
+export const MAX_CHANGESET_ENTRIES = 2;
 
 /**
  * Analyzer version signature for cache invalidation.
@@ -44,35 +55,10 @@ export interface WorktreeSignature {
 // ============================================================================
 
 /**
- * Key for caching git diff operations.
- */
-export interface DiffCacheKey {
-  base: string;
-  head: string;
-  baseSha: string;
-  headSha: string;
-  mode: DiffMode;
-  /** Worktree signature for staged/unstaged/all modes */
-  worktreeSignature?: WorktreeSignature;
-}
-
-/**
  * Key for caching ref SHA resolution.
  */
 export interface RefCacheKey {
   ref: string;
-}
-
-/**
- * Key for caching git ls-files output.
- */
-export interface FileListCacheKey {
-  /** Directories queried (empty = all files) */
-  directories: string[];
-  /** Include untracked files */
-  includeUntracked: boolean;
-  /** Worktree signature for freshness */
-  worktreeSignature: WorktreeSignature;
 }
 
 /**
@@ -84,41 +70,31 @@ export interface ChangeSetCacheKey {
 }
 
 /**
- * Key for caching analysis results.
- */
-export interface AnalysisCacheKey {
-  changeSetHash: string;
-  profile: ProfileName;
-  /** CLI and schema version for invalidation */
-  versionSignature: AnalyzerVersionSignature;
-  /** Diff mode used */
-  mode: DiffMode;
-}
-
-/**
  * Key for caching per-analyzer results (incremental analysis).
+ * 
+ * Uses ref names (not SHAs) and profile/mode to enable reuse across
+ * git state changes. The filesHash captures which files the analyzer
+ * processed, enabling selective invalidation.
  */
 export interface PerAnalyzerCacheKey {
   analyzerName: string;
-  changeSetHash: string;
+  /** Profile used for this analysis */
+  profile: ProfileName;
+  /** Diff mode used */
+  mode: DiffMode;
+  /** Base ref name (e.g., 'main', 'HEAD', 'INDEX') */
+  baseRef: string;
+  /** Head ref name (e.g., 'HEAD', 'feature-branch', 'WORKING') */
+  headRef: string;
+  /** Hash of file paths this analyzer processed */
+  filesHash: string;
+  /** Version signature for invalidation on CLI updates */
   versionSignature: AnalyzerVersionSignature;
 }
 
 // ============================================================================
 // Cache Entries
 // ============================================================================
-
-/**
- * Cached git diff data.
- */
-export interface CachedDiff {
-  key: DiffCacheKey;
-  created: string;
-  data: {
-    nameStatus: string;
-    unifiedDiff: string;
-  };
-}
 
 /**
  * Cached ref SHA resolution.
@@ -131,30 +107,12 @@ export interface CachedRef {
 }
 
 /**
- * Cached file listing.
- */
-export interface CachedFileList {
-  key: FileListCacheKey;
-  created: string;
-  files: string[];
-}
-
-/**
  * Cached ChangeSet.
  */
 export interface CachedChangeSet {
   key: ChangeSetCacheKey;
   created: string;
   changeSet: ChangeSet;
-}
-
-/**
- * Cached analysis findings.
- */
-export interface CachedAnalysis {
-  key: AnalysisCacheKey;
-  created: string;
-  findings: Finding[];
 }
 
 /**
@@ -205,11 +163,8 @@ export interface CacheStats {
  * Cache entry type.
  */
 export type CacheEntryType =
-  | "diff"
   | "changeset"
-  | "analysis"
   | "ref"
-  | "filelist"
   | "per-analyzer";
 
 /**
