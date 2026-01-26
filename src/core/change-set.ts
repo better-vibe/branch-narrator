@@ -1,5 +1,8 @@
 /**
  * ChangeSet builder utilities.
+ *
+ * Uses the high-performance DOD (Data-Oriented Design) parser for diff parsing.
+ * All diff parsing is now done through the DOD parser for optimal performance.
  */
 
 import type {
@@ -7,13 +10,19 @@ import type {
   FileChange,
   FileDiff,
   FileStatus,
-  Hunk,
 } from "./types.js";
+import {
+  parseDiffString,
+  toFileDiffs,
+  type ParseResult,
+} from "../git/dod/index.js";
 
 /**
  * Parse git diff --name-status output into FileChange array.
  */
 export function parseNameStatus(output: string): FileChange[] {
+  if (!output.trim()) return [];
+
   const lines = output.trim().split("\n").filter(Boolean);
   const changes: FileChange[] = [];
 
@@ -41,10 +50,79 @@ export function parseNameStatus(output: string): FileChange[] {
 }
 
 /**
- * Convert parse-diff File to our FileDiff structure.
+ * Build a ChangeSet from raw git diff output using DOD parser.
+ *
+ * This is the primary entry point for building ChangeSets. It uses the
+ * high-performance DOD parser internally for optimal memory usage and speed.
  */
-export function convertParsedDiff(
-  parsed: ParseDiffFile[],
+export function buildChangeSet(params: {
+  base: string;
+  head: string;
+  nameStatusOutput: string;
+  unifiedDiff: string;
+  basePackageJson?: Record<string, unknown>;
+  headPackageJson?: Record<string, unknown>;
+}): ChangeSet {
+  const files = parseNameStatus(params.nameStatusOutput);
+
+  // Parse diff using DOD parser
+  let diffs: FileDiff[];
+
+  if (params.unifiedDiff.trim()) {
+    const parseResult = parseDiffString(params.unifiedDiff);
+    const dodDiffs = toFileDiffs(parseResult, { lazy: false });
+
+    // Apply status from name-status output
+    diffs = applyFileStatuses(dodDiffs, files);
+  } else {
+    diffs = [];
+  }
+
+  return {
+    base: params.base,
+    head: params.head,
+    files,
+    diffs,
+    basePackageJson: params.basePackageJson,
+    headPackageJson: params.headPackageJson,
+  };
+}
+
+/**
+ * Build a ChangeSet from pre-parsed DOD result.
+ *
+ * Use this when you've already parsed the diff with the DOD parser
+ * and want to avoid re-parsing.
+ */
+export function buildChangeSetFromDOD(params: {
+  base: string;
+  head: string;
+  nameStatusOutput: string;
+  parseResult: ParseResult;
+  basePackageJson?: Record<string, unknown>;
+  headPackageJson?: Record<string, unknown>;
+}): ChangeSet {
+  const files = parseNameStatus(params.nameStatusOutput);
+  const dodDiffs = toFileDiffs(params.parseResult, { lazy: false });
+  const diffs = applyFileStatuses(dodDiffs, files);
+
+  return {
+    base: params.base,
+    head: params.head,
+    files,
+    diffs,
+    basePackageJson: params.basePackageJson,
+    headPackageJson: params.headPackageJson,
+  };
+}
+
+/**
+ * Apply file statuses from name-status output to parsed diffs.
+ * The DOD parser determines status from diff content, but name-status
+ * provides more accurate information (especially for renames).
+ */
+function applyFileStatuses(
+  diffs: FileDiff[],
   fileChanges: FileChange[]
 ): FileDiff[] {
   const statusMap = new Map<string, FileStatus>();
@@ -58,56 +136,59 @@ export function convertParsedDiff(
     }
   }
 
-  return parsed.map((file) => {
-    const path = file.to === "/dev/null" ? file.from! : file.to!;
-    const normalizedPath = path.replace(/^[ab]\//, "");
-    const status = statusMap.get(normalizedPath) ?? "modified";
-
-    const hunks: Hunk[] = (file.chunks || []).map((chunk) => {
-      const additions: string[] = [];
-      const deletions: string[] = [];
-
-      for (const change of chunk.changes || []) {
-        if (change.type === "add") {
-          additions.push(change.content.slice(1)); // Remove leading +
-        } else if (change.type === "del") {
-          deletions.push(change.content.slice(1)); // Remove leading -
-        }
-      }
-
-      return {
-        oldStart: chunk.oldStart,
-        oldLines: chunk.oldLines,
-        newStart: chunk.newStart,
-        newLines: chunk.newLines,
-        content: chunk.content,
-        additions,
-        deletions,
-      };
-    });
+  return diffs.map((diff) => {
+    // Normalize path (remove a/ or b/ prefix if present)
+    const normalizedPath = diff.path.replace(/^[ab]\//, "");
+    const status = statusMap.get(normalizedPath) ?? diff.status;
+    const oldPath = oldPathMap.get(normalizedPath) ?? diff.oldPath;
 
     return {
+      ...diff,
       path: normalizedPath,
       status,
-      oldPath: oldPathMap.get(normalizedPath),
-      hunks,
+      oldPath,
     };
   });
 }
 
 /**
- * Build a ChangeSet from raw git outputs.
+ * Build a ChangeSet by merging multiple diff sources.
+ *
+ * Used when combining tracked file diffs with untracked file diffs.
  */
-export function buildChangeSet(params: {
+export function buildChangeSetMerged(params: {
   base: string;
   head: string;
   nameStatusOutput: string;
-  parsedDiffs: ParseDiffFile[];
+  unifiedDiff: string;
+  additionalDiffs?: FileDiff[];
+  additionalNameStatus?: string;
   basePackageJson?: Record<string, unknown>;
   headPackageJson?: Record<string, unknown>;
 }): ChangeSet {
-  const files = parseNameStatus(params.nameStatusOutput);
-  const diffs = convertParsedDiff(params.parsedDiffs, files);
+  // Parse main diff
+  let nameStatus = params.nameStatusOutput;
+  if (params.additionalNameStatus) {
+    nameStatus = nameStatus
+      ? `${nameStatus}\n${params.additionalNameStatus}`
+      : params.additionalNameStatus;
+  }
+
+  const files = parseNameStatus(nameStatus);
+
+  // Parse tracked files diff using DOD parser
+  let diffs: FileDiff[] = [];
+
+  if (params.unifiedDiff.trim()) {
+    const parseResult = parseDiffString(params.unifiedDiff);
+    const dodDiffs = toFileDiffs(parseResult, { lazy: false });
+    diffs = applyFileStatuses(dodDiffs, files);
+  }
+
+  // Merge additional diffs (e.g., untracked files)
+  if (params.additionalDiffs && params.additionalDiffs.length > 0) {
+    diffs = [...diffs, ...params.additionalDiffs];
+  }
 
   return {
     base: params.base,
@@ -117,35 +198,6 @@ export function buildChangeSet(params: {
     basePackageJson: params.basePackageJson,
     headPackageJson: params.headPackageJson,
   };
-}
-
-// ============================================================================
-// Type definitions for parse-diff (simplified)
-// ============================================================================
-
-export interface ParseDiffChange {
-  type: "add" | "del" | "normal";
-  content: string;
-  ln?: number;
-  ln1?: number;
-  ln2?: number;
-}
-
-export interface ParseDiffChunk {
-  content: string;
-  oldStart: number;
-  oldLines: number;
-  newStart: number;
-  newLines: number;
-  changes: ParseDiffChange[];
-}
-
-export interface ParseDiffFile {
-  from?: string;
-  to?: string;
-  chunks: ParseDiffChunk[];
-  deletions: number;
-  additions: number;
 }
 
 // ============================================================================
@@ -191,4 +243,3 @@ export function createTestFileDiff(
     ],
   };
 }
-

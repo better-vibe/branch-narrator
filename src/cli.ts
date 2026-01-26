@@ -162,6 +162,7 @@ program
   )
   .action(async (options) => {
     try {
+      const startTime = Date.now();
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
@@ -192,6 +193,9 @@ program
       };
 
       console.log(renderTerminal(renderContext));
+      // Show duration (greyish color for subtlety)
+      const durationMs = Date.now() - startTime;
+      console.error(chalk.gray(`[${durationMs}ms]`));
       return;
     } catch (error) {
       handleError(error);

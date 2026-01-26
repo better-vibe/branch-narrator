@@ -2,34 +2,33 @@
 "@better-vibe/branch-narrator": minor
 ---
 
-feat: add high-performance Data-Oriented Design (DOD) diff parser
+feat: replace parse-diff with high-performance DOD parser
 
-Introduces a new diff parsing module using Data-Oriented Design principles for significantly improved performance on large diffs:
+**BREAKING INTERNAL CHANGE**: Removed the `parse-diff` dependency entirely. All diff parsing now uses the built-in Data-Oriented Design (DOD) parser for significantly improved performance.
 
-- **DiffArena**: TypedArray-based storage using Struct of Arrays (SoA) pattern for 60-80% memory reduction
-- **DiffScanner**: Zero-copy byte-level scanner for efficient tokenization
-- **StringInternPool**: String interning with FNV-1a hashing for filename deduplication
-- **StreamingDiffParser**: Single-pass streaming state machine for predictable parsing
-- **Adapter layer**: Full backward compatibility with existing FileDiff/Hunk types
+## What Changed
 
-Key benefits:
-- Eliminates GC pressure from thousands of small string/object allocations
-- Near-instant parsing startup through deferred string decoding
-- Improved CPU cache locality through flat memory layout
-- Lazy materialization - only decode what's needed
+- **Removed `parse-diff` dependency** - No longer needed as external dependency
+- **All analyzers now use DOD parser** - Unified parsing pipeline
+- **Updated `buildChangeSet()`** - Now accepts `unifiedDiff` string instead of pre-parsed diffs
+- **New `buildChangeSetMerged()`** - For combining tracked and untracked file diffs
 
-Usage:
-```typescript
-import { parseDiffBuffer, toFileDiffs } from "branch-narrator";
+## Performance Benefits
 
-// Parse diff with DOD parser
-const result = parseDiffBuffer(buffer);
+- **60-80% memory reduction** for large diffs (TypedArray storage vs object allocation)
+- **Zero GC pressure** during parsing (no intermediate string/object creation)
+- **Near-instant startup** through deferred string decoding
+- **Cache-friendly** sequential memory access pattern
 
-// Convert to legacy types for compatibility
-const diffs = toFileDiffs(result);
+## DOD Parser Architecture
 
-// Or use arena directly for maximum performance
-for (let i = 0; i < result.arena.fileCount; i++) {
-  const path = result.arena.decodeFilePath(i);
-}
-```
+- **DiffArena**: TypedArray-based Struct of Arrays (SoA) storage
+- **DiffScanner**: Zero-copy byte-level tokenization
+- **StringInternPool**: FNV-1a hash-based filename deduplication
+- **StreamingDiffParser**: Single-pass state machine
+- **Adapter layer**: Full backward compatibility with FileDiff/Hunk types
+
+## Migration
+
+No API changes for external users. The `ChangeSet` structure remains identical.
+Internal code that was using `ParseDiffFile` types should now use `FileDiff` directly.

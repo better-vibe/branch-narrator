@@ -55,7 +55,7 @@ branch-narrator facts --mode branch --base main
 | Language | TypeScript 5.x |
 | CLI | commander |
 | Git | execa |
-| Diff Parsing | parse-diff |
+| Diff Parsing | DOD parser (built-in, zero-copy) |
 | Versioning | semver |
-| Build | tsup |
-| Testing | vitest |
+| Build | bun build |
+| Testing | bun:test |

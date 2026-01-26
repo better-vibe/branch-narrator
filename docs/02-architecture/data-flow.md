@@ -6,14 +6,16 @@
 flowchart TD
     subgraph Input["Git Commands"]
         NS["git diff --name-status"]
-        UD["git diff --unified=0"]
+        UD["git diff --unified=3"]
         SP["git status --porcelain"]
         PJ["git show :package.json"]
     end
 
-    subgraph Parse["Parsing"]
+    subgraph Parse["DOD Parser (High-Performance)"]
         FP["parseNameStatus()"]
-        DP["parseDiff()"]
+        DOD["DOD StreamingParser"]
+        ARENA["DiffArena (TypedArrays)"]
+        ADAPT["Adapter → FileDiff[]"]
         PP["parsePackageJson()"]
     end
 
@@ -29,10 +31,19 @@ flowchart TD
     end
 
     NS --> FP --> CS
-    UD --> DP --> CS
+    UD --> DOD --> ARENA --> ADAPT --> CS
     SP --> FP
     PJ --> PP --> CS
 ```
+
+### DOD Parser Architecture
+
+The diff parsing uses a Data-Oriented Design approach for optimal performance:
+
+1. **DiffScanner**: Zero-copy byte-level scanner (no string allocation)
+2. **DiffArena**: TypedArray storage with Struct of Arrays layout
+3. **StringInternPool**: FNV-1a hash-based string deduplication
+4. **Lazy Decoding**: Strings decoded only when accessed
 
 ## Analyzer Pipeline
 

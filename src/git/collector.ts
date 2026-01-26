@@ -1,19 +1,20 @@
 /**
  * Git command execution and data collection.
+ *
+ * Uses the high-performance DOD parser for all diff parsing operations.
  */
 
 import { execa } from "execa";
-import parseDiff from "parse-diff";
 import {
   buildChangeSet,
-  type ParseDiffFile,
+  buildChangeSetMerged,
 } from "../core/change-set.js";
 import {
   GitCommandError,
   InvalidRefError,
   NotAGitRepoError,
 } from "../core/errors.js";
-import type { ChangeSet, DiffMode } from "../core/types.js";
+import type { ChangeSet, DiffMode, FileDiff } from "../core/types.js";
 import { batchGetFileContent } from "./batch.js";
 
 /**
@@ -313,13 +314,14 @@ async function readWorkingFile(
 /**
  * Create synthetic diff entries for untracked files.
  * Reads files in parallel for improved performance.
+ * Returns FileDiff[] directly (no legacy ParseDiffFile format needed).
  */
 async function createUntrackedDiffs(
   untrackedFiles: string[],
   cwd: string
-): Promise<{ nameStatus: string; diffs: ParseDiffFile[] }> {
+): Promise<{ nameStatus: string; diffs: FileDiff[] }> {
   const nameStatusLines: string[] = [];
-  const diffs: ParseDiffFile[] = [];
+  const diffs: FileDiff[] = [];
 
   // Separate binary files from text files
   const binaryFiles: string[] = [];
@@ -346,35 +348,29 @@ async function createUntrackedDiffs(
     }))
   );
 
-  // Process read results
+  // Process read results - create FileDiff entries directly
   for (const { file, content } of fileReadResults) {
     if (content === null) continue;
 
     nameStatusLines.push(`A\t${file}`);
 
-    // Create a synthetic diff for the file
+    // Create a FileDiff directly (no intermediate ParseDiffFile format)
     const lines = content.split("\n");
-    const changes = lines.map((line, idx) => ({
-      type: "add" as const,
-      content: "+" + line,
-      ln: idx + 1,
-    }));
 
     diffs.push({
-      from: "/dev/null",
-      to: file,
-      chunks: [
+      path: file,
+      status: "added",
+      hunks: [
         {
-          content: `@@ -0,0 +1,${lines.length} @@`,
           oldStart: 0,
           oldLines: 0,
           newStart: 1,
           newLines: lines.length,
-          changes,
+          content: `@@ -0,0 +1,${lines.length} @@`,
+          additions: lines,
+          deletions: [],
         },
       ],
-      deletions: 0,
-      additions: lines.length,
     });
   }
 
@@ -497,19 +493,16 @@ export async function collectChangeSet(
     ),
   ]);
 
-  // Parse unified diff for tracked files
-  const parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
-
   // Extract package.json content from batch result
   const basePackageContent = packageJsonBatch.get(`${base}:package.json`) ?? null;
   const headPackageContent = parsePackageJson(packageJsonBatch.get(`${headRef}:package.json`) ?? null);
 
-  // Build ChangeSet
+  // Build ChangeSet using DOD parser (parses unifiedDiff internally)
   return buildChangeSet({
     base,
     head: options.head,
     nameStatusOutput,
-    parsedDiffs,
+    unifiedDiff,
     basePackageJson: parsePackageJson(basePackageContent),
     headPackageJson: headPackageContent,
   });
@@ -558,23 +551,13 @@ async function collectChangeSetByMode(
     getUnifiedDiffByMode(options, cwd),
   ]);
 
-  // Parse unified diff for tracked files
-  let parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
-  let finalNameStatus = nameStatusOutput;
+  // Get untracked files if requested (default for "all" and "unstaged" modes)
+  let untrackedData: { nameStatus: string; diffs: FileDiff[] } | null = null;
 
-  // Include untracked files if requested (default for "all" mode)
   if (includeUntracked && options.mode !== "branch") {
     const untrackedFiles = await getUntrackedFiles(cwd);
     if (untrackedFiles.length > 0) {
-      const untrackedData = await createUntrackedDiffs(untrackedFiles, cwd);
-
-      // Merge untracked files into results
-      if (untrackedData.nameStatus) {
-        finalNameStatus = finalNameStatus
-          ? `${finalNameStatus}\n${untrackedData.nameStatus}`
-          : untrackedData.nameStatus;
-      }
-      parsedDiffs = [...parsedDiffs, ...untrackedData.diffs];
+      untrackedData = await createUntrackedDiffs(untrackedFiles, cwd);
     }
   }
 
@@ -636,12 +619,26 @@ async function collectChangeSetByMode(
     }
   }
 
-  // Build ChangeSet
+  // Build ChangeSet using DOD parser
+  // If we have untracked files, merge them with the parsed diffs
+  if (untrackedData) {
+    return buildChangeSetMerged({
+      base,
+      head,
+      nameStatusOutput,
+      unifiedDiff,
+      additionalDiffs: untrackedData.diffs,
+      additionalNameStatus: untrackedData.nameStatus,
+      basePackageJson,
+      headPackageJson,
+    });
+  }
+
   return buildChangeSet({
     base,
     head,
-    nameStatusOutput: finalNameStatus,
-    parsedDiffs,
+    nameStatusOutput,
+    unifiedDiff,
     basePackageJson,
     headPackageJson,
   });

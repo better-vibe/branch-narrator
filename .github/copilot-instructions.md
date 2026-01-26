@@ -228,7 +228,7 @@ bun run dev
 ### Production
 
 - `execa` - Running git commands
-- `parse-diff` - Parsing git diff output
+- DOD parser (built-in) - High-performance zero-copy diff parsing
 - `commander` - CLI framework
 - `chalk` - Terminal colors
 - `boxen` - Terminal boxes
