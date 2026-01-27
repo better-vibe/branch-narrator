@@ -24,16 +24,10 @@ jobs:
         with:
           branch-narrator-version: "latest"
           profile: "library"
-          sarif-upload: "true"
           comment: "true"
           redact: "true"
           baseline-artifact: "branch-narrator"
           explain-score: "true"
-
-      - uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: branch-narrator.sarif
 
       - name: Show delta info
         if: steps.narrator.outputs.delta-new-findings
