@@ -119,6 +119,9 @@ export function detectMethods(diff: FileDiff): string[] {
 
 export const routeDetectorAnalyzer: Analyzer = {
   name: "route-detector",
+  cache: {
+    includeGlobs: ["src/routes/**/*"],
+  },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

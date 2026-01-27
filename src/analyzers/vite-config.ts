@@ -206,6 +206,7 @@ function detectPluginChanges(
 
 export const viteConfigAnalyzer: Analyzer = {
   name: "vite-config",
+  cache: { includeGlobs: ["**/vite.config.*", "**/vitest.config.*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

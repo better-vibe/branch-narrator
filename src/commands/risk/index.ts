@@ -3,6 +3,7 @@
  */
 
 import type { ChangeSet, DiffMode, ProfileName, RiskFlag, RiskReport } from "../../core/types.js";
+import type { CacheConfig } from "../../cache/types.js";
 import { shouldSkipFile } from "./exclusions.js";
 import { redactLines } from "./redaction.js";
 import { computeRiskReport, filterFlagsByCategory } from "./scoring.js";
@@ -26,8 +27,10 @@ export interface RiskReportOptions {
   cwd?: string;
   /** Original CLI mode used to generate this output */
   mode?: DiffMode;
-  /** Enable test parity checking (opt-in, may be slow on large repos) */
-  testParity?: boolean;
+  /** Cache configuration */
+  cache?: CacheConfig;
+  /** Cache key of the ChangeSet (for analyzer caching) */
+  changeSetKey?: string;
 }
 
 /**
@@ -47,7 +50,8 @@ export async function generateRiskReport(
     profile: requestedProfile = "auto",
     cwd = process.cwd(),
     mode,
-    testParity = false,
+    cache,
+    changeSetKey,
   } = options;
 
   // Track skipped files
@@ -68,15 +72,12 @@ export async function generateRiskReport(
   const profileName = resolveProfileName(requestedProfile, changeSet, cwd);
   const profile = getProfile(profileName);
 
-  // Run analyzers in parallel for better performance
-  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
-
-  // Run test parity analyzer if explicitly enabled (opt-in)
-  if (testParity) {
-    const { testParityAnalyzer } = await import("../../analyzers/test-parity.js");
-    const testParityFindings = await testParityAnalyzer.analyze(changeSet);
-    rawFindings.push(...testParityFindings);
-  }
+  // Run analyzers in parallel for better performance (with caching)
+  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet, {
+    cache,
+    changeSetKey,
+    profileName,
+  });
 
   // Assign findingIds to all findings
   const findings = rawFindings.map(assignFindingId);

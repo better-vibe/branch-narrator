@@ -134,6 +134,7 @@ function getRouteType(filePath: string): RouteType {
 
 export const vueRoutesAnalyzer: Analyzer = {
   name: "vue-routes",
+  cache: { includeGlobs: ["**/pages/**", "**/src/pages/**", "**/server/**", "**/layouts/**", "**/src/layouts/**", "**/router.*", "**/routes.*", "**/router/index.*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

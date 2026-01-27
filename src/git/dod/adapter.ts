@@ -139,6 +139,8 @@ export class LazyFileDiff implements FileDiff {
 
   /**
    * Materialize a single hunk.
+   * Uses O(1) range lookup via hunkFirstLineIndex/hunkLineCount
+   * instead of scanning all lines. Skips decoding context lines.
    */
   private materializeHunk(hunkIndex: number): Hunk {
     const oldStart = this.arena.hunkOldStarts[hunkIndex];
@@ -149,24 +151,21 @@ export class LazyFileDiff implements FileDiff {
     // Decode hunk header content
     const content = this.arena.decodeHunkContent(hunkIndex);
 
-    // Collect additions and deletions
+    // Collect additions and deletions using range-based iteration
     const additions: string[] = [];
     const deletions: string[] = [];
 
-    // Find lines belonging to this hunk
-    for (let i = 0; i < this.arena.lineCount; i++) {
-      if (
-        this.arena.lineHunkIndices[i] === hunkIndex &&
-        this.arena.lineFileIndices[i] === this.fileIndex
-      ) {
-        const lineType = this.arena.lineTypes[i];
-        const lineContent = this.arena.decodeLineContent(i);
+    const firstLine = this.arena.hunkFirstLineIndex[hunkIndex];
+    const lineCount = this.arena.hunkLineCount[hunkIndex];
 
-        if (lineType === LINE_TYPE_ADD) {
-          additions.push(lineContent);
-        } else if (lineType === LINE_TYPE_DEL) {
-          deletions.push(lineContent);
-        }
+    for (let i = firstLine; i < firstLine + lineCount; i++) {
+      const lineType = this.arena.lineTypes[i];
+
+      // Only decode add/del lines - skip context lines
+      if (lineType === LINE_TYPE_ADD) {
+        additions.push(this.arena.decodeLineContent(i));
+      } else if (lineType === LINE_TYPE_DEL) {
+        deletions.push(this.arena.decodeLineContent(i));
       }
     }
 
@@ -263,11 +262,13 @@ function materializeFileDiff(
 
 /**
  * Materialize a Hunk from arena data.
+ * Uses O(1) range lookup via hunkFirstLineIndex/hunkLineCount
+ * instead of scanning all lines. Skips decoding context lines.
  */
 function materializeHunk(
   arena: DiffArena,
   hunkIndex: number,
-  fileIndex: number
+  _fileIndex: number
 ): Hunk {
   const oldStart = arena.hunkOldStarts[hunkIndex];
   const oldLines = arena.hunkOldLines[hunkIndex];
@@ -278,20 +279,18 @@ function materializeHunk(
   const additions: string[] = [];
   const deletions: string[] = [];
 
-  // Collect additions and deletions for this hunk
-  for (let i = 0; i < arena.lineCount; i++) {
-    if (
-      arena.lineHunkIndices[i] === hunkIndex &&
-      arena.lineFileIndices[i] === fileIndex
-    ) {
-      const lineType = arena.lineTypes[i];
-      const lineContent = arena.decodeLineContent(i);
+  // Collect additions and deletions using range-based iteration
+  const firstLine = arena.hunkFirstLineIndex[hunkIndex];
+  const lineCount = arena.hunkLineCount[hunkIndex];
 
-      if (lineType === LINE_TYPE_ADD) {
-        additions.push(lineContent);
-      } else if (lineType === LINE_TYPE_DEL) {
-        deletions.push(lineContent);
-      }
+  for (let i = firstLine; i < firstLine + lineCount; i++) {
+    const lineType = arena.lineTypes[i];
+
+    // Only decode add/del lines - skip context lines
+    if (lineType === LINE_TYPE_ADD) {
+      additions.push(arena.decodeLineContent(i));
+    } else if (lineType === LINE_TYPE_DEL) {
+      deletions.push(arena.decodeLineContent(i));
     }
   }
 
@@ -449,6 +448,7 @@ export function* iterateDeletions(
 
 /**
  * Count additions and deletions per file without full materialization.
+ * Uses precomputed file path index for O(1) lookup per line.
  */
 export function getChangeStats(
   result: ParseResult
@@ -456,35 +456,34 @@ export function getChangeStats(
   const { arena, internPool } = result;
   const stats = new Map<string, { additions: number; deletions: number }>();
 
-  // Initialize stats for all files
+  // Precompute file paths by index (decode once per file)
+  const filePaths: string[] = new Array(arena.fileCount);
+  const fileStats: { additions: number; deletions: number }[] = new Array(arena.fileCount);
+
   for (let i = 0; i < arena.fileCount; i++) {
     const pathOffset = arena.filePathOffsets[i];
     const pathLength = arena.filePathLengths[i];
-    const path = internPool.internFromBytes(
+    filePaths[i] = internPool.internFromBytes(
       arena["sourceBuffer"]!,
       pathOffset,
       pathLength
     );
-    stats.set(path, { additions: 0, deletions: 0 });
+    fileStats[i] = { additions: 0, deletions: 0 };
   }
 
-  // Count lines
+  // Count lines using fileIndex directly (no per-line path decoding)
   for (let i = 0; i < arena.lineCount; i++) {
-    const fileIndex = arena.lineFileIndices[i];
-    const pathOffset = arena.filePathOffsets[fileIndex];
-    const pathLength = arena.filePathLengths[fileIndex];
-    const path = internPool.internFromBytes(
-      arena["sourceBuffer"]!,
-      pathOffset,
-      pathLength
-    );
-
-    const fileStat = stats.get(path)!;
-    if (arena.lineTypes[i] === LINE_TYPE_ADD) {
-      fileStat.additions++;
-    } else if (arena.lineTypes[i] === LINE_TYPE_DEL) {
-      fileStat.deletions++;
+    const lineType = arena.lineTypes[i];
+    if (lineType === LINE_TYPE_ADD) {
+      fileStats[arena.lineFileIndices[i]].additions++;
+    } else if (lineType === LINE_TYPE_DEL) {
+      fileStats[arena.lineFileIndices[i]].deletions++;
     }
+  }
+
+  // Build result map
+  for (let i = 0; i < arena.fileCount; i++) {
+    stats.set(filePaths[i], fileStats[i]);
   }
 
   return stats;

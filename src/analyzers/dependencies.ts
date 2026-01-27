@@ -202,6 +202,7 @@ export function compareDependencies(
 
 export const dependencyAnalyzer: Analyzer = {
   name: "dependencies",
+  cache: { includeGlobs: ["**/package.json"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

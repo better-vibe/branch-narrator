@@ -26,6 +26,10 @@
 - [x] `bun.lock` lockfile detection
 - [x] Improved test file detection (src/tests/ paths)
 - [x] Integrate auto-detects agent guides and supports multiple targets
+- [x] Global caching system for ChangeSet and per-analyzer findings
+- [x] Cache management CLI (`cache stats`, `cache clear`, `cache prune`)
+- [x] Global cache flags (`--no-cache`, `--clear-cache`)
+- [x] Impact analyzer cache keyed to code diffs to avoid duplicate entries
 
 ---
 

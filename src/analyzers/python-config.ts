@@ -147,6 +147,7 @@ function extractAffectedSections(content: string): string[] {
 
 export const pythonConfigAnalyzer: Analyzer = {
   name: "python-config",
+  cache: { includeGlobs: ["**/pyproject.toml", "**/setup.py", "**/setup.cfg", "**/*.cfg", "**/*.ini", "**/.flake8", "**/.pylintrc", "**/mypy.ini", "**/tox.ini"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

@@ -42,8 +42,11 @@ The diff parsing uses a Data-Oriented Design approach for optimal performance:
 
 1. **DiffScanner**: Zero-copy byte-level scanner (no string allocation)
 2. **DiffArena**: TypedArray storage with Struct of Arrays layout
+   - **Indexed hunk access**: Each hunk stores `hunkFirstLineIndex` and `hunkLineCount`, enabling O(1) range lookup for its lines instead of scanning all lines in the arena
+   - File → hunk and hunk → line relationships are both range-indexed
 3. **StringInternPool**: FNV-1a hash-based string deduplication
-4. **Lazy Decoding**: Strings decoded only when accessed
+4. **Lazy Decoding**: Strings decoded only when accessed; context lines are never decoded during hunk materialization
+5. **Zero-copy status detection**: File status (add/delete/rename) determined by direct byte comparison, avoiding TextDecoder allocations
 
 ## Analyzer Pipeline
 

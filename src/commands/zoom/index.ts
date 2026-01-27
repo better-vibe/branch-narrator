@@ -1,6 +1,6 @@
 /**
  * Zoom command - targeted drill-down for findings and flags.
- * 
+ *
  * Provides minimal, deterministic, evidence-backed context for a single
  * finding or flag. Designed for interactive AI agent loops.
  */
@@ -16,6 +16,7 @@ import type {
   ZoomEvidence,
   PatchContext,
 } from "../../core/types.js";
+import type { CacheConfig } from "../../cache/types.js";
 import { BranchNarratorError } from "../../core/errors.js";
 import { getProfile, resolveProfileName } from "../../profiles/index.js";
 import { runAnalyzersInParallel } from "../../core/analyzer-runner.js";
@@ -38,6 +39,8 @@ export interface ZoomOptions {
   maxEvidenceLines: number;
   redact: boolean;
   noTimestamp: boolean;
+  cache?: CacheConfig;
+  changeSetKey?: string;
 }
 
 /**
@@ -83,8 +86,12 @@ async function executeZoomFinding(
   const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
   const profile = getProfile(profileName);
 
-  // Run analyzers in parallel for better performance
-  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers in parallel for better performance (with caching)
+  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet, {
+    cache: options.cache,
+    changeSetKey: options.changeSetKey,
+    profileName,
+  });
 
   // Assign IDs to all findings
   const findings = rawFindings.map(assignFindingId);
@@ -143,8 +150,12 @@ async function executeZoomFlag(
   const profileName = resolveProfileName(options.profile, changeSet, process.cwd());
   const profile = getProfile(profileName);
 
-  // Run analyzers in parallel for better performance
-  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers in parallel for better performance (with caching)
+  const rawFindings = await runAnalyzersInParallel(profile.analyzers, changeSet, {
+    cache: options.cache,
+    changeSetKey: options.changeSetKey,
+    profileName,
+  });
 
   // Assign findingIds to all findings
   const allFindings = rawFindings.map(assignFindingId);
@@ -155,6 +166,8 @@ async function executeZoomFlag(
     redact: options.redact,
     maxEvidenceLines: options.maxEvidenceLines,
     noTimestamp: options.noTimestamp,
+    cache: options.cache,
+    changeSetKey: options.changeSetKey,
   });
 
   // Find the requested flag

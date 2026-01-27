@@ -309,6 +309,38 @@ tests.missing_parity (score: 18, confidence: 0.75)
 
 ---
 
+## Global Caching Options
+
+These options can be used with any command to control caching behavior.
+
+### --no-cache
+
+Disable caching entirely. The cache will not be read or written.
+
+```bash
+branch-narrator --no-cache facts --mode branch
+```
+
+**Use cases:**
+- Ensure fresh analysis (no cached data)
+- Debugging or testing
+- When you suspect stale cache data
+
+### --clear-cache
+
+Clear all cache data before running the command.
+
+```bash
+branch-narrator --clear-cache facts --mode branch
+```
+
+**Use cases:**
+- Start fresh after significant changes
+- Reset after CLI upgrade
+- Clear corrupted cache data
+
+---
+
 ## Environment Variables
 
 ### DEBUG

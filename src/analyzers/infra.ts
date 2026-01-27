@@ -14,6 +14,7 @@ import type {
  */
 export const analyzeInfra: Analyzer = {
   name: "infra",
+  cache: { includeGlobs: ["**/Dockerfile*", "**/docker-compose*", "**/.dockerignore", "**/*.tf", "**/*.tfvars", "**/k8s/**", "**/kubernetes/**", "**/helm/**", "**/charts/**"] },
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: InfraChangeFinding[] = [];
 

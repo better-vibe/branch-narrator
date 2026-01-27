@@ -206,6 +206,7 @@ function extractRemovedPackages(diff: FileDiff, fileType: string): Array<{ name:
 
 export const pythonDependenciesAnalyzer: Analyzer = {
   name: "python-dependencies",
+  cache: { includeGlobs: ["**/requirements*.txt", "**/setup.py", "**/setup.cfg", "**/pyproject.toml", "**/Pipfile", "**/Pipfile.lock", "**/poetry.lock"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

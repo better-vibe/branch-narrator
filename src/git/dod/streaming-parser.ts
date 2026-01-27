@@ -340,14 +340,13 @@ export class StreamingDiffParser {
 
   /**
    * Determine file status from old/new paths.
+   * Uses zero-copy byte comparison to avoid TextDecoder allocations.
    */
   private determineFileStatus(
     oldPath: { start: number; length: number } | null,
     newPath: { start: number; length: number } | null,
     buffer: Uint8Array
   ): number {
-    const decoder = new TextDecoder();
-
     // Check for /dev/null (indicates add or delete)
     const isOldNull =
       oldPath !== null &&
@@ -365,16 +364,16 @@ export class StreamingDiffParser {
     }
 
     // Check for rename (different paths, neither is null)
+    // Compare bytes directly instead of decoding to strings
     if (oldPath && newPath && !isOldNull && !isNewNull) {
-      const oldPathStr = decoder.decode(
-        buffer.subarray(oldPath.start, oldPath.start + oldPath.length)
-      );
-      const newPathStr = decoder.decode(
-        buffer.subarray(newPath.start, newPath.start + newPath.length)
-      );
-
-      if (oldPathStr !== newPathStr) {
+      if (oldPath.length !== newPath.length) {
         return FILE_STATUS_RENAMED;
+      }
+
+      for (let i = 0; i < oldPath.length; i++) {
+        if (buffer[oldPath.start + i] !== buffer[newPath.start + i]) {
+          return FILE_STATUS_RENAMED;
+        }
       }
     }
 

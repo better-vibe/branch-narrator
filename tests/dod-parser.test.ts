@@ -91,6 +91,54 @@ describe("DiffArena", () => {
     expect(arena.hunkNewLines[0]).toBe(7);
   });
 
+  test("should track hunk line ranges", () => {
+    const arena = new DiffArena();
+    const buffer = new TextEncoder().encode("line1line2line3line4");
+    arena.setSourceBuffer(buffer);
+
+    arena.addFile(FILE_STATUS_MODIFIED, 0, 0);
+
+    // First hunk with 2 lines
+    arena.addHunk(0, 1, 1, 1, 2, 0, 0);
+    arena.addLine(LINE_TYPE_CTX, 0, 5, 0, 0, 1, 1);
+    arena.addLine(LINE_TYPE_ADD, 5, 5, 0, 0, 2, 0);
+
+    // Second hunk with 2 lines
+    arena.addHunk(0, 10, 1, 10, 2, 0, 0);
+    arena.addLine(LINE_TYPE_DEL, 10, 5, 0, 1, 0, 10);
+    arena.addLine(LINE_TYPE_ADD, 15, 5, 0, 1, 10, 0);
+
+    // Verify first hunk line range
+    expect(arena.hunkFirstLineIndex[0]).toBe(0);
+    expect(arena.hunkLineCount[0]).toBe(2);
+
+    // Verify second hunk line range
+    expect(arena.hunkFirstLineIndex[1]).toBe(2);
+    expect(arena.hunkLineCount[1]).toBe(2);
+  });
+
+  test("should provide range-based getHunkLines", () => {
+    const arena = new DiffArena();
+    const buffer = new TextEncoder().encode("abcdef");
+    arena.setSourceBuffer(buffer);
+
+    arena.addFile(FILE_STATUS_MODIFIED, 0, 0);
+    arena.addHunk(0, 1, 1, 1, 2, 0, 0);
+    arena.addLine(LINE_TYPE_CTX, 0, 1, 0, 0, 1, 1);
+    arena.addLine(LINE_TYPE_ADD, 1, 1, 0, 0, 2, 0);
+    arena.addLine(LINE_TYPE_ADD, 2, 1, 0, 0, 3, 0);
+
+    // Second hunk (should NOT be included)
+    arena.addHunk(0, 5, 1, 5, 1, 0, 0);
+    arena.addLine(LINE_TYPE_DEL, 3, 1, 0, 1, 0, 5);
+
+    const hunk0Lines = [...arena.getHunkLines(0)];
+    expect(hunk0Lines).toEqual([0, 1, 2]);
+
+    const hunk1Lines = [...arena.getHunkLines(1)];
+    expect(hunk1Lines).toEqual([3]);
+  });
+
   test("should add line entries correctly", () => {
     const arena = new DiffArena();
     const buffer = new TextEncoder().encode("const x = 1;");
@@ -653,6 +701,72 @@ describe("toFileDiffs", () => {
 
     // Path should still work (lazy access)
     expect(diffs[0].path).toBe("src/test.ts");
+  });
+
+  test("should correctly materialize multi-hunk files with range-based lookup", () => {
+    const multiHunkDiff = `diff --git a/src/multi.ts b/src/multi.ts
+--- a/src/multi.ts
++++ b/src/multi.ts
+@@ -1,3 +1,4 @@
+ const a = 1;
++const b = 2;
+ const c = 3;
+@@ -10,3 +11,4 @@
+ const x = 10;
+-const y = 11;
++const y = 110;
++const z = 12;
+ const w = 13;
+`;
+
+    const result = parseDiffString(multiHunkDiff);
+    const diffs = toFileDiffs(result, { lazy: false });
+
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].hunks).toHaveLength(2);
+
+    // First hunk: 1 addition, 0 deletions
+    expect(diffs[0].hunks[0].additions).toEqual(["const b = 2;"]);
+    expect(diffs[0].hunks[0].deletions).toEqual([]);
+
+    // Second hunk: 2 additions, 1 deletion
+    expect(diffs[0].hunks[1].additions).toEqual(["const y = 110;", "const z = 12;"]);
+    expect(diffs[0].hunks[1].deletions).toEqual(["const y = 11;"]);
+  });
+
+  test("lazy and eager mode produce identical output", () => {
+    const multiFileDiff = `diff --git a/file1.ts b/file1.ts
+--- a/file1.ts
++++ b/file1.ts
+@@ -1,2 +1,3 @@
+ line 1
++added line
+ line 2
+diff --git a/file2.ts b/file2.ts
+--- a/file2.ts
++++ b/file2.ts
+@@ -1,2 +1,2 @@
+-old line
++new line
+ kept line
+`;
+
+    const result = parseDiffString(multiFileDiff);
+    const lazyDiffs = toFileDiffs(result, { lazy: true });
+    const eagerDiffs = toFileDiffs(result, { lazy: false });
+
+    for (let i = 0; i < lazyDiffs.length; i++) {
+      expect(lazyDiffs[i].path).toBe(eagerDiffs[i].path);
+      expect(lazyDiffs[i].status).toBe(eagerDiffs[i].status);
+      expect(lazyDiffs[i].hunks).toHaveLength(eagerDiffs[i].hunks.length);
+
+      for (let h = 0; h < lazyDiffs[i].hunks.length; h++) {
+        expect(lazyDiffs[i].hunks[h].additions).toEqual(eagerDiffs[i].hunks[h].additions);
+        expect(lazyDiffs[i].hunks[h].deletions).toEqual(eagerDiffs[i].hunks[h].deletions);
+        expect(lazyDiffs[i].hunks[h].oldStart).toBe(eagerDiffs[i].hunks[h].oldStart);
+        expect(lazyDiffs[i].hunks[h].newStart).toBe(eagerDiffs[i].hunks[h].newStart);
+      }
+    }
   });
 });
 

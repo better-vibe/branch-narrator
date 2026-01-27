@@ -44,8 +44,6 @@
  *
  * - Tests:
  *   - `detectTestsChanged` → `TestChangeFinding` → `tests.changed`
- *   - `detectPossibleTestGap` → `TestGapFinding` → `tests.possible_gap`
- *
  * - Churn:
  *   - `detectLargeDiff` → `LargeDiffFinding` → `churn.large_diff`
  */
@@ -60,11 +58,9 @@ import type {
   APIContractChangeFinding,
   LargeDiffFinding,
   LockfileFinding,
-  TestGapFinding,
   DependencyChangeFinding,
   DbMigrationFinding,
   TestChangeFinding,
-  TestParityViolationFinding,
   StencilComponentChangeFinding,
   StencilPropChangeFinding,
   StencilEventChangeFinding,
@@ -475,7 +471,6 @@ export function findingsToFlags(findings: Array<Finding & { findingId: string }>
   const apiContractFindings = findings.filter(f => f.type === "api-contract-change") as Array<APIContractChangeFinding & { findingId: string }>;
   const largeDiffFindings = findings.filter(f => f.type === "large-diff") as Array<LargeDiffFinding & { findingId: string }>;
   const lockfileFindings = findings.filter(f => f.type === "lockfile-mismatch") as Array<LockfileFinding & { findingId: string }>;
-  const testGapFindings = findings.filter(f => f.type === "test-gap") as Array<TestGapFinding & { findingId: string }>;
   const depChanges = findings.filter(f => f.type === "dependency-change") as Array<DependencyChangeFinding & { findingId: string }>;
   const dbMigrations = findings.filter(f => f.type === "db-migration") as Array<DbMigrationFinding & { findingId: string }>;
   const testChanges = findings.filter(f => f.type === "test-change") as Array<TestChangeFinding & { findingId: string }>;
@@ -592,29 +587,6 @@ export function findingsToFlags(findings: Array<Finding & { findingId: string }>
     });
   }
   
-  // Test gap
-  for (const finding of testGapFindings) {
-    const relatedFindingIds = [finding.findingId];
-    const ruleKey = "tests.possible_gap";
-    
-    flags.push({
-      ruleKey,
-      flagId: buildFlagId(ruleKey, relatedFindingIds),
-      relatedFindingIds,
-      category: "tests",
-      score: 18,
-      confidence: 0.7,
-      title: "Possible test coverage gap",
-      summary: `${finding.prodFilesChanged} production files changed with no test updates`,
-      evidence: [],
-      suggestedChecks: [
-        "Add tests for new functionality",
-        "Update existing tests if behavior changed",
-      ],
-      effectiveScore: Math.round(18 * 0.7),
-    });
-  }
-  
   // New production dependencies
   const newProdDeps = depChanges.filter(d => d.section === "dependencies" && !d.from);
   if (newProdDeps.length > 0) {
@@ -723,45 +695,6 @@ export function findingsToFlags(findings: Array<Finding & { findingId: string }>
         "Review test coverage changes",
       ],
       effectiveScore: Math.round(5 * 0.8),
-    });
-  }
-  
-  // Test parity violations (opt-in analyzer)
-  const testParityViolations = findings.filter(f => f.type === "test-parity-violation") as Array<TestParityViolationFinding & { findingId: string }>;
-  if (testParityViolations.length > 0) {
-    const relatedFindingIds = testParityViolations.map(f => f.findingId);
-    const ruleKey = "tests.missing_parity";
-    
-    // Score based on confidence distribution
-    const highConfidenceCount = testParityViolations.filter(v => v.confidence === "high").length;
-    const mediumConfidenceCount = testParityViolations.filter(v => v.confidence === "medium").length;
-    
-    // Higher score if more high-confidence violations
-    const baseScore = 12 + (highConfidenceCount * 2) + (mediumConfidenceCount * 1);
-    const cappedScore = Math.min(baseScore, 25);
-    
-    // Confidence is higher if we have more high-confidence violations
-    const avgConfidence = highConfidenceCount > mediumConfidenceCount ? 0.85 : 0.7;
-    
-    flags.push({
-      ruleKey,
-      flagId: buildFlagId(ruleKey, relatedFindingIds),
-      relatedFindingIds,
-      category: "tests",
-      score: cappedScore,
-      confidence: avgConfidence,
-      title: "Source files without test coverage",
-      summary: `${testParityViolations.length} source ${testParityViolations.length === 1 ? "file" : "files"} modified without corresponding tests`,
-      evidence: testParityViolations.slice(0, 5).map(v => ({
-        file: v.sourceFile,
-        lines: [`No test file found (expected: ${v.expectedTestLocations[0] || "unknown"})`],
-      })),
-      suggestedChecks: [
-        "Add tests for new/changed code",
-        "Verify existing tests cover the changes",
-        "Consider if these files need unit tests",
-      ],
-      effectiveScore: Math.round(cappedScore * avgConfidence),
     });
   }
   

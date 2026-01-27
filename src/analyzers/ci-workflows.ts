@@ -27,6 +27,7 @@ function isCIFile(path: string): boolean {
  */
 export const analyzeCIWorkflows: Analyzer = {
   name: "ci-workflows",
+  cache: { includeGlobs: ["**/.github/workflows/**", "**/.gitlab-ci.yml", "**/Jenkinsfile", "**/azure-pipelines.yml", "**/bitbucket-pipelines.yml"] },
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: CIWorkflowFinding[] = [];
     const seenFiles = new Set<string>();

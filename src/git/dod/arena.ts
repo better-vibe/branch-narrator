@@ -45,6 +45,8 @@ export class DiffArena {
   hunkFileIndices: Uint32Array;
   hunkContentOffsets: Uint32Array; // Offset to @@ header in source
   hunkContentLengths: Uint32Array;
+  hunkFirstLineIndex: Uint32Array; // Index of first line in this hunk
+  hunkLineCount: Uint32Array; // Number of lines in this hunk
 
   // Parallel arrays for file data
   fileStatuses: Uint8Array;
@@ -98,6 +100,8 @@ export class DiffArena {
     this.hunkFileIndices = new Uint32Array(this.hunkCapacity);
     this.hunkContentOffsets = new Uint32Array(this.hunkCapacity);
     this.hunkContentLengths = new Uint32Array(this.hunkCapacity);
+    this.hunkFirstLineIndex = new Uint32Array(this.hunkCapacity);
+    this.hunkLineCount = new Uint32Array(this.hunkCapacity);
 
     // Initialize file arrays
     this.fileStatuses = new Uint8Array(this.fileCapacity);
@@ -166,6 +170,8 @@ export class DiffArena {
     this.hunkFileIndices[idx] = fileIndex;
     this.hunkContentOffsets[idx] = contentOffset;
     this.hunkContentLengths[idx] = contentLength;
+    this.hunkFirstLineIndex[idx] = this.lineCount;
+    this.hunkLineCount[idx] = 0;
 
     // Update file's hunk count
     this.fileHunkCount[fileIndex]++;
@@ -197,6 +203,9 @@ export class DiffArena {
     this.lineHunkIndices[idx] = hunkIndex;
     this.lineNewNumbers[idx] = newLineNumber;
     this.lineOldNumbers[idx] = oldLineNumber;
+
+    // Update hunk's line count
+    this.hunkLineCount[hunkIndex]++;
 
     return idx;
   }
@@ -268,40 +277,54 @@ export class DiffArena {
 
   /**
    * Get all addition lines for a file (returns indices for lazy access).
+   * Uses hunk line ranges for O(file_lines) instead of O(total_lines).
    */
   *getFileAdditions(fileIndex: number): Generator<number> {
-    for (let i = 0; i < this.lineCount; i++) {
-      if (
-        this.lineFileIndices[i] === fileIndex &&
-        this.lineTypes[i] === LINE_TYPE_ADD
-      ) {
-        yield i;
+    const firstHunk = this.fileFirstHunkIndex[fileIndex];
+    const hunkCount = this.fileHunkCount[fileIndex];
+
+    for (let h = firstHunk; h < firstHunk + hunkCount; h++) {
+      const firstLine = this.hunkFirstLineIndex[h];
+      const lineCount = this.hunkLineCount[h];
+
+      for (let i = firstLine; i < firstLine + lineCount; i++) {
+        if (this.lineTypes[i] === LINE_TYPE_ADD) {
+          yield i;
+        }
       }
     }
   }
 
   /**
    * Get all deletion lines for a file (returns indices for lazy access).
+   * Uses hunk line ranges for O(file_lines) instead of O(total_lines).
    */
   *getFileDeletions(fileIndex: number): Generator<number> {
-    for (let i = 0; i < this.lineCount; i++) {
-      if (
-        this.lineFileIndices[i] === fileIndex &&
-        this.lineTypes[i] === LINE_TYPE_DEL
-      ) {
-        yield i;
+    const firstHunk = this.fileFirstHunkIndex[fileIndex];
+    const hunkCount = this.fileHunkCount[fileIndex];
+
+    for (let h = firstHunk; h < firstHunk + hunkCount; h++) {
+      const firstLine = this.hunkFirstLineIndex[h];
+      const lineCount = this.hunkLineCount[h];
+
+      for (let i = firstLine; i < firstLine + lineCount; i++) {
+        if (this.lineTypes[i] === LINE_TYPE_DEL) {
+          yield i;
+        }
       }
     }
   }
 
   /**
    * Get all lines for a hunk (returns indices).
+   * Uses O(1) range lookup via hunkFirstLineIndex/hunkLineCount.
    */
   *getHunkLines(hunkIndex: number): Generator<number> {
-    for (let i = 0; i < this.lineCount; i++) {
-      if (this.lineHunkIndices[i] === hunkIndex) {
-        yield i;
-      }
+    const firstLine = this.hunkFirstLineIndex[hunkIndex];
+    const lineCount = this.hunkLineCount[hunkIndex];
+
+    for (let i = firstLine; i < firstLine + lineCount; i++) {
+      yield i;
     }
   }
 
@@ -343,7 +366,9 @@ export class DiffArena {
       this.hunkNewLines.byteLength +
       this.hunkFileIndices.byteLength +
       this.hunkContentOffsets.byteLength +
-      this.hunkContentLengths.byteLength;
+      this.hunkContentLengths.byteLength +
+      this.hunkFirstLineIndex.byteLength +
+      this.hunkLineCount.byteLength;
 
     const fileBytes =
       this.fileStatuses.byteLength +
@@ -357,7 +382,7 @@ export class DiffArena {
     const totalBytes = lineBytes + hunkBytes + fileBytes;
     const usedBytes =
       this.lineCount * 29 + // 29 bytes per line entry
-      this.hunkCount * 24 + // 24 bytes per hunk entry
+      this.hunkCount * 32 + // 32 bytes per hunk entry (24 + 8 for line indexing)
       this.fileCount * 21; // 21 bytes per file entry
 
     return {
@@ -409,6 +434,8 @@ export class DiffArena {
     this.hunkFileIndices = this.growTypedArray(this.hunkFileIndices, newCapacity);
     this.hunkContentOffsets = this.growTypedArray(this.hunkContentOffsets, newCapacity);
     this.hunkContentLengths = this.growTypedArray(this.hunkContentLengths, newCapacity);
+    this.hunkFirstLineIndex = this.growTypedArray(this.hunkFirstLineIndex, newCapacity);
+    this.hunkLineCount = this.growTypedArray(this.hunkLineCount, newCapacity);
 
     this.hunkCapacity = newCapacity;
   }

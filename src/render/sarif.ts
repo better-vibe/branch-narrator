@@ -28,7 +28,6 @@ import type {
   StencilMethodChangeFinding,
   StencilPropChangeFinding,
   StencilSlotChangeFinding,
-  TestGapFinding,
   TypeScriptConfigFinding,
 } from "../core/types.js";
 import { getAdditionsWithLineNumbers } from "../git/parser.js";
@@ -270,15 +269,6 @@ export const SARIF_RULES: Record<string, RuleMapping> = {
     defaultLevel: "warning",
     category: "infra",
   },
-  BNR016: {
-    id: "BNR016",
-    name: "TestGapDetected",
-    shortDescription: "Test coverage gap detected",
-    fullDescription:
-      "Production code was modified but no corresponding test files were changed. Consider adding tests to cover the new or modified functionality.",
-    defaultLevel: "note",
-    category: "quality",
-  },
   BNR017: {
     id: "BNR017",
     name: "LargeDiff",
@@ -481,9 +471,6 @@ function mapFindingToResult(
 
     case "infra-change":
       return mapInfraChangeFinding(finding as InfraChangeFinding);
-
-    case "test-gap":
-      return mapTestGapFinding(finding as TestGapFinding);
 
     case "large-diff":
       return mapLargeDiffFinding(finding as LargeDiffFinding);
@@ -1265,41 +1252,6 @@ function mapInfraChangeFinding(finding: InfraChangeFinding): SarifResult {
     properties: {
       infraType: finding.infraType,
       files: finding.files,
-    },
-  };
-}
-
-/**
- * Map test gap finding to SARIF result.
- */
-function mapTestGapFinding(finding: TestGapFinding): SarifResult {
-  const locations = finding.evidence.map((ev) => ({
-    physicalLocation: {
-      artifactLocation: {
-        uri: ev.file,
-        uriBaseId: "SRCROOT",
-      },
-      region: ev.line
-        ? {
-            startLine: ev.line,
-          }
-        : undefined,
-    },
-  }));
-
-  return {
-    ruleId: "BNR016",
-    level: "note",
-    message: {
-      text: `Test coverage gap: ${finding.prodFilesChanged} production files changed, ${finding.testFilesChanged} test files changed`,
-    },
-    locations,
-    partialFingerprints: {
-      findingId: finding.findingId || "",
-    },
-    properties: {
-      prodFilesChanged: finding.prodFilesChanged,
-      testFilesChanged: finding.testFilesChanged,
     },
   };
 }

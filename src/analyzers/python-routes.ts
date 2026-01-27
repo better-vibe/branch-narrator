@@ -240,6 +240,7 @@ function pathToRouteId(routePath: string, framework: string): string {
 
 export const pythonRoutesAnalyzer: Analyzer = {
   name: "python-routes",
+  cache: { includeGlobs: ["**/*.py"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

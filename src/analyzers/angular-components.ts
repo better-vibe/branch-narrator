@@ -178,6 +178,7 @@ function extractDecoratorInfo(content: string): DecoratorInfo | null {
 
 export const angularComponentsAnalyzer: Analyzer = {
   name: "angular-components",
+  cache: { includeGlobs: ["**/*.ts", "**/*.html", "**/*.css", "**/*.scss"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

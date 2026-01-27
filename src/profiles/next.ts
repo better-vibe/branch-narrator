@@ -6,7 +6,6 @@ import type { Profile } from "../core/types.js";
 import {
   analyzeLargeDiff,
   analyzeLockfiles,
-  analyzeTestGaps,
   analyzeSQLRisks,
   analyzeCIWorkflows,
   analyzeInfra,
@@ -41,7 +40,6 @@ export const nextProfile: Profile = {
     tailwindAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
-    analyzeTestGaps,
     analyzeSQLRisks,
     analyzeCIWorkflows,
     analyzeInfra,

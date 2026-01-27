@@ -287,6 +287,7 @@ function describeChange(diff: FileDiff): string | null {
 
 export const fileSummaryAnalyzer: Analyzer = {
   name: "file-summary",
+  cache: {},
 
   analyze(changeSet: ChangeSet): Finding[] {
     const added: string[] = [];

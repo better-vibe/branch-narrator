@@ -82,6 +82,7 @@ export function getSecurityReasonLabel(reason: SecurityFileReason): string {
 
 export const securityFilesAnalyzer: Analyzer = {
   name: "security-files",
+  cache: {},
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

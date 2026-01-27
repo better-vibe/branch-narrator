@@ -14,7 +14,6 @@ import {
   impactAnalyzer,
   analyzeLargeDiff,
   analyzeLockfiles,
-  analyzeTestGaps,
   analyzeCIWorkflows,
   analyzeAPIContracts,
 } from "../analyzers/index.js";
@@ -38,7 +37,6 @@ export const libraryProfile: Profile = {
     monorepoAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
-    analyzeTestGaps,
     analyzeCIWorkflows,
     analyzeAPIContracts,
   ],
