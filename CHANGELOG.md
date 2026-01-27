@@ -1,5 +1,96 @@
 # @better-vibe/branch-narrator
 
+## 1.7.0
+
+### Minor Changes
+
+- 15721e9: feat: replace parse-diff with high-performance DOD parser
+
+  **BREAKING INTERNAL CHANGE**: Removed the `parse-diff` dependency entirely. All diff parsing now uses the built-in Data-Oriented Design (DOD) parser for significantly improved performance.
+
+  ## What Changed
+
+  - **Removed `parse-diff` dependency** - No longer needed as external dependency
+  - **All analyzers now use DOD parser** - Unified parsing pipeline
+  - **Updated `buildChangeSet()`** - Now accepts `unifiedDiff` string instead of pre-parsed diffs
+  - **New `buildChangeSetMerged()`** - For combining tracked and untracked file diffs
+
+  ## Performance Benefits
+
+  - **60-80% memory reduction** for large diffs (TypedArray storage vs object allocation)
+  - **Zero GC pressure** during parsing (no intermediate string/object creation)
+  - **Near-instant startup** through deferred string decoding
+  - **Cache-friendly** sequential memory access pattern
+
+  ## DOD Parser Architecture
+
+  - **DiffArena**: TypedArray-based Struct of Arrays (SoA) storage
+  - **DiffScanner**: Zero-copy byte-level tokenization
+  - **StringInternPool**: FNV-1a hash-based filename deduplication
+  - **StreamingDiffParser**: Single-pass state machine
+  - **Adapter layer**: Full backward compatibility with FileDiff/Hunk types
+
+  ## Migration
+
+  No API changes for external users. The `ChangeSet` structure remains identical.
+  Internal code that was using `ParseDiffFile` types should now use `FileDiff` directly.
+
+- 7faa035: Add global caching system for improved performance
+
+  This release introduces a comprehensive caching system that persists intermediate results across CLI executions:
+
+  **Cache Features:**
+
+  - **ChangeSet caching**: Parsed git diff output is cached based on git state
+  - **Per-analyzer caching**: Individual analyzer findings are cached with file-pattern-aware invalidation
+  - **Git ref caching**: SHA lookups are cached and invalidated when HEAD changes
+
+  **New CLI Options:**
+
+  - `--no-cache`: Disable caching entirely (bypass lookup and don't store)
+  - `--clear-cache`: Clear the cache before running the command
+
+  **New `cache` Command:**
+
+  - `cache stats [--pretty]`: Show cache statistics (hits, misses, hit rate, size)
+  - `cache clear`: Remove all cache data
+  - `cache prune [--max-age <days>]`: Remove entries older than N days (default: 30)
+
+  **Cache Location:**
+  All cache data is stored in `.branch-narrator/cache/` within your project directory.
+
+  **Cache Invalidation:**
+
+  - Content-addressed caching with SHA-256 hashes
+  - Automatic invalidation on CLI version change
+  - Mode-specific invalidation strategies for different git states
+  - Two-entry limit policy (current + previous) prevents unbounded growth
+
+  The caching system is enabled by default and works transparently. Use `--no-cache` when you need fresh results.
+
+### Patch Changes
+
+- 7faa035: Fix impact analyzer caching so clean reruns reuse the same cache entry instead of creating duplicates.
+- 60c8f60: docs: align CLI/docs with current profiles, outputs, and public API export
+- 7faa035: perf: optimize DOD diff parser with indexed hunk line access
+
+  ## What Changed
+
+  - **Hunk line indexing**: Added `hunkFirstLineIndex` and `hunkLineCount` to `DiffArena`, enabling O(1) range lookups for hunk lines instead of O(totalLines) full scans
+  - **Range-based materialization**: Adapter `materializeHunk()` (both lazy and eager paths) now iterates only the hunk's line range
+  - **Context line skip**: Context lines are no longer decoded during hunk materialization since only additions and deletions are collected
+  - **Zero-copy file status detection**: `determineFileStatus()` now compares path bytes directly instead of allocating a `TextDecoder` per file
+  - **Optimized `getChangeStats()`**: File paths are precomputed by index once, eliminating per-line path decoding
+
+  ## Performance Impact
+
+  For a diff with F files, H hunks, and L total lines:
+
+  - **Hunk materialization**: O(L \* H) → O(L) (each line visited once via its hunk range)
+  - **File additions/deletions generators**: O(L) full scan → O(file_lines) range scan
+  - **`getChangeStats()`**: O(L) path decodings → O(F) path decodings
+  - **`determineFileStatus()`**: Eliminates TextDecoder allocation per file
+
 ## 1.6.0
 
 ### Minor Changes
