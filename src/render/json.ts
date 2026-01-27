@@ -1,20 +1,18 @@
 /**
  * JSON facts renderer.
+ *
+ * Note: The canonical FactsOutput type is defined in core/types.ts
+ * and used by the facts command builder. This renderer produces a
+ * simplified JSON output for basic use cases.
  */
 
-import type { Finding, RenderContext, RiskScore } from "../core/types.js";
-
-export interface FactsOutput {
-  profile: string;
-  riskScore: RiskScore;
-  findings: Finding[];
-}
+import type { RenderContext } from "../core/types.js";
 
 /**
  * Render findings as JSON output.
  */
 export function renderJson(context: RenderContext): string {
-  const output: FactsOutput = {
+  const output = {
     profile: context.profile,
     riskScore: context.riskScore,
     findings: context.findings,

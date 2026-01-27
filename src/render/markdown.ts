@@ -43,24 +43,15 @@ import { getCategoryLabel } from "../analyzers/file-category.js";
 import { getSecurityReasonLabel } from "../analyzers/security-files.js";
 import {
   buildSummaryData,
+  buildDependencyOverview,
+  formatDependencyOverviewBullets,
   formatDiffstat,
   formatRiskLevel,
+  getFindings,
+  groupFindingsByType,
+  stripEmojiPrefix,
   type TopFinding,
 } from "./summary.js";
-
-/**
- * Group findings by type.
- */
-function groupFindings(findings: Finding[]): Map<string, Finding[]> {
-  const groups = new Map<string, Finding[]>();
-  for (const finding of findings) {
-    if (!groups.has(finding.type)) {
-      groups.set(finding.type, []);
-    }
-    groups.get(finding.type)!.push(finding);
-  }
-  return groups;
-}
 
 /**
  * Render the Context section (interactive mode only).
@@ -229,6 +220,30 @@ function renderWhatChanged(
 }
 
 /**
+ * Render Dependencies primary section (promoted from details).
+ * Shows a concise overview of dependency changes with key highlights.
+ */
+function renderDependenciesPrimary(findings: Finding[]): string {
+  const overview = buildDependencyOverview(findings);
+  if (overview.total === 0) {
+    return "";
+  }
+
+  const bullets = formatDependencyOverviewBullets(overview);
+  if (bullets.length === 0) {
+    return "";
+  }
+
+  let output = "## Dependencies\n\n";
+  for (const bullet of bullets) {
+    output += `- ${bullet}\n`;
+  }
+  output += "\n";
+
+  return output;
+}
+
+/**
  * Render Suggested test plan section with rationales.
  */
 function renderTestPlan(
@@ -238,10 +253,8 @@ function renderTestPlan(
   const bullets: { cmd: string; rationale: string }[] = [];
 
   // Check if test files were changed
-  const testChanges = groups.get("test-change") as
-    | TestChangeFinding[]
-    | undefined;
-  if (testChanges && testChanges.length > 0) {
+  const testChanges = getFindings<TestChangeFinding>(groups, "test-change");
+  if (testChanges.length > 0) {
     const allTestFiles = testChanges.flatMap((t) => t.files);
 
     // Targeted test if only one file changed
@@ -277,8 +290,8 @@ function renderTestPlan(
   }
 
   // Route exercise suggestions
-  const routes = groups.get("route-change") as RouteChangeFinding[] | undefined;
-  if (routes) {
+  const routes = getFindings<RouteChangeFinding>(groups, "route-change");
+  if (routes.length > 0) {
     const endpoints = routes.filter((r) => r.routeType === "endpoint");
     for (const endpoint of endpoints.slice(0, 3)) {
       const urlPath = routeIdToUrlPath(endpoint.routeId);
@@ -324,24 +337,23 @@ function renderTestPlan(
 
 /**
  * Render Notes section (risk summary + evidence).
+ * Omitted entirely when risk is low and there are no evidence bullets,
+ * since that would only add "no elevated risks" noise.
  */
 function renderNotes(context: RenderContext): string {
   const { riskScore } = context;
+  const bullets = riskScore.evidenceBullets ?? [];
+
+  // Skip the entire section when low risk with no evidence - reduces noise
+  if (bullets.length === 0 && riskScore.level === "low") {
+    return "";
+  }
 
   let output = "## Notes\n\n";
   output += `- Risk: ${formatRiskLevel(riskScore)}\n`;
 
-  const bullets = riskScore.evidenceBullets ?? [];
-  if (bullets.length === 0 && riskScore.level === "low") {
-    output += `- No elevated risks detected.\n`;
-  } else {
-    for (const bullet of bullets) {
-      // Remove emoji prefixes if present
-      const cleanBullet = bullet
-        .replace(/^[⚠️⚡ℹ️✅]\s*/, "")
-        .replace(/^[\u2600-\u27FF]\s*/, "");
-      output += `- ${cleanBullet}\n`;
-    }
+  for (const bullet of bullets) {
+    output += `- ${stripEmojiPrefix(bullet)}\n`;
   }
   output += "\n";
 
@@ -852,16 +864,11 @@ function renderPackageExports(exports: PackageExportsFinding[]): string {
  * Render Stencil Component API changes.
  */
 function renderStencilChanges(groups: Map<string, Finding[]>): string {
-  const componentChanges =
-    (groups.get("stencil-component-change") as StencilComponentChangeFinding[]) ?? [];
-  const propChanges =
-    (groups.get("stencil-prop-change") as StencilPropChangeFinding[]) ?? [];
-  const eventChanges =
-    (groups.get("stencil-event-change") as StencilEventChangeFinding[]) ?? [];
-  const methodChanges =
-    (groups.get("stencil-method-change") as StencilMethodChangeFinding[]) ?? [];
-  const slotChanges =
-    (groups.get("stencil-slot-change") as StencilSlotChangeFinding[]) ?? [];
+  const componentChanges = getFindings<StencilComponentChangeFinding>(groups, "stencil-component-change");
+  const propChanges = getFindings<StencilPropChangeFinding>(groups, "stencil-prop-change");
+  const eventChanges = getFindings<StencilEventChangeFinding>(groups, "stencil-event-change");
+  const methodChanges = getFindings<StencilMethodChangeFinding>(groups, "stencil-method-change");
+  const slotChanges = getFindings<StencilSlotChangeFinding>(groups, "stencil-slot-change");
 
   const hasChanges =
     componentChanges.length > 0 ||
@@ -984,8 +991,7 @@ function renderStencilChanges(groups: Map<string, Finding[]>): string {
  * Render Angular Component changes.
  */
 function renderAngularChanges(groups: Map<string, Finding[]>): string {
-  const componentChanges =
-    (groups.get("angular-component-change") as AngularComponentChangeFinding[]) ?? [];
+  const componentChanges = getFindings<AngularComponentChangeFinding>(groups, "angular-component-change");
 
   if (componentChanges.length === 0) {
     return "";
@@ -1197,9 +1203,8 @@ function renderPythonConfig(configs: PythonConfigFinding[]): string {
  * Render Warnings section (large-diff, lockfile-mismatch).
  */
 function renderWarnings(groups: Map<string, Finding[]>): string {
-  const largeDiff = (groups.get("large-diff") as LargeDiffFinding[]) ?? [];
-  const lockfileMismatch =
-    (groups.get("lockfile-mismatch") as LockfileFinding[]) ?? [];
+  const largeDiff = getFindings<LargeDiffFinding>(groups, "large-diff");
+  const lockfileMismatch = getFindings<LockfileFinding>(groups, "lockfile-mismatch");
 
   const hasWarnings =
     largeDiff.length > 0 || lockfileMismatch.length > 0;
@@ -1229,7 +1234,9 @@ function renderWarnings(groups: Map<string, Finding[]>): string {
 }
 
 /**
- * Render Impact Analysis section.
+ * Render Impact Analysis section (trimmed to high/medium only, capped).
+ * Low blast radius entries are omitted since they add noise without actionable info.
+ * The section is skipped entirely when impact is already represented in Top findings.
  */
 function renderImpactAnalysis(
   impacts: ImpactAnalysisFinding[]
@@ -1238,23 +1245,42 @@ function renderImpactAnalysis(
     return "";
   }
 
-  // Sort by blast radius priority: high first, medium second, low last
+  // Only show high and medium blast radius - low adds noise
+  const significantImpacts = impacts.filter(
+    (i) => i.blastRadius === "high" || i.blastRadius === "medium"
+  );
+
+  if (significantImpacts.length === 0) {
+    return "";
+  }
+
+  // Sort by blast radius priority: high first, medium second
   const priorityOrder = { high: 0, medium: 1, low: 2 };
-  const sortedImpacts = [...impacts].sort(
+  const sortedImpacts = [...significantImpacts].sort(
     (a, b) => priorityOrder[a.blastRadius] - priorityOrder[b.blastRadius]
   );
 
+  // Cap the number of entries displayed
+  const MAX_IMPACT_ENTRIES = 5;
+  const MAX_DEPENDENTS_PER_ENTRY = 3;
+  const displayImpacts = sortedImpacts.slice(0, MAX_IMPACT_ENTRIES);
+  const omittedCount = sortedImpacts.length - displayImpacts.length;
+
   let output = "### Impact Analysis\n\n";
-  for (const impact of sortedImpacts) {
+  for (const impact of displayImpacts) {
     output += `**\`${impact.sourceFile}\`** - Blast Radius: ${impact.blastRadius.toUpperCase()} (${impact.affectedFiles.length} files)\n\n`;
     output += "Affected files:\n";
-    for (const f of impact.affectedFiles.slice(0, 5)) {
+    for (const f of impact.affectedFiles.slice(0, MAX_DEPENDENTS_PER_ENTRY)) {
       output += `- \`${f}\`\n`;
     }
-    if (impact.affectedFiles.length > 5) {
-      output += `- ...and ${impact.affectedFiles.length - 5} more\n`;
+    if (impact.affectedFiles.length > MAX_DEPENDENTS_PER_ENTRY) {
+      output += `- ...and ${impact.affectedFiles.length - MAX_DEPENDENTS_PER_ENTRY} more\n`;
     }
     output += "\n";
+  }
+
+  if (omittedCount > 0) {
+    output += `*...and ${omittedCount} more files with significant blast radius*\n\n`;
   }
 
   return output;
@@ -1295,53 +1321,43 @@ function renderDetails(
   let detailsContent = "";
 
   // Impact Analysis
-  const impacts =
-    (groups.get("impact-analysis") as ImpactAnalysisFinding[]) ?? [];
+  const impacts = getFindings<ImpactAnalysisFinding>(groups, "impact-analysis");
   detailsContent += renderImpactAnalysis(impacts);
 
   // Routes / API
-  const routes = (groups.get("route-change") as RouteChangeFinding[]) ?? [];
+  const routes = getFindings<RouteChangeFinding>(groups, "route-change");
   detailsContent += renderRoutes(routes);
 
   // API Contracts
-  const apiContracts =
-    (groups.get("api-contract-change") as APIContractChangeFinding[]) ?? [];
+  const apiContracts = getFindings<APIContractChangeFinding>(groups, "api-contract-change");
   detailsContent += renderAPIContracts(apiContracts);
 
   // GraphQL Schema
-  const graphqlChanges =
-    (groups.get("graphql-change") as GraphQLChangeFinding[]) ?? [];
+  const graphqlChanges = getFindings<GraphQLChangeFinding>(groups, "graphql-change");
   detailsContent += renderGraphQL(graphqlChanges);
 
   // Database (Supabase)
-  const migrations =
-    (groups.get("db-migration") as DbMigrationFinding[]) ?? [];
+  const migrations = getFindings<DbMigrationFinding>(groups, "db-migration");
   detailsContent += renderDatabase(migrations);
 
   // Database (Python - Alembic/Django)
-  const pythonMigrations =
-    (groups.get("python-migration") as PythonMigrationFinding[]) ?? [];
+  const pythonMigrations = getFindings<PythonMigrationFinding>(groups, "python-migration");
   detailsContent += renderPythonMigrations(pythonMigrations);
 
   // SQL Risk
-  const sqlRisks = (groups.get("sql-risk") as SQLRiskFinding[]) ?? [];
+  const sqlRisks = getFindings<SQLRiskFinding>(groups, "sql-risk");
   detailsContent += renderSQLRisk(sqlRisks);
 
   // Config / Env
-  const envVars = (groups.get("env-var") as EnvVarFinding[]) ?? [];
+  const envVars = getFindings<EnvVarFinding>(groups, "env-var");
   detailsContent += renderEnvVars(envVars);
 
   // Configuration Changes (TypeScript, Tailwind, Vite, Monorepo, Python)
-  const tsConfigs =
-    (groups.get("typescript-config") as TypeScriptConfigFinding[]) ?? [];
-  const tailwindConfigs =
-    (groups.get("tailwind-config") as TailwindConfigFinding[]) ?? [];
-  const monorepoConfigs =
-    (groups.get("monorepo-config") as MonorepoConfigFinding[]) ?? [];
-  const viteConfigs =
-    (groups.get("vite-config") as ViteConfigFinding[]) ?? [];
-  const pythonConfigs =
-    (groups.get("python-config") as PythonConfigFinding[]) ?? [];
+  const tsConfigs = getFindings<TypeScriptConfigFinding>(groups, "typescript-config");
+  const tailwindConfigs = getFindings<TailwindConfigFinding>(groups, "tailwind-config");
+  const monorepoConfigs = getFindings<MonorepoConfigFinding>(groups, "monorepo-config");
+  const viteConfigs = getFindings<ViteConfigFinding>(groups, "vite-config");
+  const pythonConfigs = getFindings<PythonConfigFinding>(groups, "python-config");
   detailsContent += renderConfiguration(
     tsConfigs,
     tailwindConfigs,
@@ -1351,18 +1367,17 @@ function renderDetails(
   detailsContent += renderPythonConfig(pythonConfigs);
 
   // Cloudflare
-  const cloudflare =
-    (groups.get("cloudflare-change") as CloudflareChangeFinding[]) ?? [];
+  const cloudflare = getFindings<CloudflareChangeFinding>(groups, "cloudflare-change");
   detailsContent += renderCloudflare(cloudflare);
 
-  // Dependencies
-  const deps =
-    (groups.get("dependency-change") as DependencyChangeFinding[]) ?? [];
+  // Dependencies detail table (only if there are deps not fully covered by the
+  // promoted primary section -- we always show the detail table for completeness
+  // since the primary section is a summary and the detail table has full versions)
+  const deps = getFindings<DependencyChangeFinding>(groups, "dependency-change");
   detailsContent += renderDependencies(deps);
 
   // Package API (exports)
-  const packageExports =
-    (groups.get("package-exports") as PackageExportsFinding[]) ?? [];
+  const packageExports = getFindings<PackageExportsFinding>(groups, "package-exports");
   detailsContent += renderPackageExports(packageExports);
 
   // Component API (Stencil)
@@ -1372,20 +1387,16 @@ function renderDetails(
   detailsContent += renderAngularChanges(groups);
 
   // CI / Infrastructure
-  const ciWorkflows =
-    (groups.get("ci-workflow") as CIWorkflowFinding[]) ?? [];
-  const infraChanges =
-    (groups.get("infra-change") as InfraChangeFinding[]) ?? [];
+  const ciWorkflows = getFindings<CIWorkflowFinding>(groups, "ci-workflow");
+  const infraChanges = getFindings<InfraChangeFinding>(groups, "infra-change");
   detailsContent += renderCIInfrastructure(ciWorkflows, infraChanges);
 
   // Security-Sensitive Files
-  const securityFiles =
-    (groups.get("security-file") as SecurityFileFinding[]) ?? [];
+  const securityFiles = getFindings<SecurityFileFinding>(groups, "security-file");
   detailsContent += renderSecurityFiles(securityFiles);
 
   // Convention Violations
-  const violations =
-    (groups.get("convention-violation") as ConventionViolationFinding[]) ?? [];
+  const violations = getFindings<ConventionViolationFinding>(groups, "convention-violation");
   detailsContent += renderConventionViolations(violations);
 
   // Warnings
@@ -1404,8 +1415,16 @@ function renderDetails(
  * No emojis, compact by default, extended info in details block.
  */
 export function renderMarkdown(context: RenderContext): string {
-  const groups = groupFindings(context.findings);
+  const groups = groupFindingsByType(context.findings);
   const summaryData = buildSummaryData(context.findings);
+
+  // No-changes short-circuit: single-line message with metadata comment.
+  // Only short-circuit when there are truly no findings at all (not just no file-summary)
+  // and no interactive context has been provided.
+  const hasInteractiveContent = !!(context.interactive?.context || context.interactive?.testNotes);
+  if (summaryData.diffstat.total === 0 && context.findings.length === 0 && !hasInteractiveContent) {
+    return `<!-- branch-narrator: profile=${context.profile} -->\nNo changes detected.\n`;
+  }
 
   let output = "";
 
@@ -1429,6 +1448,9 @@ export function renderMarkdown(context: RenderContext): string {
     | FileSummaryFinding
     | undefined;
   output += renderWhatChanged(categoryFinding, fileSummary, summaryData);
+
+  // Dependencies (promoted to primary section, before test plan)
+  output += renderDependenciesPrimary(context.findings);
 
   // Suggested test plan
   output += renderTestPlan(context, groups);

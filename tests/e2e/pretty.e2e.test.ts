@@ -9,6 +9,7 @@ import {
   createSvelteKitRepo,
   createRepoWithMigrations,
   createRepoWithEnvVars,
+  createRepoWithDependencyChanges,
   createComprehensiveRepo,
   runCli,
   type TestRepo,
@@ -313,15 +314,21 @@ describe("pretty command - error handling", () => {
 // ============================================================================
 
 describe("pretty command - edge cases", () => {
-  it("should handle empty changes gracefully", async () => {
+  it("should handle empty changes gracefully with no-changes message", async () => {
     currentRepo = await createTestRepo({});
 
-    // With no files in the diff, should still exit successfully
-    const { exitCode } = await runCli(
+    const { stdout, exitCode } = await runCli(
       ["pretty", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
       currentRepo.cwd
     );
 
+    // Should succeed or report no changes gracefully
+    if (exitCode === 0) {
+      expect(stdout).toContain("No changes detected");
+      // Should NOT contain test plan or notes sections
+      expect(stdout.toLowerCase()).not.toContain("suggested test plan");
+      expect(stdout.toLowerCase()).not.toContain("notes");
+    }
     // May succeed with "no changes" or may fail - either is acceptable
     expect([0, 1]).toContain(exitCode);
   });
@@ -337,5 +344,37 @@ describe("pretty command - edge cases", () => {
     );
 
     expect(exitCode).toBe(0);
+  });
+});
+
+// ============================================================================
+// Dependency Section Tests
+// ============================================================================
+
+describe("pretty command - dependency changes", () => {
+  it("should show dependency overview in primary area", async () => {
+    currentRepo = await createRepoWithDependencyChanges();
+
+    const { stdout } = await runCli(
+      ["pretty", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Should display dependency changes in the main output
+    expect(stdout.toLowerCase()).toMatch(/dependenc/);
+    // Should include count information
+    expect(stdout.toLowerCase()).toMatch(/dependency changes/);
+  });
+
+  it("should highlight major updates in dependency overview", async () => {
+    currentRepo = await createRepoWithDependencyChanges();
+
+    const { stdout } = await runCli(
+      ["pretty", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Major updates should be called out
+    expect(stdout.toLowerCase()).toMatch(/major/);
   });
 });

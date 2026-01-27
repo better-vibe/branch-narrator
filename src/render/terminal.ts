@@ -10,7 +10,6 @@ import type {
   CIWorkflowFinding,
   CloudflareChangeFinding,
   DbMigrationFinding,
-  DependencyChangeFinding,
   EnvVarFinding,
   FileCategoryFinding,
   FileSummaryFinding,
@@ -34,10 +33,16 @@ import type {
   TypeScriptConfigFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
+import { getCategoryLabel } from "../analyzers/file-category.js";
 import {
   buildSummaryData,
+  buildDependencyOverview,
+  formatDependencyOverviewBullets,
   formatDiffstat,
   formatFindingsByCategory,
+  getFindings,
+  groupFindingsByType,
+  stripEmojiPrefix,
   type TopFinding,
 } from "./summary.js";
 
@@ -113,31 +118,43 @@ const TEST_COMMANDS: Record<
 };
 
 /**
- * Group findings by type.
+ * Unicode box-drawing characters for table rendering.
  */
-function groupFindings(findings: Finding[]): Map<string, Finding[]> {
-  const groups = new Map<string, Finding[]>();
-  for (const finding of findings) {
-    if (!groups.has(finding.type)) {
-      groups.set(finding.type, []);
-    }
-    groups.get(finding.type)!.push(finding);
-  }
-  return groups;
+const TABLE_CHARS = {
+  top: "─",
+  "top-mid": "┬",
+  "top-left": "┌",
+  "top-right": "┐",
+  bottom: "─",
+  "bottom-mid": "┴",
+  "bottom-left": "└",
+  "bottom-right": "┘",
+  left: "│",
+  "left-mid": "├",
+  mid: "─",
+  "mid-mid": "┼",
+  right: "│",
+  "right-mid": "┤",
+  middle: "│",
+};
+
+/**
+ * Get color function for risk/attention level.
+ */
+function getRiskColor(level: string): (text: string) => string {
+  const normalized = level.toLowerCase();
+  return normalized === "high"
+    ? colors.riskHigh
+    : normalized === "medium"
+      ? colors.riskMedium
+      : colors.riskLow;
 }
 
 /**
  * Get risk level text with color (no emoji).
  */
 function getRiskText(level: "low" | "medium" | "high"): string {
-  const colorFn =
-    level === "high"
-      ? colors.riskHigh
-      : level === "medium"
-        ? colors.riskMedium
-        : colors.riskLow;
-
-  return colorFn(level.toUpperCase());
+  return getRiskColor(level)(level.toUpperCase());
 }
 
 /**
@@ -146,14 +163,7 @@ function getRiskText(level: "low" | "medium" | "high"): string {
 function getReviewAttentionText(
   attention: "HIGH" | "MEDIUM" | "LOW"
 ): string {
-  const colorFn =
-    attention === "HIGH"
-      ? colors.riskHigh
-      : attention === "MEDIUM"
-        ? colors.riskMedium
-        : colors.riskLow;
-
-  return colorFn(attention);
+  return getRiskColor(attention)(attention);
 }
 
 /**
@@ -353,26 +363,6 @@ function renderWhatChanged(
   return output;
 }
 
-/**
- * Get human-readable label for a category.
- */
-function getCategoryLabel(
-  category: string
-): string {
-  const labels: Record<string, string> = {
-    product: "Code",
-    tests: "Tests",
-    ci: "CI/CD",
-    infra: "Infrastructure",
-    database: "Database",
-    docs: "Documentation",
-    dependencies: "Dependencies",
-    config: "Configuration",
-    artifacts: "Build Artifacts",
-    other: "Other",
-  };
-  return labels[category] ?? category;
-}
 
 /**
  * Render Routes / API table (no emoji).
@@ -395,23 +385,7 @@ function renderRoutes(routes: RouteChangeFinding[]): string {
       head: [],
       border: ["dim"],
     },
-    chars: {
-      top: "─",
-      "top-mid": "┬",
-      "top-left": "┌",
-      "top-right": "┐",
-      bottom: "─",
-      "bottom-mid": "┴",
-      "bottom-left": "└",
-      "bottom-right": "┘",
-      left: "│",
-      "left-mid": "├",
-      mid: "─",
-      "mid-mid": "┼",
-      right: "│",
-      "right-mid": "┤",
-      middle: "│",
-    },
+    chars: TABLE_CHARS,
   });
 
   for (const route of routes) {
@@ -488,23 +462,7 @@ function renderEnvVars(envVars: EnvVarFinding[]): string {
       head: [],
       border: ["dim"],
     },
-    chars: {
-      top: "─",
-      "top-mid": "┬",
-      "top-left": "┌",
-      "top-right": "┐",
-      bottom: "─",
-      "bottom-mid": "┴",
-      "bottom-left": "└",
-      "bottom-right": "┘",
-      left: "│",
-      "left-mid": "├",
-      mid: "─",
-      "mid-mid": "┼",
-      right: "│",
-      "right-mid": "┤",
-      middle: "│",
-    },
+    chars: TABLE_CHARS,
   });
 
   for (const envVar of envVars) {
@@ -545,86 +503,8 @@ function renderCloudflare(changes: CloudflareChangeFinding[]): string {
   return output;
 }
 
-/**
- * Render Dependencies section.
- */
-function renderDependencies(deps: DependencyChangeFinding[]): string {
-  if (deps.length === 0) {
-    return "";
-  }
-
-  const prodDeps = deps.filter((d) => d.section === "dependencies");
-  const devDeps = deps.filter((d) => d.section === "devDependencies");
-
-  let output = sectionHeader("Dependencies");
-
-  const renderDepTable = (
-    depList: DependencyChangeFinding[],
-    title: string
-  ): string => {
-    if (depList.length === 0) return "";
-
-    let result = `${colors.subheader(title)}\n`;
-
-    const table = new Table({
-      head: [
-        colors.label("Package"),
-        colors.label("From"),
-        colors.label("To"),
-        colors.label("Impact"),
-      ],
-      style: {
-        head: [],
-        border: ["dim"],
-      },
-      chars: {
-        top: "─",
-        "top-mid": "┬",
-        "top-left": "┌",
-        "top-right": "┐",
-        bottom: "─",
-        "bottom-mid": "┴",
-        "bottom-left": "└",
-        "bottom-right": "┘",
-        left: "│",
-        "left-mid": "├",
-        mid: "─",
-        "mid-mid": "┼",
-        right: "│",
-        "right-mid": "┤",
-        middle: "│",
-      },
-    });
-
-    for (const dep of depList) {
-      const impactColor =
-        dep.impact === "major"
-          ? colors.error
-          : dep.impact === "minor"
-            ? colors.warning
-            : colors.muted;
-
-      table.push([
-        colors.packageName(dep.name),
-        colors.muted(dep.from ?? "-"),
-        colors.version(dep.to ?? "-"),
-        impactColor(dep.impact ?? "-"),
-      ]);
-    }
-
-    result += table.toString() + "\n";
-    return result;
-  };
-
-  if (prodDeps.length > 0) {
-    output += renderDepTable(prodDeps, "Production");
-  }
-  if (devDeps.length > 0) {
-    output += renderDepTable(devDeps, "Dev Dependencies");
-  }
-
-  return output;
-}
+// Dependencies rendering has been promoted to renderDependencyOverview()
+// which uses the shared buildDependencyOverview() from summary.ts
 
 /**
  * Render Suggested test plan section with rationales.
@@ -635,12 +515,10 @@ function renderTestPlan(
 ): string {
   const bullets: { cmd: string; rationale: string }[] = [];
 
-  const testChanges = groups.get("test-change") as
-    | TestChangeFinding[]
-    | undefined;
+  const testChanges = getFindings<TestChangeFinding>(groups, "test-change");
 
   // Test command with file count rationale
-  if (testChanges && testChanges.length > 0) {
+  if (testChanges.length > 0) {
     const allTestFiles = testChanges.flatMap((t) => t.files);
 
     // Targeted test if only one file changed
@@ -663,8 +541,8 @@ function renderTestPlan(
     bullets.push({ cmd, rationale });
   }
 
-  const routes = groups.get("route-change") as RouteChangeFinding[] | undefined;
-  if (routes) {
+  const routes = getFindings<RouteChangeFinding>(groups, "route-change");
+  if (routes.length > 0) {
     const endpoints = routes.filter((r) => r.routeType === "endpoint");
     for (const endpoint of endpoints.slice(0, 3)) {
       const urlPath = routeIdToUrlPath(endpoint.routeId);
@@ -1107,28 +985,23 @@ function renderConfigChanges(groups: Map<string, Finding[]>): string {
 
 /**
  * Render Notes section (only new information).
+ * Omitted entirely when risk is low and there are no evidence bullets.
  */
 function renderNotes(context: RenderContext): string {
   const { riskScore } = context;
 
   const bullets = riskScore.evidenceBullets ?? [];
 
-  // If no evidence bullets and risk is low, just say no elevated risks
+  // Skip the entire section when low risk with no evidence - reduces noise
   if (bullets.length === 0 && riskScore.level === "low") {
-    let output = sectionHeader("Notes");
-    output += `  No elevated risks detected.\n`;
-    return output;
+    return "";
   }
 
   // If there are evidence bullets, show them
   if (bullets.length > 0) {
     let output = sectionHeader("Notes");
     for (const bullet of bullets) {
-      // Remove emoji prefixes if present
-      const cleanBullet = bullet
-        .replace(/^[⚠️⚡ℹ️✅]\s*/, "")
-        .replace(/^[\u2600-\u27FF]\s*/, "");
-      output += `  - ${cleanBullet}\n`;
+      output += `  - ${stripEmojiPrefix(bullet)}\n`;
     }
     return output;
   }
@@ -1156,12 +1029,39 @@ function renderContext(context: RenderContext): string {
 }
 
 /**
+ * Render a concise dependency overview section (promoted to primary area).
+ */
+function renderDependencyOverview(findings: Finding[]): string {
+  const overview = buildDependencyOverview(findings);
+  if (overview.total === 0) {
+    return "";
+  }
+
+  const bullets = formatDependencyOverviewBullets(overview);
+  if (bullets.length === 0) {
+    return "";
+  }
+
+  let output = sectionHeader("Dependencies");
+  for (const bullet of bullets) {
+    output += `  ${colors.value(bullet)}\n`;
+  }
+
+  return output;
+}
+
+/**
  * Render findings into a colorized terminal output.
  * No emojis, explicit diffstat, single Top findings section.
  */
 export function renderTerminal(context: RenderContext): string {
-  const groups = groupFindings(context.findings);
+  const groups = groupFindingsByType(context.findings);
   const summaryData = buildSummaryData(context.findings);
+
+  // No-changes short-circuit: only when truly no findings at all
+  if (summaryData.diffstat.total === 0 && context.findings.length === 0) {
+    return "\n" + colors.muted("No changes detected.") + "\n";
+  }
 
   let output = "\n";
 
@@ -1176,33 +1076,28 @@ export function renderTerminal(context: RenderContext): string {
   output += renderTopFindings(summaryData.topFindings);
 
   // Large diff warning (show early if present)
-  const largeDiff = (groups.get("large-diff") as LargeDiffFinding[]) ?? [];
+  const largeDiff = getFindings<LargeDiffFinding>(groups, "large-diff");
   output += renderLargeDiff(largeDiff);
 
   // What Changed (grouped by category with changesets separated)
-  const categoryFinding = groups.get("file-category")?.[0] as
-    | FileCategoryFinding
-    | undefined;
-  const fileSummary = groups.get("file-summary")?.[0] as
-    | FileSummaryFinding
-    | undefined;
+  const categoryFinding = getFindings<FileCategoryFinding>(groups, "file-category")[0];
+  const fileSummary = getFindings<FileSummaryFinding>(groups, "file-summary")[0];
   output += renderWhatChanged(categoryFinding, fileSummary, summaryData);
 
   // Routes / API
-  const routes = (groups.get("route-change") as RouteChangeFinding[]) ?? [];
+  const routes = getFindings<RouteChangeFinding>(groups, "route-change");
   output += renderRoutes(routes);
 
   // Database (Supabase)
-  const migrations =
-    (groups.get("db-migration") as DbMigrationFinding[]) ?? [];
+  const migrations = getFindings<DbMigrationFinding>(groups, "db-migration");
   output += renderDatabase(migrations);
 
   // SQL Risks
-  const sqlRisks = (groups.get("sql-risk") as SQLRiskFinding[]) ?? [];
+  const sqlRisks = getFindings<SQLRiskFinding>(groups, "sql-risk");
   output += renderSQLRisks(sqlRisks);
 
   // Config / Env
-  const envVars = (groups.get("env-var") as EnvVarFinding[]) ?? [];
+  const envVars = getFindings<EnvVarFinding>(groups, "env-var");
   output += renderEnvVars(envVars);
 
   // Config Changes (TypeScript, Tailwind, GraphQL, Package Exports, Monorepo)
@@ -1212,22 +1107,19 @@ export function renderTerminal(context: RenderContext): string {
   output += renderStencil(groups);
 
   // Infrastructure
-  const infra = (groups.get("infra-change") as InfraChangeFinding[]) ?? [];
+  const infra = getFindings<InfraChangeFinding>(groups, "infra-change");
   output += renderInfra(infra);
 
   // CI/CD Workflows
-  const ciWorkflows = (groups.get("ci-workflow") as CIWorkflowFinding[]) ?? [];
+  const ciWorkflows = getFindings<CIWorkflowFinding>(groups, "ci-workflow");
   output += renderCIWorkflows(ciWorkflows);
 
   // Cloudflare
-  const cloudflare =
-    (groups.get("cloudflare-change") as CloudflareChangeFinding[]) ?? [];
+  const cloudflare = getFindings<CloudflareChangeFinding>(groups, "cloudflare-change");
   output += renderCloudflare(cloudflare);
 
-  // Dependencies
-  const deps =
-    (groups.get("dependency-change") as DependencyChangeFinding[]) ?? [];
-  output += renderDependencies(deps);
+  // Dependencies (promoted overview, before test plan)
+  output += renderDependencyOverview(context.findings);
 
   // Suggested test plan
   output += renderTestPlan(context, groups);

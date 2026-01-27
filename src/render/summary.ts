@@ -24,6 +24,35 @@ import type {
   TestChangeFinding,
   TypeScriptConfigFinding,
 } from "../core/types.js";
+
+// ============================================================================
+// Dependency Overview Types
+// ============================================================================
+
+export interface DependencyOverview {
+  /** Total number of dependency changes */
+  total: number;
+  /** Production dependency change count */
+  prodCount: number;
+  /** Dev dependency change count */
+  devCount: number;
+  /** Breakdown by impact type */
+  byImpact: {
+    major: number;
+    minor: number;
+    patch: number;
+    new: number;
+    removed: number;
+  };
+  /** Major version updates (capped list for display) */
+  majorUpdates: { name: string; from?: string; to?: string }[];
+  /** Newly added packages (capped list for display) */
+  newPackages: string[];
+  /** Removed packages (capped list for display) */
+  removedPackages: string[];
+  /** Whether any risky category packages changed */
+  hasRiskyCategoryChanges: boolean;
+}
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 
 // ============================================================================
@@ -163,7 +192,7 @@ function buildFindingsByCategory(findings: Finding[]): FindingsByCategory {
  * Group findings by type in a single pass for O(n) performance.
  * This avoids multiple filter() calls which would be O(n*m) where m is number of types.
  */
-function groupFindingsByType(findings: Finding[]): Map<string, Finding[]> {
+export function groupFindingsByType(findings: Finding[]): Map<string, Finding[]> {
   const groups = new Map<string, Finding[]>();
 
   for (const finding of findings) {
@@ -176,6 +205,17 @@ function groupFindingsByType(findings: Finding[]): Map<string, Finding[]> {
   }
 
   return groups;
+}
+
+/**
+ * Get findings of a specific type from a grouped findings map.
+ * Eliminates verbose `(groups.get("type") as T[]) ?? []` pattern.
+ */
+export function getFindings<T extends Finding>(
+  groups: Map<string, Finding[]>,
+  type: string
+): T[] {
+  return (groups.get(type) as T[]) ?? [];
 }
 
 /**
@@ -449,6 +489,135 @@ function getChangesetFiles(findings: Finding[]): string[] {
 }
 
 // ============================================================================
+// Dependency Overview
+// ============================================================================
+
+const DEP_OVERVIEW_EXAMPLES_LIMIT = 5;
+
+/**
+ * Build a concise dependency overview from dependency-change findings.
+ * Used by both markdown and terminal renderers for the promoted dependency section.
+ */
+export function buildDependencyOverview(
+  findings: Finding[]
+): DependencyOverview {
+  const depFindings = findings.filter(
+    (f) => f.type === "dependency-change"
+  ) as DependencyChangeFinding[];
+
+  const overview: DependencyOverview = {
+    total: depFindings.length,
+    prodCount: 0,
+    devCount: 0,
+    byImpact: { major: 0, minor: 0, patch: 0, new: 0, removed: 0 },
+    majorUpdates: [],
+    newPackages: [],
+    removedPackages: [],
+    hasRiskyCategoryChanges: false,
+  };
+
+  if (depFindings.length === 0) {
+    return overview;
+  }
+
+  for (const dep of depFindings) {
+    // Count by section
+    if (dep.section === "dependencies") {
+      overview.prodCount++;
+    } else {
+      overview.devCount++;
+    }
+
+    // Count by impact
+    const impact = dep.impact ?? "unknown";
+    if (impact === "major") {
+      overview.byImpact.major++;
+      if (overview.majorUpdates.length < DEP_OVERVIEW_EXAMPLES_LIMIT) {
+        overview.majorUpdates.push({
+          name: dep.name,
+          from: dep.from,
+          to: dep.to,
+        });
+      }
+    } else if (impact === "minor") {
+      overview.byImpact.minor++;
+    } else if (impact === "patch") {
+      overview.byImpact.patch++;
+    } else if (impact === "new") {
+      overview.byImpact.new++;
+      if (overview.newPackages.length < DEP_OVERVIEW_EXAMPLES_LIMIT) {
+        overview.newPackages.push(dep.name);
+      }
+    } else if (impact === "removed") {
+      overview.byImpact.removed++;
+      if (overview.removedPackages.length < DEP_OVERVIEW_EXAMPLES_LIMIT) {
+        overview.removedPackages.push(dep.name);
+      }
+    }
+
+    // Risky category check
+    if (dep.riskCategory) {
+      overview.hasRiskyCategoryChanges = true;
+    }
+  }
+
+  return overview;
+}
+
+/**
+ * Format a dependency overview as a compact human-readable summary.
+ * Returns an array of bullet strings for embedding in output sections.
+ */
+export function formatDependencyOverviewBullets(
+  overview: DependencyOverview
+): string[] {
+  if (overview.total === 0) {
+    return [];
+  }
+
+  const bullets: string[] = [];
+
+  // Counts line
+  const parts: string[] = [];
+  if (overview.prodCount > 0) {
+    parts.push(`${overview.prodCount} production`);
+  }
+  if (overview.devCount > 0) {
+    parts.push(`${overview.devCount} dev`);
+  }
+  bullets.push(`${overview.total} dependency changes (${parts.join(", ")})`);
+
+  // Major updates
+  if (overview.majorUpdates.length > 0) {
+    const names = overview.majorUpdates.map((u) => {
+      if (u.from && u.to) {
+        return `${u.name} ${u.from} -> ${u.to}`;
+      }
+      return u.name;
+    });
+    const moreCount = overview.byImpact.major - overview.majorUpdates.length;
+    const moreStr = moreCount > 0 ? ` (+${moreCount} more)` : "";
+    bullets.push(`Major: ${names.join(", ")}${moreStr}`);
+  }
+
+  // New packages
+  if (overview.newPackages.length > 0) {
+    const moreCount = overview.byImpact.new - overview.newPackages.length;
+    const moreStr = moreCount > 0 ? ` (+${moreCount} more)` : "";
+    bullets.push(`Added: ${overview.newPackages.join(", ")}${moreStr}`);
+  }
+
+  // Removed packages
+  if (overview.removedPackages.length > 0) {
+    const moreCount = overview.byImpact.removed - overview.removedPackages.length;
+    const moreStr = moreCount > 0 ? ` (+${moreCount} more)` : "";
+    bullets.push(`Removed: ${overview.removedPackages.join(", ")}${moreStr}`);
+  }
+
+  return bullets;
+}
+
+// ============================================================================
 // Main Export
 // ============================================================================
 
@@ -535,4 +704,14 @@ export function formatFindingsByCategory(
  */
 export function formatRiskLevel(riskScore: RiskScore): string {
   return `${riskScore.level.toUpperCase()} (${riskScore.score}/100)`;
+}
+
+/**
+ * Strip emoji prefixes from a bullet string.
+ * Used to clean risk evidence bullets before rendering.
+ */
+export function stripEmojiPrefix(text: string): string {
+  return text
+    .replace(/^[⚠️⚡ℹ️✅]\s*/, "")
+    .replace(/^[\u2600-\u27FF]\s*/, "");
 }
