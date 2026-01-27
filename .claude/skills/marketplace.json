@@ -1,0 +1,57 @@
+{
+  "$schema": "https://agentskills.io/schema/marketplace.json",
+  "name": "branch-narrator-skills",
+  "displayName": "Branch Narrator Skills",
+  "description": "AI-powered git diff analysis skills using branch-narrator CLI",
+  "version": "1.0.0",
+  "author": "@better-vibe",
+  "license": "MIT",
+  "repository": "https://github.com/better-vibe/branch-narrator",
+  "homepage": "https://github.com/better-vibe/branch-narrator#skills",
+  "keywords": [
+    "git",
+    "diff",
+    "analysis",
+    "risk",
+    "code-review",
+    "pr",
+    "pull-request"
+  ],
+  "skills": [
+    {
+      "name": "diff-facts",
+      "path": "diff-facts/SKILL.md",
+      "description": "Full structured analysis of git changes with findings and risk"
+    },
+    {
+      "name": "diff-risk",
+      "path": "diff-risk/SKILL.md",
+      "description": "Risk assessment with evidence-backed flags"
+    },
+    {
+      "name": "diff-summary",
+      "path": "diff-summary/SKILL.md",
+      "description": "Quick, token-efficient summary of changes"
+    },
+    {
+      "name": "diff-zoom",
+      "path": "diff-zoom/SKILL.md",
+      "description": "Drill into specific findings or flags"
+    }
+  ],
+  "dependencies": {
+    "cli": [
+      {
+        "name": "branch-narrator",
+        "package": "@better-vibe/branch-narrator",
+        "version": ">=1.5.0",
+        "install": "npm install -g @better-vibe/branch-narrator"
+      }
+    ]
+  },
+  "categories": [
+    "development",
+    "git",
+    "code-review"
+  ]
+}
