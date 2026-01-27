@@ -35,8 +35,6 @@ import type {
   StencilSlotChangeFinding,
   TailwindConfigFinding,
   TestChangeFinding,
-  TestGapFinding,
-  TestParityViolationFinding,
   TypeScriptConfigFinding,
   ViteConfigFinding,
 } from "../core/types.js";
@@ -301,19 +299,6 @@ function renderTestPlan(
         rationale: "page changed",
       });
     }
-  }
-
-  // Test gaps
-  const testGaps = groups.get("test-gap") as TestGapFinding[] | undefined;
-  if (testGaps && testGaps.length > 0) {
-    const totalUntested = testGaps.reduce(
-      (sum, t) => sum + t.prodFilesChanged,
-      0
-    );
-    bullets.push({
-      cmd: `Add tests for ${totalUntested} modified file(s) lacking coverage`,
-      rationale: "test gap",
-    });
   }
 
   // Interactive test notes
@@ -1209,16 +1194,15 @@ function renderPythonConfig(configs: PythonConfigFinding[]): string {
 }
 
 /**
- * Render Warnings section (large-diff, lockfile-mismatch, test-gap).
+ * Render Warnings section (large-diff, lockfile-mismatch).
  */
 function renderWarnings(groups: Map<string, Finding[]>): string {
   const largeDiff = (groups.get("large-diff") as LargeDiffFinding[]) ?? [];
   const lockfileMismatch =
     (groups.get("lockfile-mismatch") as LockfileFinding[]) ?? [];
-  const testGap = (groups.get("test-gap") as TestGapFinding[]) ?? [];
 
   const hasWarnings =
-    largeDiff.length > 0 || lockfileMismatch.length > 0 || testGap.length > 0;
+    largeDiff.length > 0 || lockfileMismatch.length > 0;
 
   if (!hasWarnings) {
     return "";
@@ -1238,11 +1222,6 @@ function renderWarnings(groups: Map<string, Finding[]>): string {
     } else if (!lm.manifestChanged && lm.lockfileChanged) {
       output += `- **Lockfile mismatch:** lockfile changed but package.json not updated\n`;
     }
-  }
-
-  // Test gap warning
-  for (const tg of testGap) {
-    output += `- **Test coverage gap:** ${tg.prodFilesChanged} production files changed, only ${tg.testFilesChanged} test files changed\n`;
   }
 
   output += "\n";
@@ -1300,35 +1279,6 @@ function renderConventionViolations(
     if (v.files.length > 5) {
       output += `  - ...and ${v.files.length - 5} more\n`;
     }
-  }
-  output += "\n";
-
-  return output;
-}
-
-/**
- * Render Test Parity Violations.
- */
-function renderTestParityViolations(
-  violations: TestParityViolationFinding[]
-): string {
-  if (violations.length === 0) {
-    return "";
-  }
-
-  let output = "### Test Coverage Gaps\n\n";
-  output += `Found ${violations.length} source file(s) without corresponding tests:\n\n`;
-  for (const v of violations.slice(0, 10)) {
-    const confidenceLabel =
-      v.confidence === "high"
-        ? "[high]"
-        : v.confidence === "medium"
-          ? "[medium]"
-          : "[low]";
-    output += `- ${confidenceLabel} \`${v.sourceFile}\`\n`;
-  }
-  if (violations.length > 10) {
-    output += `- ...and ${violations.length - 10} more\n`;
   }
   output += "\n";
 
@@ -1437,11 +1387,6 @@ function renderDetails(
   const violations =
     (groups.get("convention-violation") as ConventionViolationFinding[]) ?? [];
   detailsContent += renderConventionViolations(violations);
-
-  // Test Parity Violations
-  const testParityViolations =
-    (groups.get("test-parity-violation") as TestParityViolationFinding[]) ?? [];
-  detailsContent += renderTestParityViolations(testParityViolations);
 
   // Warnings
   detailsContent += renderWarnings(groups);

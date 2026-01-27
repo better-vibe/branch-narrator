@@ -32,3 +32,6 @@ test-delta-manual.js
 # Website build output
 website/dist/
 
+# branch-narrator cache and data
+.branch-narrator/
+

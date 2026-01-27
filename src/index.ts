@@ -8,6 +8,7 @@
 export * from "./core/types.js";
 export * from "./core/change-set.js";
 export * from "./core/errors.js";
+export { runAnalyzersInParallel } from "./core/analyzer-runner.js";
 
 // Export logger and sorting explicitly to avoid conflicts
 export {

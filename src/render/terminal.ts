@@ -31,7 +31,6 @@ import type {
   StencilSlotChangeFinding,
   TailwindConfigFinding,
   TestChangeFinding,
-  TestGapFinding,
   TypeScriptConfigFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
@@ -686,19 +685,6 @@ function renderTestPlan(
         rationale: "page changed",
       });
     }
-  }
-
-  // Test gaps warning
-  const testGaps = groups.get("test-gap") as TestGapFinding[] | undefined;
-  if (testGaps && testGaps.length > 0) {
-    const totalUntested = testGaps.reduce(
-      (sum, t) => sum + t.prodFilesChanged,
-      0
-    );
-    bullets.push({
-      cmd: `Add tests for ${totalUntested} modified file(s) lacking coverage`,
-      rationale: "test gap",
-    });
   }
 
   if (context.interactive?.testNotes) {

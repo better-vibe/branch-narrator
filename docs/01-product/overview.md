@@ -49,6 +49,9 @@ branch-narrator automates PR description generation by:
 | Vue/Nuxt | ✅ Full | Pages, layouts, API routes |
 | Astro | ✅ Full | Pages, API routes, integrations |
 | Stencil | ✅ Full | Components, props, events, methods |
+| Angular | ✅ Full | Routes, components, services, modules |
+| Python | ✅ Full | Routes (FastAPI/Django/Flask), migrations, config |
+| Vite | ✅ Full | Vite configuration changes |
 | Library | ✅ Full | Package exports, bin entries, breaking changes |
 | Generic | ✅ Full | Dependencies, env vars, tests, CI workflows |
 

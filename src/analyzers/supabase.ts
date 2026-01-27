@@ -90,7 +90,7 @@ export function determineMigrationRisk(
     for (const { description } of destructive) {
       hasDestructive = true;
       reasons.push(`${description} detected in ${file}`);
-      
+
       // Find the line with the destructive pattern
       const lineWithPattern = additions.find((line) =>
         DESTRUCTIVE_PATTERNS.some((p) => p.pattern.test(line))
@@ -127,6 +127,9 @@ export function determineMigrationRisk(
 
 export const supabaseAnalyzer: Analyzer = {
   name: "supabase",
+  cache: {
+    includeGlobs: ["supabase/**/*.sql", "supabase/migrations/**/*"],
+  },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

@@ -26,6 +26,7 @@ function isMigrationFile(path: string): boolean {
  */
 export const analyzeSQLRisks: Analyzer = {
   name: "sql-risks",
+  cache: { includeGlobs: ["**/migrations/**", "**/migrate/**", "**/*.sql"] },
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: SQLRiskFinding[] = [];
 

@@ -298,6 +298,7 @@ export function extractStencilComponents(
 
 export const stencilAnalyzer: Analyzer = {
   name: "stencil",
+  cache: { includeGlobs: ["**/*.tsx", "**/*.ts"] },
 
   async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];

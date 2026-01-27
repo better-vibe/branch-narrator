@@ -4,42 +4,57 @@
 
 ```mermaid
 flowchart TB
-    subgraph CLI["CLI Layer"]
-        pr-body["pr-body command"]
+    subgraph cliLayer [CLI Layer]
+        pretty["pretty command"]
+        prBody["pr-body command"]
         facts["facts command"]
+        riskReport["risk-report command"]
+        dumpDiff["dump-diff command"]
+        zoom["zoom command"]
+        integrate["integrate command"]
+        snap["snap command"]
+        cacheCmd["cache command"]
     end
 
-    subgraph Core["Core Engine"]
+    subgraph coreEngine [Core Engine]
         collector["Git Collector"]
+        cacheLayer["Cache Layer"]
         changeset["ChangeSet"]
         resolver["Profile Resolver"]
+        runner["Analyzer Runner"]
     end
 
-    subgraph Analyzers["Analyzer Layer"]
-        A1["file-summary"]
-        A2["file-category"]
-        A3["route-detector"]
-        A4["supabase"]
-        A5["env-var"]
-        A6["cloudflare"]
-        A7["vitest"]
-        A8["dependencies"]
-        A9["security-files"]
+    subgraph analyzers [Analyzer Layer]
+        fileSummary["file-summary"]
+        fileCategory["file-category"]
+        impact["impact"]
+        routes["route analyzers"]
+        deps["dependency analyzers"]
+        infra["infra/security analyzers"]
+        tests["test analyzers"]
     end
 
-    subgraph Render["Render Layer"]
-        risk["Risk Score"]
-        md["Markdown"]
-        json["JSON"]
+    subgraph renderLayer [Render Layer]
+        riskScore["Risk Score (facts)"]
+        markdown["Markdown PR body"]
+        terminal["Terminal summary"]
+        factsJson["Facts JSON"]
+        sarif["SARIF output"]
+        riskReportRender["Risk Report (JSON/MD/TXT)"]
     end
 
     CLI --> collector
+    CLI --> cacheLayer
     collector --> changeset
     changeset --> resolver
-    resolver --> Analyzers
-    Analyzers --> risk
-    risk --> md
-    risk --> json
+    resolver --> runner
+    runner --> analyzers
+    analyzers --> riskScore
+    riskScore --> markdown
+    riskScore --> terminal
+    riskScore --> factsJson
+    factsJson --> sarif
+    analyzers --> riskReportRender
 ```
 
 ## Data Flow
@@ -48,12 +63,15 @@ flowchart TB
 sequenceDiagram
     participant User
     participant CLI
+    participant Cache
     participant Git
     participant Profile
     participant Analyzers
     participant Renderer
 
-    User->>CLI: branch-narrator pr-body
+    User->>CLI: branch-narrator facts
+    CLI->>Cache: loadChangeSetCache()
+    Cache-->>CLI: cached ChangeSet? (optional)
     CLI->>Git: collectChangeSet(base, head)
     Git->>Git: git diff --name-status
     Git->>Git: git diff --unified=0
@@ -63,8 +81,8 @@ sequenceDiagram
     Profile-->>CLI: Profile with Analyzer[]
     CLI->>Analyzers: analyze(changeSet)
     Analyzers-->>CLI: Finding[]
-    CLI->>Renderer: render(findings)
-    Renderer-->>CLI: Markdown/JSON
+    CLI->>Renderer: renderMarkdown / renderFacts / renderRiskReport
+    Renderer-->>CLI: Markdown/JSON/SARIF/Text
     CLI-->>User: stdout
 ```
 
@@ -98,4 +116,9 @@ Easy to add:
 - New analyzers (one file each)
 - New profiles (compose analyzers)
 - New output formats (renderers)
+
+### 5. Deterministic and Cached
+
+- Stable IDs allow reproducible references across runs
+- Caching reduces repeated git parsing and analysis work
 

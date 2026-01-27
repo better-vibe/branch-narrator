@@ -12,14 +12,9 @@ structured context for AI coding agents and human code review.
 ```bash
 # Install as dev dependency (recommended)
 bun add -D @better-vibe/branch-narrator
-# or
-npm install -D @better-vibe/branch-narrator
-
-# Or install globally
-npm install -g @better-vibe/branch-narrator
 
 # Or run without installing
-npx @better-vibe/branch-narrator facts --pretty
+bunx @better-vibe/branch-narrator facts --pretty
 ```
 
 ### Common Commands
@@ -27,6 +22,9 @@ npx @better-vibe/branch-narrator facts --pretty
 ```bash
 # Generate a PR description for current changes
 branch-narrator pr-body
+
+# Colorized summary for humans
+branch-narrator pretty
 
 # Structured JSON facts for automation
 branch-narrator facts --pretty
@@ -37,8 +35,14 @@ branch-narrator risk-report --format md
 # Prompt-ready diff with smart filtering
 branch-narrator dump-diff --out .ai/diff.txt
 
+# Zoom into a specific finding
+branch-narrator zoom --finding finding.env-var#abc123
+
 # Save workspace snapshot for agent iteration
 branch-narrator snap save "before-refactor"
+
+# Cache stats for performance debugging
+branch-narrator cache stats --pretty
 
 # SARIF output for GitHub Code Scanning
 branch-narrator facts --format sarif --out results.sarif
@@ -81,12 +85,12 @@ branch-narrator facts --since .ai/baseline.json
 
 ### Analysis Features
 - Route and API change detection for SvelteKit, Next.js App Router, React Router,
-  Vue/Nuxt, and Astro.
+  Vue/Nuxt, Astro, Angular, and Python (FastAPI/Django/Flask).
 - Dependency and package surface analysis (semver impact, exports, lockfile
   mismatches).
 - Environment variables, security-sensitive files, CI workflows, and
   infrastructure changes.
-- Migration safety checks (Supabase migrations and SQL risk patterns).
+- Migration safety checks (Supabase and Python migrations, SQL risk patterns).
 
 ### Agent Workflows
 - **Delta mode** (`--since`) for comparing runs and tracking changes over time.
@@ -131,6 +135,8 @@ See [`CHANGELOG.md`](CHANGELOG.md) for version history and release notes.
 |------|-------------|
 | `--quiet` | Suppress non-fatal diagnostics (warnings, info) |
 | `--debug` | Print debug diagnostics to stderr |
+| `--no-cache` | Disable caching entirely |
+| `--clear-cache` | Clear cache before running |
 
 ### Diff modes
 
@@ -154,6 +160,9 @@ Use `--profile <name>` to override auto-detection.
 | `vue` | Vue/Nuxt apps | `nuxt` or `vue` + `pages/` |
 | `astro` | Astro projects | `astro` dependency or `astro.config.*` |
 | `stencil` | StencilJS projects | `@stencil/core` or `stencil.config.*` |
+| `angular` | Angular apps | `@angular/core` or `angular.json` |
+| `python` | Python apps | `pyproject.toml` or `requirements.txt` |
+| `vite` | Vite projects | `vite` dependency or `vite.config.*` |
 | `library` | npm packages/libraries | `exports`, `publishConfig`, `bin`, `private: false` |
 
 ### Commands
@@ -171,7 +180,7 @@ branch-narrator pretty [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `library` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
 
 Examples:
 
@@ -241,7 +250,6 @@ branch-narrator facts [options]
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 | `--since <path>` | (none) | Compare current output to a previous JSON file |
 | `--since-strict` | `false` | Exit with code 1 on scope mismatch |
-| `--test-parity` | `false` | Enable test parity checks |
 
 Examples:
 
@@ -344,7 +352,6 @@ branch-narrator risk-report [options]
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 | `--since <path>` | (none) | Compare current output to a previous JSON file |
 | `--since-strict` | `false` | Exit with code 1 on scope mismatch |
-| `--test-parity` | `false` | Enable test parity checks |
 
 Risk levels:
 
@@ -508,16 +515,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install branch-narrator
-        run: npm install -g @better-vibe/branch-narrator
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
 
       - name: Generate SARIF report
-        run: branch-narrator facts --mode branch --base origin/main --format sarif --out results.sarif
+        run: bunx @better-vibe/branch-narrator facts --mode branch --base origin/main --format sarif --out results.sarif
 
       - name: Upload SARIF to GitHub
         uses: github/codeql-action/upload-sarif@v3
@@ -582,28 +584,47 @@ Sample `facts` output (truncated):
   "profile": {
     "requested": "auto",
     "detected": "sveltekit",
-    "confidence": "high"
+    "confidence": "high",
+    "reasons": ["Found src/routes/ directory (SvelteKit file-based routing)"]
   },
   "stats": {
     "filesChanged": 12,
     "insertions": 245,
-    "deletions": 89
+    "deletions": 89,
+    "skippedFilesCount": 0
+  },
+  "summary": {
+    "byArea": { "routes": 1, "dependencies": 1 },
+    "highlights": ["2 route(s) changed"]
+  },
+  "changeset": {
+    "files": {
+      "added": ["src/routes/api/users/+server.ts"],
+      "modified": ["package.json"],
+      "deleted": [],
+      "renamed": []
+    },
+    "warnings": []
   },
   "risk": {
     "score": 35,
-    "level": "moderate",
+    "level": "medium",
     "factors": [
-      { "category": "routes", "weight": 15 },
-      { "category": "dependencies", "weight": 10 },
-      { "category": "config", "weight": 10 }
+      {
+        "kind": "route-added",
+        "weight": 5,
+        "explanation": "Route added: /api/users",
+        "evidence": []
+      }
     ]
   },
   "findings": [
     {
       "type": "route-change",
       "findingId": "finding.route-change#a1b2c3d4",
-      "route": "/api/users",
+      "routeId": "/api/users",
       "change": "added",
+      "routeType": "endpoint",
       "methods": ["GET", "POST"],
       "evidence": [...]
     }

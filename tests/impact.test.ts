@@ -109,5 +109,12 @@ describe("impactAnalyzer", () => {
     const findings = await analyzer.analyze(mockChangeSet);
     expect(findings).toHaveLength(0);
   });
+
+  it("should advertise cache globs for code files", () => {
+    const analyzer = createImpactAnalyzer();
+    expect(analyzer.cache?.includeGlobs).toEqual([
+      "**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,vue,svelte}",
+    ]);
+  });
 });
 

@@ -165,6 +165,15 @@ export function extractEnvVars(content: string): Set<string> {
 
 export const envVarAnalyzer: Analyzer = {
   name: "env-var",
+  cache: {
+    includeGlobs: [
+      "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs",
+      "**/*.svelte", "**/*.vue", "**/*.astro",
+      "**/.env*", "**/vite.config.*", "**/svelte.config.*",
+      "**/next.config.*", "**/nuxt.config.*", "**/astro.config.*",
+    ],
+    excludeGlobs: ["**/*.md", "**/docs/**", "**/tests/**", "**/__tests__/**", "**/fixtures/**"],
+  },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

@@ -315,6 +315,7 @@ export function extractRoutesFromContent(
 
 export const reactRouterRoutesAnalyzer: Analyzer = {
   name: "react-router-routes",
+  cache: { includeGlobs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"] },
 
   async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];

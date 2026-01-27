@@ -118,6 +118,7 @@ function analyzeAdditions(additions: string[]): string[] {
 
 export const graphqlAnalyzer: Analyzer = {
   name: "graphql",
+  cache: { includeGlobs: ["**/*.graphql", "**/*.gql", "**/*.graphqls", "**/*.sdl"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

@@ -145,6 +145,7 @@ function detectBreakingChanges(
 
 export const tailwindAnalyzer: Analyzer = {
   name: "tailwind",
+  cache: { includeGlobs: ["**/tailwind.config.*", "**/postcss.config.*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

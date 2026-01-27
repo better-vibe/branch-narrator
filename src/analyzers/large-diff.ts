@@ -14,6 +14,7 @@ import type {
  */
 export const analyzeLargeDiff: Analyzer = {
   name: "large-diff",
+  cache: {},
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: LargeDiffFinding[] = [];
 

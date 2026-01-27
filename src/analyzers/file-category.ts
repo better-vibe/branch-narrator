@@ -212,6 +212,7 @@ export function getCategoryLabel(category: FileCategory): string {
 
 export const fileCategoryAnalyzer: Analyzer = {
   name: "file-category",
+  cache: {},
 
   analyze(changeSet: ChangeSet): Finding[] {
     const categories: Record<FileCategory, string[]> = {

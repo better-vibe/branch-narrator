@@ -315,6 +315,7 @@ export function extractRoutesFromContent(
 
 export const angularRoutesAnalyzer: Analyzer = {
   name: "angular-routes",
+  cache: { includeGlobs: ["**/*.ts", "**/*.html"] },
 
   async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];

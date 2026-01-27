@@ -1,6 +1,6 @@
 # CLI Commands
 
-branch-narrator provides eight commands for different use cases.
+branch-narrator provides nine commands for different use cases.
 
 ## pretty
 
@@ -17,7 +17,7 @@ branch-narrator pretty [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `library`, `python` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
 
 ### Diff Modes
 
@@ -99,7 +99,7 @@ branch-narrator pr-body [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
 | `--interactive` | `false` | Prompt for context |
 
 ### Diff Modes
@@ -188,8 +188,8 @@ branch-narrator facts [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
-| `--format <type>` | `json` | Output format: `json` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
+| `--format <type>` | `json` | Output format: `json`, `sarif` |
 | `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
 | `--redact` | `false` | Redact obvious secret values in evidence excerpts |
 | `--exclude <glob>` | (none) | Additional exclusion glob (repeatable) |
@@ -230,7 +230,7 @@ branch-narrator facts --mode all
 branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
 
 # Get risk level
-branch-narrator facts | jq -r '.riskScore.level'
+branch-narrator facts | jq -r '.risk.level'
 
 # Write to file
 branch-narrator facts --out facts.json
@@ -746,7 +746,7 @@ Either `--finding <id>` or `--flag <id>` must be provided.
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
 | `--format <type>` | `json` | Output format: `json`, `md`, or `text` |
 | `--unified <n>` | `3` | Lines of unified context for patch hunks |
 | `--no-patch` | (off) | Do not include patch context, only evidence |
@@ -809,7 +809,7 @@ branch-narrator zoom --flag "flag.security.workflow_permissions_broadened#def789
 branch-narrator zoom --finding "finding.route-change#abc123" --out zoom-output.md
 
 # Deterministic output for testing
-branch-narrator zoom --finding "finding.test-gap#xyz789" --no-timestamp --format json
+branch-narrator zoom --finding "finding.ci-workflow#xyz789" --no-timestamp --format json
 
 # Text format for simple terminal output
 branch-narrator zoom --finding "finding.sql-risk#abc456" --format text
@@ -1138,6 +1138,96 @@ See [Snapshots Documentation](../10-snapshots/overview.md) for detailed informat
 
 ---
 
+## cache
+
+Manage the global cache system.
+
+```bash
+branch-narrator cache <subcommand> [options]
+```
+
+### Subcommands
+
+#### cache stats
+
+Show cache statistics including hit/miss counts and size.
+
+```bash
+branch-narrator cache stats [--pretty]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--pretty` | Pretty-print JSON with 2-space indentation |
+
+**Example output:**
+
+```json
+{
+  "hits": 42,
+  "misses": 8,
+  "hitRate": 84,
+  "entries": 15,
+  "sizeBytes": 125432,
+  "sizeHuman": "122.5 KB",
+  "oldestEntry": "2024-01-15T10:30:00Z",
+  "newestEntry": "2024-01-20T14:22:00Z"
+}
+```
+
+#### cache clear
+
+Remove all cache data.
+
+```bash
+branch-narrator cache clear
+```
+
+#### cache prune
+
+Remove cache entries older than the specified number of days.
+
+```bash
+branch-narrator cache prune [--max-age <days>] [--pretty]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--max-age <days>` | `30` | Maximum age in days |
+| `--pretty` | `false` | Pretty-print JSON output |
+
+### Global Cache Flags
+
+These flags can be used with any command:
+
+| Flag | Description |
+|------|-------------|
+| `--no-cache` | Disable caching entirely (bypass lookup and don't store) |
+| `--clear-cache` | Clear the cache before running the command |
+
+### Examples
+
+```bash
+# Check cache status
+branch-narrator cache stats --pretty
+
+# Clear all cache data
+branch-narrator cache clear
+
+# Prune entries older than 7 days
+branch-narrator cache prune --max-age 7
+
+# Run facts without using cache
+branch-narrator --no-cache facts --mode branch
+
+# Clear cache before running facts
+branch-narrator --clear-cache facts --mode branch
+```
+
+See [Caching Documentation](../12-caching/overview.md) for detailed information.
+
+---
+
 ## Exit Codes
 
 | Code | Description |
@@ -1166,6 +1256,10 @@ branch-narrator snap list --help
 branch-narrator snap show --help
 branch-narrator snap diff --help
 branch-narrator snap restore --help
+branch-narrator cache --help
+branch-narrator cache stats --help
+branch-narrator cache clear --help
+branch-narrator cache prune --help
 
 # Show version
 branch-narrator --version

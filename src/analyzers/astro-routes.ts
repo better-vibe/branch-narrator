@@ -136,6 +136,7 @@ function getRouteType(filePath: string): RouteType {
 
 export const astroRoutesAnalyzer: Analyzer = {
   name: "astro-routes",
+  cache: { includeGlobs: ["**/src/pages/**", "**/src/layouts/**", "**/src/content/**", "astro.config.*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

@@ -17,6 +17,7 @@
 | [09-stable-ids](./09-stable-ids/) | Stable IDs for findings and flags |
 | [10-snapshots](./10-snapshots/) | Local workspace snapshots for agent iteration |
 | [11-delta-mode](./11-delta-mode/) | Delta mode for comparing runs |
+| [12-caching](./12-caching/) | Global caching system for performance |
 
 ---
 
@@ -55,7 +56,7 @@ branch-narrator facts --mode branch --base main
 | Language | TypeScript 5.x |
 | CLI | commander |
 | Git | execa |
-| Diff Parsing | parse-diff |
+| Diff Parsing | DOD parser (built-in, zero-copy) |
 | Versioning | semver |
-| Build | tsup |
-| Testing | vitest |
+| Build | bun build |
+| Testing | bun:test |

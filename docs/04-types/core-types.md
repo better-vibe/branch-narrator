@@ -82,13 +82,16 @@ interface RiskScore {
 }
 ```
 
-**Thresholds:**
+**Thresholds (facts risk score):**
 
 | Score | Level |
 |-------|-------|
 | 0-19 | `low` |
 | 20-49 | `medium` |
 | 50-100 | `high` |
+
+**Note:** `risk-report` uses a separate five-level scale (`low`, `moderate`,
+`elevated`, `high`, `critical`) and a different schema.
 
 ---
 
@@ -100,6 +103,10 @@ Interface for all analyzers.
 interface Analyzer {
   name: string;
   analyze(changeSet: ChangeSet): Finding[] | Promise<Finding[]>;
+  cache?: {
+    includeGlobs?: string[];
+    excludeGlobs?: string[];
+  };
 }
 ```
 
@@ -110,7 +117,18 @@ interface Analyzer {
 Profile configuration.
 
 ```typescript
-type ProfileName = "auto" | "sveltekit" | "react" | "stencil" | "next";
+type ProfileName =
+  | "auto"
+  | "sveltekit"
+  | "next"
+  | "react"
+  | "vue"
+  | "astro"
+  | "stencil"
+  | "angular"
+  | "library"
+  | "python"
+  | "vite";
 
 interface Profile {
   name: ProfileName;
@@ -275,6 +293,40 @@ interface FactsOutput {
   actions: Action[];
   skippedFiles: SkippedFile[];
   warnings: string[];
+}
+```
+
+---
+
+## RiskReport Output
+
+The `risk-report` command emits a separate schema (`schemaVersion: "2.0"`).
+
+```typescript
+type RiskReportLevel = "low" | "moderate" | "elevated" | "high" | "critical";
+type RiskCategory = "security" | "ci" | "deps" | "db" | "infra" | "api" | "tests" | "churn";
+
+interface RiskFlag {
+  ruleKey: string;
+  flagId: string;
+  relatedFindingIds: string[];
+  category: RiskCategory;
+  score: number;
+  confidence: number;
+  title: string;
+  summary: string;
+  effectiveScore: number;
+}
+
+interface RiskReport {
+  schemaVersion: "2.0";
+  generatedAt?: string;
+  range: { base: string; head: string; mode?: DiffMode };
+  riskScore: number;
+  riskLevel: RiskReportLevel;
+  categoryScores: Record<RiskCategory, number>;
+  flags: RiskFlag[];
+  skippedFiles: Array<{ file: string; reason: string }>;
 }
 ```
 

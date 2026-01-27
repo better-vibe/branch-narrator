@@ -30,23 +30,22 @@ flowchart TD
 
 | Analyzer | Purpose |
 |----------|---------|
-| `fileSummaryAnalyzer` | Summarize file changes |
-| `fileCategoryAnalyzer` | Categorize files by type |
-| `nextRoutesAnalyzer` | Detect App Router changes |
-| `envVarAnalyzer` | Detect environment variable usage |
-| `cloudflareAnalyzer` | Detect Cloudflare config changes |
-| `vitestAnalyzer` | Detect test file changes |
-| `dependencyAnalyzer` | Detect dependency changes |
-| `securityFilesAnalyzer` | Detect security-sensitive files |
-| `impactAnalyzer` | Analyze blast radius of changes |
-| `tailwindAnalyzer` | Detect Tailwind CSS config changes |
-| `analyzeLargeDiff` | Warn about large changesets |
-| `analyzeLockfiles` | Check lockfile consistency |
-| `analyzeTestGaps` | Detect missing test coverage |
-| `analyzeSQLRisks` | Detect risky SQL in migrations |
-| `analyzeCIWorkflows` | Detect CI/CD changes |
-| `analyzeInfra` | Detect infrastructure changes |
-| `analyzeAPIContracts` | Detect API contract changes |
+| `file-summary` | Summarize file changes |
+| `file-category` | Categorize files by type |
+| `next-routes` | Detect App Router changes |
+| `env-var` | Detect environment variable usage |
+| `cloudflare` | Detect Cloudflare config changes |
+| `vitest` | Detect test file changes |
+| `dependencies` | Detect dependency changes |
+| `security-files` | Detect security-sensitive files |
+| `impact` | Analyze blast radius of changes |
+| `tailwind` | Detect Tailwind CSS config changes |
+| `large-diff` | Warn about large changesets |
+| `lockfiles` | Check lockfile consistency |
+| `sql-risks` | Detect risky SQL in migrations |
+| `ci-workflows` | Detect CI/CD changes |
+| `infra` | Detect infrastructure changes |
+| `api-contracts` | Detect API contract changes |
 
 ## Next.js-Specific Features
 

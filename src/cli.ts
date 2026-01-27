@@ -10,13 +10,24 @@ import chalk from "chalk";
 import { BranchNarratorError } from "./core/errors.js";
 import { getVersion } from "./core/version.js";
 import type { DiffMode, Finding, ProfileName, RenderContext } from "./core/types.js";
+import type { CacheConfig } from "./cache/types.js";
 import { runAnalyzersInParallel } from "./core/analyzer-runner.js";
 import { executeDumpDiff } from "./commands/dump-diff/index.js";
-import { collectChangeSet, getDefaultBranch } from "./git/collector.js";
+import { getDefaultBranch } from "./git/collector.js";
 import { getProfile, resolveProfileName, detectProfileWithReasons } from "./profiles/index.js";
 import { renderMarkdown, renderTerminal } from "./render/index.js";
 import { computeRiskScore } from "./render/risk-score.js";
 import { configureLogger, error as logError, warn, info } from "./core/logger.js";
+
+/**
+ * Get cache configuration from global CLI options.
+ */
+function getCacheConfig(globalOpts: { cache?: boolean }): CacheConfig {
+  // --no-cache sets cache to false, otherwise default to enabled
+  return {
+    enabled: globalOpts.cache !== false,
+  };
+}
 
 const program = new Command();
 
@@ -31,13 +42,22 @@ program
   .version(version)
   .option("--quiet", "Suppress all non-fatal diagnostic output (warnings, info)")
   .option("--debug", "Show debug diagnostics on stderr")
-  .hook("preAction", (thisCommand) => {
+  .option("--no-cache", "Disable caching entirely (bypass lookup and don't store)")
+  .option("--clear-cache", "Clear the cache before running")
+  .hook("preAction", async (thisCommand) => {
     // Configure logger from global options
     const opts = thisCommand.opts();
     configureLogger({
       quiet: opts.quiet,
       debug: opts.debug,
     });
+
+    // Clear cache if requested
+    if (opts.clearCache) {
+      const { clearCache } = await import("./cache/index.js");
+      await clearCache();
+      info("Cache cleared");
+    }
   });
 
 /**
@@ -100,7 +120,10 @@ async function runAnalysisWithMode(options: {
   head?: string;
   profile: ProfileName;
   showSpinner?: boolean;
+  cache?: CacheConfig;
 }): Promise<{ findings: Finding[]; resolvedProfile: ProfileName }> {
+  const { collectChangeSetWithCache } = await import("./git/collector.js");
+
   const spinner = options.showSpinner
     ? ora({
         text: "Collecting git changes...",
@@ -108,12 +131,16 @@ async function runAnalysisWithMode(options: {
       }).start()
     : null;
 
-  // Collect git data using mode-based options
-  const changeSet = await collectChangeSet({
+  // Default to caching enabled
+  const cacheConfig = options.cache ?? { enabled: true };
+
+  // Collect git data using mode-based options (with caching)
+  const { changeSet, cacheKey } = await collectChangeSetWithCache({
     mode: options.mode,
     base: options.base,
     head: options.head,
     includeUntracked: options.mode === "all" || options.mode === "unstaged",
+    cache: cacheConfig,
   });
 
   if (spinner) {
@@ -132,8 +159,13 @@ async function runAnalysisWithMode(options: {
     spinner.text = `Running analyzers (${profile.analyzers.length})...`;
   }
 
-  // Run analyzers in parallel for better performance
-  const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
+  // Run analyzers in parallel for better performance (with caching)
+  // Pass the ChangeSet's cache key so analyzer caches are properly linked
+  const findings = await runAnalyzersInParallel(profile.analyzers, changeSet, {
+    cache: cacheConfig,
+    changeSetKey: cacheKey ?? undefined,
+    profileName: resolvedProfile,
+  });
 
   if (spinner) {
     spinner.succeed(
@@ -157,11 +189,16 @@ program
   .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
-  .action(async (options) => {
+  .action(async (options, command) => {
     try {
+      const startTime = Date.now();
+      // Get global options for caching
+      const globalOpts = command.parent?.opts() ?? {};
+      const cacheConfig = getCacheConfig(globalOpts);
+
       // Validate mode
       const mode = options.mode as DiffMode;
       if (!["branch", "unstaged", "staged", "all"].includes(mode)) {
@@ -181,6 +218,7 @@ program
         head,
         profile: options.profile as ProfileName,
         showSpinner: true,
+        cache: cacheConfig,
       });
 
       const riskScore = computeRiskScore(findings);
@@ -192,6 +230,9 @@ program
       };
 
       console.log(renderTerminal(renderContext));
+      // Show duration (greyish color for subtlety)
+      const durationMs = Date.now() - startTime;
+      console.error(chalk.gray(`[${durationMs}ms]`));
       return;
     } catch (error) {
       handleError(error);
@@ -211,12 +252,16 @@ program
   .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
   .option("--interactive", "Prompt for additional context", false)
-  .action(async (options) => {
+  .action(async (options, command) => {
     try {
+      // Get global options for caching
+      const globalOpts = command.parent?.opts() ?? {};
+      const cacheConfig = getCacheConfig(globalOpts);
+
       const mode = options.mode as DiffMode;
 
       // Validate mode
@@ -237,6 +282,7 @@ program
         head,
         profile: options.profile as ProfileName,
         showSpinner: false,
+        cache: cacheConfig,
       });
 
       const riskScore = computeRiskScore(findings);
@@ -284,7 +330,7 @@ program
   .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
   .option("--format <type>", "Output format: json|sarif", "json")
@@ -320,13 +366,16 @@ program
   .option("--no-timestamp", "Omit generatedAt for deterministic output")
   .option("--since <path>", "Compare current output to a previous JSON file")
   .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
-  .option("--test-parity", "Enable test parity checking (opt-in, may be slow on large repos)", false)
-  .action(async (options) => {
+  .action(async (options, command) => {
     try {
       // Import executeFacts dynamically to avoid circular dependencies
       const { executeFacts } = await import("./commands/facts/index.js");
       const { getRepoRoot, isWorkingDirDirty } = await import("./git/collector.js");
       const { computeFactsDelta } = await import("./commands/facts/delta.js");
+
+      // Get global options for caching
+      const globalOpts = command.parent?.opts() ?? {};
+      const cacheConfig = getCacheConfig(globalOpts);
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -354,12 +403,16 @@ program
         ? parseInt(options.maxFindings, 10)
         : undefined;
 
-      // Collect git data using mode-based options
-      const changeSet = await collectChangeSet({
+      // Collect git data using mode-based options (with caching)
+      const { collectChangeSetWithCache } = await import("./git/collector.js");
+      const { changeSet, cacheKey } = await collectChangeSetWithCache({
         mode,
         base,
         head,
         includeUntracked: mode === "all" || mode === "unstaged",
+        cache: cacheConfig,
+        includes: options.include,
+        excludes: options.exclude,
       });
 
       // Compute git metadata once (parallel for efficiency)
@@ -388,15 +441,12 @@ program
 
       const profile = getProfile(detectedProfile);
 
-      // Run analyzers in parallel for better performance
-      const findings = await runAnalyzersInParallel(profile.analyzers, changeSet);
-
-      // Run test parity analyzer if explicitly enabled (opt-in)
-      if (options.testParity) {
-        const { testParityAnalyzer } = await import("./analyzers/test-parity.js");
-        const testParityFindings = await testParityAnalyzer.analyze(changeSet);
-        findings.push(...testParityFindings);
-      }
+      // Run analyzers in parallel for better performance (with caching)
+      const findings = await runAnalyzersInParallel(profile.analyzers, changeSet, {
+        cache: cacheConfig,
+        changeSetKey: cacheKey ?? undefined,
+        profileName: detectedProfile,
+      });
 
       // Compute risk
       const riskScore = computeRiskScore(findings);
@@ -631,12 +681,15 @@ program
   .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
   .option("--since <path>", "Compare current output to a previous JSON file")
   .option("--since-strict", "Exit with code 1 on scope/tool/schema mismatch", false)
-  .option("--test-parity", "Enable test parity checking (opt-in, may be slow on large repos)", false)
-  .action(async (options) => {
+  .action(async (options, command) => {
     try {
       // Import risk report command dynamically
       const { executeRiskReport, renderRiskReportJSON, renderRiskReportMarkdown, renderRiskReportText } = await import("./commands/risk/index.js");
       const { computeRiskReportDelta } = await import("./commands/risk/delta.js");
+
+      // Get global options for caching
+      const globalOpts = command.parent?.opts() ?? {};
+      const cacheConfig = getCacheConfig(globalOpts);
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -680,15 +733,17 @@ program
         ? options.exclude.split(",").map((s: string) => s.trim())
         : undefined;
 
-      // Collect git data using mode-based options
-      const changeSet = await collectChangeSet({
+      // Collect git data using mode-based options (with caching)
+      const { collectChangeSetWithCache } = await import("./git/collector.js");
+      const { changeSet, cacheKey } = await collectChangeSetWithCache({
         mode,
         base,
         head,
         includeUntracked: mode === "all" || mode === "unstaged",
+        cache: cacheConfig,
       });
 
-      // Execute risk report command
+      // Execute risk report command (with caching)
       const report = await executeRiskReport(changeSet, {
         only,
         exclude,
@@ -697,7 +752,8 @@ program
         explainScore: options.explainScore,
         noTimestamp: options.timestamp === false,
         mode,
-        testParity: options.testParity,
+        cache: cacheConfig,
+        changeSetKey: cacheKey ?? undefined,
       });
 
       // If --since is provided, compute delta and force JSON format
@@ -777,7 +833,7 @@ program
   .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
   .option("--format <type>", "Output format: json|md|text", "json")
@@ -788,11 +844,15 @@ program
   .option("--out <path>", "Write output to file instead of stdout")
   .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
   .option("--no-timestamp", "Omit generatedAt for deterministic output")
-  .action(async (options) => {
+  .action(async (options, command) => {
     try {
       // Import zoom command dynamically
       const { executeZoom } = await import("./commands/zoom/index.js");
       const { renderZoomJSON, renderZoomMarkdown, renderZoomText } = await import("./commands/zoom/renderers.js");
+
+      // Get global options for caching
+      const globalOpts = command.parent?.opts() ?? {};
+      const cacheConfig = getCacheConfig(globalOpts);
 
       // Validate mode
       const mode = options.mode as DiffMode;
@@ -828,15 +888,17 @@ program
         process.exit(1);
       }
 
-      // Collect git data using mode-based options
-      const changeSet = await collectChangeSet({
+      // Collect git data using mode-based options (with caching)
+      const { collectChangeSetWithCache } = await import("./git/collector.js");
+      const { changeSet, cacheKey } = await collectChangeSetWithCache({
         mode,
         base,
         head,
         includeUntracked: mode === "all" || mode === "unstaged",
+        cache: cacheConfig,
       });
 
-      // Execute zoom command
+      // Execute zoom command (with caching)
       const zoomOutput = await executeZoom(changeSet, {
         findingId: options.finding,
         flagId: options.flag,
@@ -849,6 +911,8 @@ program
         maxEvidenceLines,
         redact: options.redact,
         noTimestamp: options.timestamp === false,
+        cache: cacheConfig,
+        changeSetKey: cacheKey ?? undefined,
       });
 
       // Render output
@@ -996,6 +1060,66 @@ snap
         warn("Verification: patch hashes differ (this may be expected for empty patches)");
       }
 
+      return;
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+// cache command - cache management operations
+const cache = program
+  .command("cache")
+  .description("Cache management operations");
+
+cache
+  .command("stats")
+  .description("Show cache statistics")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .action(async (options) => {
+    try {
+      const { executeCacheStats, renderCacheStats } = await import(
+        "./commands/cache/index.js"
+      );
+      const stats = await executeCacheStats();
+      console.log(renderCacheStats(stats, options.pretty));
+      return;
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+cache
+  .command("clear")
+  .description("Clear all cache data")
+  .action(async () => {
+    try {
+      const { executeCacheClear } = await import("./commands/cache/index.js");
+      await executeCacheClear();
+      info("Cache cleared successfully");
+      return;
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+cache
+  .command("prune")
+  .description("Remove old cache entries")
+  .option("--max-age <days>", "Maximum age in days (default: 30)", "30")
+  .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
+  .action(async (options) => {
+    try {
+      const { executeCachePrune, renderPruneResult } = await import(
+        "./commands/cache/index.js"
+      );
+      const maxAgeDays = parseInt(options.maxAge, 10);
+      if (isNaN(maxAgeDays) || maxAgeDays <= 0) {
+        logError("Invalid max-age: must be a positive integer");
+        process.exit(1);
+      }
+      const result = await executeCachePrune({ maxAgeDays });
+      console.log(renderPruneResult(result, options.pretty));
+      info(`Pruned ${result.prunedCount} entries older than ${maxAgeDays} days`);
       return;
     } catch (error) {
       handleError(error);

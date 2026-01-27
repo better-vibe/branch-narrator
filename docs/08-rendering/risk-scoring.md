@@ -21,6 +21,16 @@ const report = computeRiskReport(base, head, flags, skippedFiles, options);
 
 Current `risk-report` output uses **`schemaVersion: "2.0"`** (see `src/core/types.ts`).
 
+## Facts Risk Score vs Risk Report
+
+The `facts` command includes a `risk` object computed by `computeRiskScore` in
+`src/render/risk-score.ts`. This is a lightweight heuristic score used for
+summary and highlighting and has **three levels**: `low`, `medium`, `high`.
+
+`risk-report` is a separate output with flags, category scores, and a
+**five-level scale**: `low`, `moderate`, `elevated`, `high`, `critical`.
+Use `risk-report` for gating or security review workflows.
+
 ## Flags and traceability
 
 Every emitted flag is traceable back to the finding(s) that produced it:

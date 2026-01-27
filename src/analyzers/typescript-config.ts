@@ -175,6 +175,7 @@ function getStrictnessChanges(
 
 export const typescriptConfigAnalyzer: Analyzer = {
   name: "typescript-config",
+  cache: { includeGlobs: ["**/tsconfig*.json"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

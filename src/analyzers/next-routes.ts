@@ -174,6 +174,7 @@ export function isNextConfigFile(path: string): boolean {
 
 export const nextRoutesAnalyzer: Analyzer = {
   name: "next-routes",
+  cache: { includeGlobs: ["**/app/**", "**/src/app/**", "**/pages/**", "**/src/pages/**", "middleware.*", "src/middleware.*", "next.config.*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
     const findings: Finding[] = [];

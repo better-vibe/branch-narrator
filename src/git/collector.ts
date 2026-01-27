@@ -1,19 +1,27 @@
 /**
  * Git command execution and data collection.
+ *
+ * Uses the high-performance DOD parser for all diff parsing operations.
+ * Supports caching for improved performance on repeated runs.
  */
 
 import { execa } from "execa";
-import parseDiff from "parse-diff";
 import {
   buildChangeSet,
-  type ParseDiffFile,
+  buildChangeSetMerged,
 } from "../core/change-set.js";
 import {
   GitCommandError,
   InvalidRefError,
   NotAGitRepoError,
 } from "../core/errors.js";
-import type { ChangeSet, DiffMode } from "../core/types.js";
+import type { ChangeSet, DiffMode, FileDiff } from "../core/types.js";
+import type { CacheConfig } from "../cache/types.js";
+import {
+  loadCachedChangeSet,
+  saveChangeSetToCache,
+} from "../cache/changeset.js";
+import { computeWorktreeSignature } from "../cache/signatures.js";
 import { batchGetFileContent } from "./batch.js";
 
 /**
@@ -313,13 +321,14 @@ async function readWorkingFile(
 /**
  * Create synthetic diff entries for untracked files.
  * Reads files in parallel for improved performance.
+ * Returns FileDiff[] directly (no legacy ParseDiffFile format needed).
  */
 async function createUntrackedDiffs(
   untrackedFiles: string[],
   cwd: string
-): Promise<{ nameStatus: string; diffs: ParseDiffFile[] }> {
+): Promise<{ nameStatus: string; diffs: FileDiff[] }> {
   const nameStatusLines: string[] = [];
-  const diffs: ParseDiffFile[] = [];
+  const diffs: FileDiff[] = [];
 
   // Separate binary files from text files
   const binaryFiles: string[] = [];
@@ -346,35 +355,29 @@ async function createUntrackedDiffs(
     }))
   );
 
-  // Process read results
+  // Process read results - create FileDiff entries directly
   for (const { file, content } of fileReadResults) {
     if (content === null) continue;
 
     nameStatusLines.push(`A\t${file}`);
 
-    // Create a synthetic diff for the file
+    // Create a FileDiff directly (no intermediate ParseDiffFile format)
     const lines = content.split("\n");
-    const changes = lines.map((line, idx) => ({
-      type: "add" as const,
-      content: "+" + line,
-      ln: idx + 1,
-    }));
 
     diffs.push({
-      from: "/dev/null",
-      to: file,
-      chunks: [
+      path: file,
+      status: "added",
+      hunks: [
         {
-          content: `@@ -0,0 +1,${lines.length} @@`,
           oldStart: 0,
           oldLines: 0,
           newStart: 1,
           newLines: lines.length,
-          changes,
+          content: `@@ -0,0 +1,${lines.length} @@`,
+          additions: lines,
+          deletions: [],
         },
       ],
-      deletions: 0,
-      additions: lines.length,
     });
   }
 
@@ -442,11 +445,28 @@ export interface CollectChangeSetOptionsV2 {
   head?: string;
   cwd?: string;
   includeUntracked?: boolean;
+  /** Cache configuration (optional, defaults to disabled) */
+  cache?: CacheConfig;
+  /** Include patterns for file filtering (used in cache key) */
+  includes?: string[];
+  /** Exclude patterns for file filtering (used in cache key) */
+  excludes?: string[];
+}
+
+/**
+ * Result of collecting a ChangeSet with caching.
+ */
+export interface CollectChangeSetResult {
+  changeSet: ChangeSet;
+  /** Cache key for this ChangeSet (null if caching disabled) */
+  cacheKey: string | null;
 }
 
 /**
  * Collect all git diff data and build a ChangeSet.
  * Supports both legacy options (base/head) and new mode-based options.
+ *
+ * For caching support with cache key access, use collectChangeSetWithCache().
  */
 export async function collectChangeSet(
   baseOrOptions: string | CollectChangeSetOptions | CollectChangeSetOptionsV2,
@@ -455,7 +475,8 @@ export async function collectChangeSet(
 ): Promise<ChangeSet> {
   // Handle v2 options with mode
   if (typeof baseOrOptions === "object" && "mode" in baseOrOptions) {
-    return collectChangeSetByMode(baseOrOptions);
+    const result = await collectChangeSetByMode(baseOrOptions);
+    return result.changeSet;
   }
 
   // Handle both old signature and legacy options object
@@ -497,19 +518,16 @@ export async function collectChangeSet(
     ),
   ]);
 
-  // Parse unified diff for tracked files
-  const parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
-
   // Extract package.json content from batch result
   const basePackageContent = packageJsonBatch.get(`${base}:package.json`) ?? null;
   const headPackageContent = parsePackageJson(packageJsonBatch.get(`${headRef}:package.json`) ?? null);
 
-  // Build ChangeSet
+  // Build ChangeSet using DOD parser (parses unifiedDiff internally)
   return buildChangeSet({
     base,
     head: options.head,
     nameStatusOutput,
-    parsedDiffs,
+    unifiedDiff,
     basePackageJson: parsePackageJson(basePackageContent),
     headPackageJson: headPackageContent,
   });
@@ -517,15 +535,55 @@ export async function collectChangeSet(
 
 /**
  * Collect all git diff data and build a ChangeSet using mode-based options.
+ * Returns both the ChangeSet and its cache key (if caching is enabled).
  */
 async function collectChangeSetByMode(
   options: CollectChangeSetOptionsV2
-): Promise<ChangeSet> {
+): Promise<CollectChangeSetResult> {
   const cwd = options.cwd ?? process.cwd();
   const includeUntracked = options.includeUntracked ?? (options.mode === "all" || options.mode === "unstaged");
+  const cacheConfig: CacheConfig = options.cache ?? { enabled: false };
+  const isNonBranch = options.mode !== "branch";
 
-  // Validate git repo
-  if (!(await isGitRepo(cwd))) {
+  // Pre-compute worktree signature once for non-branch modes with cache enabled.
+  // This runs git status + write-tree + rev-parse HEAD in parallel and
+  // implicitly validates that we're in a git repo.
+  let worktreeSignature: string | undefined;
+  let gitRepoValidated = false;
+
+  if (cacheConfig.enabled && isNonBranch) {
+    try {
+      worktreeSignature = await computeWorktreeSignature(cwd);
+      gitRepoValidated = true; // If this succeeded, we're in a git repo
+    } catch {
+      // Not in a git repo or git not available
+    }
+  }
+
+  // Try to load from cache first (pass pre-computed worktreeSignature)
+  if (cacheConfig.enabled) {
+    const cached = await loadCachedChangeSet(
+      {
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        includes: options.includes,
+        excludes: options.excludes,
+        cwd,
+      },
+      cacheConfig,
+      worktreeSignature
+    );
+    if (cached) {
+      return {
+        changeSet: cached.changeSet,
+        cacheKey: cached.cacheKey,
+      };
+    }
+  }
+
+  // Validate git repo (skip if already validated by worktree signature computation)
+  if (!gitRepoValidated && !(await isGitRepo(cwd))) {
     throw new NotAGitRepoError(cwd);
   }
 
@@ -546,35 +604,35 @@ async function collectChangeSetByMode(
   }
 
   // For non-branch modes that reference HEAD, validate HEAD exists
-  if (options.mode === "staged" || options.mode === "all") {
+  // Skip if gitRepoValidated (worktree signature already ran rev-parse HEAD)
+  if (!gitRepoValidated && (options.mode === "staged" || options.mode === "all")) {
     if (!(await refExists("HEAD", cwd))) {
       throw new InvalidRefError("HEAD");
     }
   }
 
-  // Collect data based on mode
-  const [nameStatusOutput, unifiedDiff] = await Promise.all([
+  // Collect data: parallelize diffs with untracked file collection
+  const diffPromises: Promise<any>[] = [
     getNameStatusByMode(options, cwd),
     getUnifiedDiffByMode(options, cwd),
-  ]);
+  ];
 
-  // Parse unified diff for tracked files
-  let parsedDiffs = parseDiff(unifiedDiff) as ParseDiffFile[];
-  let finalNameStatus = nameStatusOutput;
+  // Run untracked files collection in parallel with diffs
+  const collectUntracked = includeUntracked && isNonBranch;
+  if (collectUntracked) {
+    diffPromises.push(getUntrackedFiles(cwd));
+  }
 
-  // Include untracked files if requested (default for "all" mode)
-  if (includeUntracked && options.mode !== "branch") {
-    const untrackedFiles = await getUntrackedFiles(cwd);
+  const results = await Promise.all(diffPromises);
+  const nameStatusOutput = results[0] as string;
+  const unifiedDiff = results[1] as string;
+
+  // Process untracked files (only file content reading, not the listing)
+  let untrackedData: { nameStatus: string; diffs: FileDiff[] } | null = null;
+  if (collectUntracked) {
+    const untrackedFiles = results[2] as string[];
     if (untrackedFiles.length > 0) {
-      const untrackedData = await createUntrackedDiffs(untrackedFiles, cwd);
-
-      // Merge untracked files into results
-      if (untrackedData.nameStatus) {
-        finalNameStatus = finalNameStatus
-          ? `${finalNameStatus}\n${untrackedData.nameStatus}`
-          : untrackedData.nameStatus;
-      }
-      parsedDiffs = [...parsedDiffs, ...untrackedData.diffs];
+      untrackedData = await createUntrackedDiffs(untrackedFiles, cwd);
     }
   }
 
@@ -636,15 +694,60 @@ async function collectChangeSetByMode(
     }
   }
 
-  // Build ChangeSet
-  return buildChangeSet({
-    base,
-    head,
-    nameStatusOutput: finalNameStatus,
-    parsedDiffs,
-    basePackageJson,
-    headPackageJson,
-  });
+  // Build ChangeSet using DOD parser
+  // If we have untracked files, merge them with the parsed diffs
+  let changeSet: ChangeSet;
+  if (untrackedData) {
+    changeSet = buildChangeSetMerged({
+      base,
+      head,
+      nameStatusOutput,
+      unifiedDiff,
+      additionalDiffs: untrackedData.diffs,
+      additionalNameStatus: untrackedData.nameStatus,
+      basePackageJson,
+      headPackageJson,
+    });
+  } else {
+    changeSet = buildChangeSet({
+      base,
+      head,
+      nameStatusOutput,
+      unifiedDiff,
+      basePackageJson,
+      headPackageJson,
+    });
+  }
+
+  // Save to cache if enabled (pass pre-computed worktreeSignature to avoid recomputation)
+  let cacheKey: string | null = null;
+  if (cacheConfig.enabled) {
+    cacheKey = await saveChangeSetToCache(
+      changeSet,
+      {
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        includes: options.includes,
+        excludes: options.excludes,
+        cwd,
+      },
+      cacheConfig,
+      worktreeSignature
+    );
+  }
+
+  return { changeSet, cacheKey };
+}
+
+/**
+ * Collect a ChangeSet with full caching support.
+ * Returns both the ChangeSet and its cache key for use with analyzer caching.
+ */
+export async function collectChangeSetWithCache(
+  options: CollectChangeSetOptionsV2
+): Promise<CollectChangeSetResult> {
+  return collectChangeSetByMode(options);
 }
 
 /**

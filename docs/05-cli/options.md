@@ -4,12 +4,15 @@ Detailed documentation for each CLI option.
 
 ## --mode
 
-Select the diff mode to use. Available on `pretty`, `facts`, and `dump-diff` commands.
+Select the diff mode to use. Available on `pretty`, `pr-body`, `facts`, `dump-diff`, `risk-report`, and `zoom` commands.
 
 ```bash
 branch-narrator pretty --mode <type>
+branch-narrator pr-body --mode <type>
 branch-narrator facts --mode <type>
 branch-narrator dump-diff --mode <type>
+branch-narrator risk-report --mode <type>
+branch-narrator zoom --mode <type>
 ```
 
 | Mode | Description | Git Equivalent |
@@ -34,6 +37,8 @@ branch-narrator pretty --mode branch --base <ref>
 branch-narrator pr-body --mode branch --base <ref>
 branch-narrator facts --mode branch --base <ref>
 branch-narrator dump-diff --mode branch --base <ref>
+branch-narrator risk-report --mode branch --base <ref>
+branch-narrator zoom --mode branch --base <ref>
 ```
 
 ### Values
@@ -57,6 +62,10 @@ Head git reference (your changes). Only used in `branch` mode.
 
 ```bash
 branch-narrator pr-body --head <ref>
+branch-narrator facts --head <ref>
+branch-narrator dump-diff --head <ref>
+branch-narrator risk-report --head <ref>
+branch-narrator zoom --head <ref>
 ```
 
 Same value types as `--base`.
@@ -88,21 +97,24 @@ branch-narrator facts --profile <name>
 | `vue` | Vue.js + Vue Router analyzers |
 | `astro` | Astro pages and routes analyzers |
 | `stencil` | StencilJS component API analyzers |
+| `angular` | Angular routes and component API analyzers |
 | `library` | npm package/library analyzers (API surface, exports) |
 | `python` | Python project analyzers (Django, FastAPI, Flask) |
+| `vite` | Vite configuration analyzer set |
 
 ### Auto-Detection Logic
 
-1. Check for `src/routes/` directory → SvelteKit
-2. Check for `@sveltejs/kit` in package.json → SvelteKit
-3. Check for `@stencil/core` or `stencil.config.*` → Stencil
-4. Check for `next` in package.json with `app/` directory → Next.js
-5. Check for `react` + `react-router-dom` → React
-6. Check for `vue` + Nuxt markers → Vue
-7. Check for `astro` in package.json → Astro
-8. Check for `exports`/`publishConfig`/`bin` in package.json → Library
-9. Check for Python files (pyproject.toml, requirements.txt) → Python
-10. Otherwise → Default profile
+1. Check for `src/routes/` directory or `@sveltejs/kit` → SvelteKit
+2. Check for `@stencil/core` or `stencil.config.*` → Stencil
+3. Check for `next` in package.json with `app/` or `src/app/` → Next.js
+4. Check for `react` + `react-router` → React
+5. Check for `vue` + Nuxt markers (`pages/`, `src/pages`) → Vue
+6. Check for `astro` dependency or `astro.config.*` → Astro
+7. Check for `@angular/core` or `angular.json` → Angular
+8. Check for `vite` dependency or `vite.config.*` → Vite
+9. Check for `exports`/`publishConfig`/`bin` in package.json → Library
+10. Check for Python files (pyproject.toml, requirements.txt) → Python
+11. Otherwise → Default profile
 
 ---
 
@@ -128,6 +140,28 @@ Responses appear in `## Context` section:
 
 This PR implements user authentication using Supabase Auth.
 ```
+
+---
+
+## --format
+
+Output format for commands that support alternate renderers.
+
+```bash
+branch-narrator facts --format <type>
+branch-narrator risk-report --format <type>
+branch-narrator dump-diff --format <type>
+branch-narrator zoom --format <type>
+```
+
+### Formats by Command
+
+| Command | Formats |
+|---------|---------|
+| `facts` | `json`, `sarif` |
+| `risk-report` | `json`, `md`, `text` |
+| `dump-diff` | `text`, `md`, `json` |
+| `zoom` | `json`, `md`, `text` |
 
 ---
 
@@ -166,22 +200,6 @@ branch-narrator dump-diff --out .ai/diff.txt
 ```
 
 Creates parent directories as needed.
-
----
-
-### --format
-
-Output format for the diff.
-
-```bash
-branch-narrator dump-diff --format <type>
-```
-
-| Format | Description |
-|--------|-------------|
-| `text` | Raw unified diff (default) |
-| `md` | Markdown with fenced code block and header |
-| `json` | Machine-readable JSON with metadata |
 
 ---
 
@@ -273,39 +291,35 @@ Shows file lists, estimated sizes, and chunk counts.
 
 ---
 
-## --test-parity
+## Global Caching Options
 
-Enable test parity checking. Available on `facts` and `risk-report` commands.
+These options can be used with any command to control caching behavior.
 
-```bash
-branch-narrator facts --mode branch --base main --test-parity
-branch-narrator risk-report --mode branch --base main --test-parity
-```
+### --no-cache
 
-### Behavior
-
-When enabled, the test parity analyzer checks if modified/added source files have corresponding test files. This is an opt-in feature because it requires git file system operations that can be slow on large repositories.
-
-### Output
-
-Produces `test-parity-violation` findings for each source file without a corresponding test. In risk reports, these are aggregated into a `tests.missing_parity` flag.
-
-### Example
+Disable caching entirely. The cache will not be read or written.
 
 ```bash
-# Check for test coverage gaps
-branch-narrator risk-report --mode branch --base main --test-parity --format text
+branch-narrator --no-cache facts --mode branch
 ```
 
-Output:
-```
-tests.missing_parity (score: 18, confidence: 0.75)
-  Source files modified without corresponding tests
-  - src/services/auth.ts: No test file found
-  - src/utils/helpers.ts: No test file found
+**Use cases:**
+- Ensure fresh analysis (no cached data)
+- Debugging or testing
+- When you suspect stale cache data
+
+### --clear-cache
+
+Clear all cache data before running the command.
+
+```bash
+branch-narrator --clear-cache facts --mode branch
 ```
 
-**Default:** Disabled (opt-in only)
+**Use cases:**
+- Start fresh after significant changes
+- Reset after CLI upgrade
+- Clear corrupted cache data
 
 ---
 

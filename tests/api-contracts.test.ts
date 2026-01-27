@@ -7,6 +7,7 @@ import { analyzeAPIContracts } from "../src/analyzers/api-contracts.js";
 import type { APIContractChangeFinding } from "../src/core/types.js";
 import { createChangeSet, createFileChange } from "./fixtures/index.js";
 
+
 describe("analyzeAPIContracts", () => {
   describe("OpenAPI/Swagger detection", () => {
     it("should detect openapi.yaml", () => {

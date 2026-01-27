@@ -18,7 +18,7 @@ branch-narrator pr-body > pr.md
 
 ```bash
 # Get risk level as text
-branch-narrator facts | jq -r '.riskScore.level'
+branch-narrator facts | jq -r '.risk.level'
 
 # Output: low, medium, or high
 ```
@@ -34,7 +34,7 @@ branch-narrator facts | jq -r '.riskScore.level'
 branch-narrator pr-body
 
 # See what will be flagged
-branch-narrator facts | jq '.riskScore.evidenceBullets'
+branch-narrator facts | jq '.risk.evidenceBullets'
 ```
 
 ### Feature Branch
@@ -72,7 +72,7 @@ branch-narrator facts | jq '.findings[] | select(.type == "dependency-change")'
 
 ```bash
 # List all changed files
-branch-narrator facts | jq -r '.findings[] | select(.type == "file-summary") | .added[], .modified[]'
+branch-narrator facts | jq -r '.changeset.files.added[], .changeset.files.modified[], .changeset.files.deleted[]'
 
 # Get new env vars
 branch-narrator facts | jq -r '.findings[] | select(.type == "env-var" and .change == "added") | .name'
@@ -82,7 +82,7 @@ branch-narrator facts | jq -r '.findings[] | select(.type == "env-var" and .chan
 
 ```bash
 # Get score and evidence
-branch-narrator facts | jq '{score: .riskScore.score, level: .riskScore.level, evidence: .riskScore.evidenceBullets}'
+branch-narrator facts | jq '{score: .risk.score, level: .risk.level, evidence: .risk.evidenceBullets}'
 ```
 
 ---
@@ -128,11 +128,9 @@ jobs:
 
       - uses: oven-sh/setup-bun@v1
 
-      - run: bun add -D branch-narrator
-
       - name: Generate PR body
         run: |
-          npx branch-narrator pr-body \
+          bunx @better-vibe/branch-narrator pr-body \
             --mode branch \
             --base ${{ github.base_ref }} \
             --head ${{ github.head_ref }} > pr-body.md
@@ -157,11 +155,11 @@ jobs:
 #!/bin/bash
 # .git/hooks/pre-commit
 
-RISK=$(npx branch-narrator facts --mode unstaged | jq -r '.riskScore.level')
+RISK=$(bunx @better-vibe/branch-narrator facts --mode unstaged | jq -r '.risk.level')
 
 if [ "$RISK" = "high" ]; then
   echo "⚠️  High risk changes detected!"
-  npx branch-narrator facts --mode unstaged | jq -r '.riskScore.evidenceBullets[]'
+  bunx @better-vibe/branch-narrator facts --mode unstaged | jq -r '.risk.evidenceBullets[]'
   echo ""
   read -p "Continue anyway? (y/n) " -n 1 -r
   echo
@@ -179,9 +177,9 @@ Add to `~/.gitconfig`:
 
 ```ini
 [alias]
-  pr-body = !npx branch-narrator pr-body
-  pr-facts = !npx branch-narrator facts
-  pr-risk = !npx branch-narrator facts | jq -r '.riskScore.level'
+  pr-body = !bunx @better-vibe/branch-narrator pr-body
+  pr-facts = !bunx @better-vibe/branch-narrator facts
+  pr-risk = !bunx @better-vibe/branch-narrator facts | jq -r '.risk.level'
 ```
 
 Usage:
@@ -203,14 +201,14 @@ git pr-risk
 
 # Generate PR description and check risk
 FACTS=$(branch-narrator facts)
-RISK=$(echo "$FACTS" | jq -r '.riskScore.level')
-SCORE=$(echo "$FACTS" | jq -r '.riskScore.score')
+RISK=$(echo "$FACTS" | jq -r '.risk.level')
+SCORE=$(echo "$FACTS" | jq -r '.risk.score')
 
 echo "Risk: $RISK (score: $SCORE)"
 
 if [ "$RISK" = "high" ]; then
   echo "High risk detected. Evidence:"
-  echo "$FACTS" | jq -r '.riskScore.evidenceBullets[]'
+  echo "$FACTS" | jq -r '.risk.evidenceBullets[]'
 fi
 ```
 
@@ -220,11 +218,11 @@ fi
 import { execSync } from "child_process";
 
 const facts = JSON.parse(
-  execSync("npx branch-narrator facts").toString()
+  execSync("bunx @better-vibe/branch-narrator facts").toString()
 );
 
-console.log(`Profile: ${facts.profile}`);
-console.log(`Risk: ${facts.riskScore.level} (${facts.riskScore.score}/100)`);
+console.log(`Profile: ${facts.profile.detected}`);
+console.log(`Risk: ${facts.risk.level} (${facts.risk.score}/100)`);
 
 for (const finding of facts.findings) {
   if (finding.type === "route-change") {

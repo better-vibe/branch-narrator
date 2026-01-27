@@ -38,6 +38,8 @@ const ANALYZABLE_EXTENSIONS = new Set([
   ".svelte",
 ]);
 
+const IMPACT_CACHE_GLOBS = ["**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,vue,svelte}"];
+
 // Pattern to match code files (for filtering dependents)
 // Only these files can have actual imports, excludes docs/config/lockfiles
 const CODE_FILE_PATTERN = /\.(js|jsx|ts|tsx|mjs|cjs|mts|cts|vue|svelte)$/i;
@@ -222,6 +224,7 @@ export function createImpactAnalyzer(options?: {
 
   return {
     name: "impact",
+    cache: { includeGlobs: IMPACT_CACHE_GLOBS },
 
     async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];
