@@ -64,10 +64,4 @@ export function shouldExcludeFile(path: string): boolean {
   return EXCLUDED_PATTERNS.some((pattern) => pattern.test(path));
 }
 
-/**
- * Filter out excluded files from a list of paths.
- */
-export function filterExcludedFiles(paths: string[]): string[] {
-  return paths.filter((path) => !shouldExcludeFile(path));
-}
 

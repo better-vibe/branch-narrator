@@ -10,20 +10,25 @@ function renderMarkdown(context: RenderContext): string;
 
 ## Structure Overview
 
-The output is organized into compact primary sections with extended information in a collapsible `<details>` block:
+The output is organized into compact primary sections with extended information in a collapsible `<details>` block.
+
+**No-Changes Short-Circuit:** When `diffstat.total === 0` and there are no findings (and no interactive content), the renderer returns a single-line `"No changes detected."` message with the hidden metadata comment. All other sections are skipped.
 
 ```mermaid
 flowchart TB
+    SC{"No changes?"} -->|"Yes"| NC["No changes detected."]
+    SC -->|"No"| S1
     S1["## Context"] -->|"interactive only"| S2
     S2["## Summary"] --> S3
     S3["## Top findings"] --> S4
     S4["## What changed"] --> S5
-    S5["## Suggested test plan"] --> S6
-    S6["## Notes"] --> S7
-    S7["<details>Details</details>"] --> D1
+    S5["## Dependencies"] --> S6
+    S6["## Suggested test plan"] --> S7
+    S7["## Notes"] -->|"omitted if low risk, no evidence"| S8
+    S8["<details>Details</details>"] --> D1
     
     subgraph Details Block
-        D1["### Impact Analysis"] --> D2
+        D1["### Impact Analysis (high/medium only)"] --> D2
         D2["### Routes / API"] --> D3
         D3["### API Contracts"] --> D4
         D4["### GraphQL Schema"] --> D5
@@ -33,15 +38,14 @@ flowchart TB
         D8["### Config / Env"] --> D9
         D9["### Configuration Changes"] --> D10
         D10["### Cloudflare"] --> D11
-        D11["### Dependencies"] --> D12
+        D11["### Dependencies (full table)"] --> D12
         D12["### Package API"] --> D13
         D13["### Component API (Stencil)"] --> D14
         D14["### Angular Components"] --> D15
         D15["### CI / Infrastructure"] --> D16
         D16["### Security-Sensitive Files"] --> D17
         D17["### Conventions"] --> D18
-        D18["### Test Coverage Gaps"] --> D19
-        D19["### Warnings"]
+        D18["### Warnings"]
     end
 ```
 
@@ -115,6 +119,20 @@ Files grouped by category with Primary files for small changes and Changesets se
 - `.changeset/brave-tigers-fly.md` *(new)*
 ```
 
+### Dependencies
+
+Concise overview of dependency changes, promoted to the primary area for visibility. Shows counts by prod/dev, highlights major updates, new packages, and removed packages.
+
+```markdown
+## Dependencies
+
+- 5 dependency changes (3 production, 2 dev)
+- Major: express ^4.0.0 -> ^5.0.0, @sveltejs/kit ^1.0.0 -> ^2.0.0
+- Added: better-auth
+```
+
+This section is only rendered when there are dependency changes. The full dependency tables (with From/To/Impact columns) remain available in the Details block.
+
 ### Suggested test plan
 
 Profile-specific commands with rationales.
@@ -130,16 +148,9 @@ Profile-specific commands with rationales.
 
 ### Notes
 
-Risk level and evidence bullets.
+Risk level and evidence bullets. **Omitted entirely** when risk is low and there are no evidence bullets.
 
-```markdown
-## Notes
-
-- Risk: LOW (15/100)
-- No elevated risks detected.
-```
-
-Or with evidence:
+With evidence:
 
 ```markdown
 ## Notes
@@ -156,7 +167,7 @@ Extended information is placed in a collapsible `<details>` block.
 
 ### Impact Analysis
 
-Files with high/medium blast radius and their dependents.
+Files with high/medium blast radius and their dependents. **Low blast radius entries are omitted** to reduce noise. The section is capped at 5 entries with 3 dependents shown per entry.
 
 ```markdown
 ### Impact Analysis
@@ -167,9 +178,7 @@ Affected files:
 - `src/routes/api/users/+server.ts`
 - `src/routes/api/posts/+server.ts`
 - `src/lib/auth.ts`
-- `src/lib/cache.ts`
-- `src/lib/session.ts`
-- ...and 10 more
+- ...and 12 more
 ```
 
 ### Routes / API
@@ -523,9 +532,14 @@ Warnings about changeset characteristics.
 - **Test coverage gap:** 10 production files changed, only 2 test files changed
 ```
 
-## Empty Section Handling
+## Conditional Rendering
 
-Sections with no content are automatically omitted. The `<details>` block is only rendered if there is extended content to show.
+- **No-changes short-circuit:** When there are no findings and no interactive content, the output is a single `"No changes detected."` line with the hidden metadata comment.
+- **Empty sections:** Sections with no content are automatically omitted.
+- **Notes section:** Omitted entirely when risk is low and there are no evidence bullets.
+- **Impact Analysis:** Only shows high and medium blast radius entries; low entries are omitted.
+- **Details block:** Only rendered if there is extended content to show.
+- **Dependencies:** A concise overview is promoted to the primary area; the full table remains in Details.
 
 ## No Emojis
 

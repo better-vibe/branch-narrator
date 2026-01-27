@@ -16,6 +16,10 @@ import type {
 } from "../src/core/types.js";
 import { renderMarkdown } from "../src/render/markdown.js";
 import { computeRiskScore } from "../src/render/risk-score.js";
+import {
+  buildDependencyOverview,
+  formatDependencyOverviewBullets,
+} from "../src/render/summary.js";
 
 function createContext(
   findings: Finding[],
@@ -474,5 +478,352 @@ describe("computeRiskScore", () => {
 
     const score = computeRiskScore(findings);
     expect(score.score).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================================
+// Dependency Overview Tests
+// ============================================================================
+
+describe("buildDependencyOverview", () => {
+  it("should return empty overview for no findings", () => {
+    const overview = buildDependencyOverview([]);
+    expect(overview.total).toBe(0);
+    expect(overview.prodCount).toBe(0);
+    expect(overview.devCount).toBe(0);
+  });
+
+  it("should count prod and dev dependencies separately", () => {
+    const findings: Finding[] = [
+      {
+        type: "dependency-change",
+        name: "express",
+        section: "dependencies",
+        from: "^4.0.0",
+        to: "^5.0.0",
+        impact: "major",
+      } as DependencyChangeFinding,
+      {
+        type: "dependency-change",
+        name: "typescript",
+        section: "devDependencies",
+        from: "^4.0.0",
+        to: "^5.0.0",
+        impact: "major",
+      } as DependencyChangeFinding,
+      {
+        type: "dependency-change",
+        name: "lodash",
+        section: "dependencies",
+        from: "^4.17.0",
+        to: "^4.17.21",
+        impact: "patch",
+      } as DependencyChangeFinding,
+    ];
+
+    const overview = buildDependencyOverview(findings);
+    expect(overview.total).toBe(3);
+    expect(overview.prodCount).toBe(2);
+    expect(overview.devCount).toBe(1);
+    expect(overview.byImpact.major).toBe(2);
+    expect(overview.byImpact.patch).toBe(1);
+  });
+
+  it("should track major updates with version info", () => {
+    const findings: Finding[] = [
+      {
+        type: "dependency-change",
+        name: "@sveltejs/kit",
+        section: "dependencies",
+        from: "^1.0.0",
+        to: "^2.0.0",
+        impact: "major",
+      } as DependencyChangeFinding,
+    ];
+
+    const overview = buildDependencyOverview(findings);
+    expect(overview.majorUpdates).toHaveLength(1);
+    expect(overview.majorUpdates[0].name).toBe("@sveltejs/kit");
+    expect(overview.majorUpdates[0].from).toBe("^1.0.0");
+    expect(overview.majorUpdates[0].to).toBe("^2.0.0");
+  });
+
+  it("should track new and removed packages", () => {
+    const findings: Finding[] = [
+      {
+        type: "dependency-change",
+        name: "better-auth",
+        section: "dependencies",
+        to: "^1.0.0",
+        impact: "new",
+      } as DependencyChangeFinding,
+      {
+        type: "dependency-change",
+        name: "old-lib",
+        section: "dependencies",
+        from: "^1.0.0",
+        impact: "removed",
+      } as DependencyChangeFinding,
+    ];
+
+    const overview = buildDependencyOverview(findings);
+    expect(overview.newPackages).toContain("better-auth");
+    expect(overview.removedPackages).toContain("old-lib");
+    expect(overview.byImpact.new).toBe(1);
+    expect(overview.byImpact.removed).toBe(1);
+  });
+
+  it("should detect risky category changes", () => {
+    const findings: Finding[] = [
+      {
+        type: "dependency-change",
+        name: "stripe",
+        section: "dependencies",
+        to: "^12.0.0",
+        impact: "new",
+        riskCategory: "payment",
+      } as DependencyChangeFinding,
+    ];
+
+    const overview = buildDependencyOverview(findings);
+    expect(overview.hasRiskyCategoryChanges).toBe(true);
+  });
+});
+
+describe("formatDependencyOverviewBullets", () => {
+  it("should return empty array for no deps", () => {
+    const overview = buildDependencyOverview([]);
+    const bullets = formatDependencyOverviewBullets(overview);
+    expect(bullets).toHaveLength(0);
+  });
+
+  it("should format counts correctly", () => {
+    const findings: Finding[] = [
+      {
+        type: "dependency-change",
+        name: "express",
+        section: "dependencies",
+        from: "^4.0.0",
+        to: "^5.0.0",
+        impact: "major",
+      } as DependencyChangeFinding,
+      {
+        type: "dependency-change",
+        name: "typescript",
+        section: "devDependencies",
+        from: "^4.0.0",
+        to: "^5.0.0",
+        impact: "major",
+      } as DependencyChangeFinding,
+    ];
+
+    const overview = buildDependencyOverview(findings);
+    const bullets = formatDependencyOverviewBullets(overview);
+
+    expect(bullets.length).toBeGreaterThan(0);
+    expect(bullets[0]).toContain("2 dependency changes");
+    expect(bullets[0]).toContain("1 production");
+    expect(bullets[0]).toContain("1 dev");
+  });
+});
+
+// ============================================================================
+// No-Changes Short-Circuit Tests
+// ============================================================================
+
+describe("renderMarkdown - no-changes short-circuit", () => {
+  it("should render single-line message when no findings", () => {
+    const markdown = renderMarkdown(createContext([]));
+
+    expect(markdown).toContain("No changes detected");
+    expect(markdown).toContain("<!-- branch-narrator:");
+    expect(markdown).not.toContain("## Summary");
+    expect(markdown).not.toContain("## Suggested test plan");
+    expect(markdown).not.toContain("## Notes");
+    expect(markdown).not.toContain("<details>");
+  });
+
+  it("should NOT short-circuit when interactive content is provided", () => {
+    const interactive = {
+      context: "This is a test context.",
+    };
+    const markdown = renderMarkdown(createContext([], interactive));
+
+    expect(markdown).toContain("## Context");
+    expect(markdown).toContain("This is a test context.");
+  });
+
+  it("should NOT short-circuit when findings exist even without file-summary", () => {
+    const findings: Finding[] = [
+      {
+        type: "dependency-change",
+        name: "@sveltejs/kit",
+        section: "dependencies",
+        from: "^1.0.0",
+        to: "^2.0.0",
+        impact: "major",
+      } as DependencyChangeFinding,
+    ];
+
+    const markdown = renderMarkdown(createContext(findings));
+
+    // Should NOT be the short-circuit message
+    expect(markdown).toContain("## Summary");
+    // Should contain the promoted dependency section
+    expect(markdown).toContain("## Dependencies");
+  });
+});
+
+// ============================================================================
+// Promoted Dependencies in Primary Section
+// ============================================================================
+
+describe("renderMarkdown - promoted dependencies", () => {
+  it("should render dependency overview as primary section", () => {
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        added: [],
+        modified: ["package.json"],
+        deleted: [],
+        renamed: [],
+      } as FileSummaryFinding,
+      {
+        type: "dependency-change",
+        name: "express",
+        section: "dependencies",
+        from: "^4.0.0",
+        to: "^5.0.0",
+        impact: "major",
+      } as DependencyChangeFinding,
+      {
+        type: "dependency-change",
+        name: "better-auth",
+        section: "dependencies",
+        to: "^1.0.0",
+        impact: "new",
+      } as DependencyChangeFinding,
+    ];
+
+    const markdown = renderMarkdown(createContext(findings));
+
+    // Primary dependency section
+    expect(markdown).toContain("## Dependencies");
+    expect(markdown).toContain("dependency changes");
+    expect(markdown).toContain("Major:");
+    expect(markdown).toContain("express");
+    expect(markdown).toContain("Added:");
+    expect(markdown).toContain("better-auth");
+  });
+
+  it("should not render dependency section when no deps", () => {
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        added: ["src/index.ts"],
+        modified: [],
+        deleted: [],
+        renamed: [],
+      } as FileSummaryFinding,
+    ];
+
+    const markdown = renderMarkdown(createContext(findings));
+
+    expect(markdown).not.toContain("## Dependencies");
+  });
+});
+
+// ============================================================================
+// Impact Analysis Trimming
+// ============================================================================
+
+describe("renderMarkdown - impact analysis trimming", () => {
+  it("should only show high/medium blast radius in details", () => {
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        added: [],
+        modified: ["src/core.ts"],
+        deleted: [],
+        renamed: [],
+      } as FileSummaryFinding,
+      {
+        type: "impact-analysis",
+        kind: "impact-analysis",
+        category: "product",
+        confidence: "high",
+        evidence: [],
+        sourceFile: "src/core.ts",
+        blastRadius: "high",
+        affectedFiles: ["a.ts", "b.ts", "c.ts"],
+      },
+      {
+        type: "impact-analysis",
+        kind: "impact-analysis",
+        category: "product",
+        confidence: "high",
+        evidence: [],
+        sourceFile: "src/low.ts",
+        blastRadius: "low",
+        affectedFiles: ["d.ts"],
+      },
+    ] as Finding[];
+
+    const markdown = renderMarkdown(createContext(findings));
+
+    // High blast radius should appear
+    expect(markdown).toContain("src/core.ts");
+    expect(markdown).toContain("HIGH");
+    // Low blast radius should NOT appear in impact analysis
+    expect(markdown).not.toContain("src/low.ts");
+  });
+});
+
+// ============================================================================
+// Notes Section Conditional Rendering
+// ============================================================================
+
+describe("renderMarkdown - notes conditional rendering", () => {
+  it("should omit notes when risk is low and no evidence", () => {
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        added: ["src/index.ts"],
+        modified: [],
+        deleted: [],
+        renamed: [],
+      } as FileSummaryFinding,
+    ];
+
+    const markdown = renderMarkdown(createContext(findings));
+
+    // Notes section should be omitted for low risk with no evidence
+    expect(markdown).not.toContain("## Notes");
+  });
+
+  it("should render notes when risk has evidence", () => {
+    const findings: Finding[] = [
+      {
+        type: "file-summary",
+        added: [],
+        modified: ["src/auth.ts"],
+        deleted: [],
+        renamed: [],
+      } as FileSummaryFinding,
+      {
+        type: "risk-flag",
+        kind: "risk-flag",
+        category: "infra",
+        confidence: "high",
+        evidence: [],
+        risk: "high",
+        evidenceText: "Critical security change",
+      },
+    ] as Finding[];
+
+    const markdown = renderMarkdown(createContext(findings));
+
+    expect(markdown).toContain("## Notes");
+    expect(markdown).toContain("Critical security change");
   });
 });

@@ -217,27 +217,6 @@ export function hasStencilDependency(
   return Boolean(deps?.["@stencil/core"] || devDeps?.["@stencil/core"]);
 }
 
-/**
- * Check if Stencil config exists.
- */
-export function hasStencilConfig(cwd: string = process.cwd()): boolean {
-  return existsSync(join(cwd, "stencil.config.ts")) || existsSync(join(cwd, "stencil.config.js"));
-}
-
-/**
- * Check if a project has Next.js App Router directory.
- */
-export function isNextAppDir(cwd: string = process.cwd()): boolean {
-  // Check for app/ directory (Next.js 13+ App Router)
-  if (existsSync(join(cwd, "app"))) {
-    return true;
-  }
-  // Check for src/app/ directory
-  if (existsSync(join(cwd, "src", "app"))) {
-    return true;
-  }
-  return false;
-}
 
 /**
  * Check if package.json contains Vue.js dependencies.
@@ -271,12 +250,6 @@ export function hasNuxtDependency(
   return Boolean(deps?.["nuxt"] || devDeps?.["nuxt"]);
 }
 
-/**
- * Check if project has Nuxt pages directory.
- */
-export function isNuxtProject(cwd: string = process.cwd()): boolean {
-  return existsSync(join(cwd, "pages")) || existsSync(join(cwd, "src", "pages"));
-}
 
 /**
  * Check if package.json contains Astro dependency.
@@ -315,26 +288,6 @@ export function hasAngularDependency(
   );
 }
 
-/**
- * Check if project has Angular config.
- */
-export function hasAngularConfig(cwd: string = process.cwd()): boolean {
-  return (
-    existsSync(join(cwd, "angular.json")) ||
-    existsSync(join(cwd, ".angular-cli.json"))
-  );
-}
-
-/**
- * Check if project has Astro config.
- */
-export function hasAstroConfig(cwd: string = process.cwd()): boolean {
-  return (
-    existsSync(join(cwd, "astro.config.mjs")) ||
-    existsSync(join(cwd, "astro.config.ts")) ||
-    existsSync(join(cwd, "astro.config.js"))
-  );
-}
 
 /**
  * Check if project is a library/package (has exports or publishConfig).
@@ -359,22 +312,6 @@ export function isLibraryProject(
   return false;
 }
 
-/**
- * Check if a project is a Python project.
- */
-export function isPythonProject(cwd: string = process.cwd()): boolean {
-  // Check for common Python project files
-  const pythonFiles = [
-    "pyproject.toml",
-    "setup.py",
-    "setup.cfg",
-    "requirements.txt",
-    "Pipfile",
-    "poetry.lock",
-  ];
-
-  return pythonFiles.some(file => existsSync(join(cwd, file)));
-}
 
 /**
  * Check if package.json contains Vite dependency.
@@ -392,35 +329,6 @@ export function hasViteDependency(
   return Boolean(deps?.["vite"] || devDeps?.["vite"]);
 }
 
-/**
- * Check if project has Vite config.
- */
-export function hasViteConfig(cwd: string = process.cwd()): boolean {
-  return (
-    existsSync(join(cwd, "vite.config.ts")) ||
-    existsSync(join(cwd, "vite.config.js")) ||
-    existsSync(join(cwd, "vite.config.mjs")) ||
-    existsSync(join(cwd, "vite.config.mts"))
-  );
-}
-
-/**
- * Check if a project has Python web framework markers.
- */
-export function hasPythonWebFramework(cwd: string = process.cwd()): boolean {
-  // Check for framework-specific directories/files
-  const frameworkMarkers = [
-    // Django
-    "manage.py",
-    // FastAPI common patterns
-    "app/main.py",
-    "src/main.py",
-    // Flask
-    "app/__init__.py",
-  ];
-
-  return frameworkMarkers.some(marker => existsSync(join(cwd, marker)));
-}
 
 /**
  * Detect Python framework from changeset files.

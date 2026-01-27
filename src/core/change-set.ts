@@ -14,7 +14,6 @@ import type {
 import {
   parseDiffString,
   toFileDiffs,
-  type ParseResult,
 } from "../git/dod/index.js";
 
 /**
@@ -77,34 +76,6 @@ export function buildChangeSet(params: {
   } else {
     diffs = [];
   }
-
-  return {
-    base: params.base,
-    head: params.head,
-    files,
-    diffs,
-    basePackageJson: params.basePackageJson,
-    headPackageJson: params.headPackageJson,
-  };
-}
-
-/**
- * Build a ChangeSet from pre-parsed DOD result.
- *
- * Use this when you've already parsed the diff with the DOD parser
- * and want to avoid re-parsing.
- */
-export function buildChangeSetFromDOD(params: {
-  base: string;
-  head: string;
-  nameStatusOutput: string;
-  parseResult: ParseResult;
-  basePackageJson?: Record<string, unknown>;
-  headPackageJson?: Record<string, unknown>;
-}): ChangeSet {
-  const files = parseNameStatus(params.nameStatusOutput);
-  const dodDiffs = toFileDiffs(params.parseResult, { lazy: false });
-  const diffs = applyFileStatuses(dodDiffs, files);
 
   return {
     base: params.base,

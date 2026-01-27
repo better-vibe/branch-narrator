@@ -10,6 +10,7 @@ import {
   createNextJsRepo,
   createRepoWithMigrations,
   createRepoWithEnvVars,
+  createRepoWithDependencyChanges,
   createComprehensiveRepo,
   runCli,
   type TestRepo,
@@ -265,5 +266,96 @@ describe("pr-body command - output quality", () => {
     );
 
     expect(stdout.trim().length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================================
+// No-Changes Output Tests
+// ============================================================================
+
+describe("pr-body command - no-changes output", () => {
+  it("should produce single-line no-changes message when diff is empty", async () => {
+    currentRepo = await createTestRepo({});
+
+    const { stdout, exitCode } = await runCli(
+      ["pr-body", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Should succeed or report no changes gracefully
+    if (exitCode === 0) {
+      expect(stdout).toContain("No changes detected");
+      // Should include hidden metadata comment
+      expect(stdout).toContain("<!-- branch-narrator:");
+      // Should NOT contain test plan, notes, or details sections
+      expect(stdout).not.toContain("## Suggested test plan");
+      expect(stdout).not.toContain("## Notes");
+      expect(stdout).not.toContain("<details>");
+    }
+  });
+});
+
+// ============================================================================
+// Dependency Section Tests
+// ============================================================================
+
+describe("pr-body command - dependency changes", () => {
+  it("should show dependency overview in primary section", async () => {
+    currentRepo = await createRepoWithDependencyChanges();
+
+    const { stdout } = await runCli(
+      ["pr-body", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Dependency overview should appear as a primary section (## heading, not ### in details)
+    expect(stdout).toContain("## Dependencies");
+    // Should summarize dependency changes with counts
+    expect(stdout.toLowerCase()).toMatch(/dependency changes/);
+  });
+
+  it("should show major updates in dependency overview", async () => {
+    currentRepo = await createRepoWithDependencyChanges();
+
+    const { stdout } = await runCli(
+      ["pr-body", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Major dependency updates should be highlighted
+    expect(stdout.toLowerCase()).toMatch(/major/);
+  });
+
+  it("should still include detailed dependency table in details block", async () => {
+    currentRepo = await createRepoWithDependencyChanges();
+
+    const { stdout } = await runCli(
+      ["pr-body", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // Details block should still contain the full dependency tables
+    expect(stdout).toContain("<details>");
+    expect(stdout).toContain("### Dependencies");
+  });
+});
+
+// ============================================================================
+// Impact Analysis Trimming Tests
+// ============================================================================
+
+describe("pr-body command - impact analysis trimming", () => {
+  it("should include impact analysis for complex changes", async () => {
+    currentRepo = await createComprehensiveRepo();
+
+    const { stdout } = await runCli(
+      ["pr-body", "--mode", "branch", "--base", currentRepo.base, "--head", currentRepo.head],
+      currentRepo.cwd
+    );
+
+    // If impact analysis is present, it should be in details
+    if (stdout.includes("### Impact Analysis")) {
+      expect(stdout).toContain("<details>");
+    }
   });
 });

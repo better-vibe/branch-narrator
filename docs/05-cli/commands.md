@@ -57,9 +57,14 @@ The pretty command renders the following sections when relevant findings are det
 | **Infrastructure** | Docker, Terraform, Kubernetes changes |
 | **CI/CD Workflows** | GitHub Actions security warnings |
 | **Cloudflare** | Wrangler configuration changes |
-| **Dependencies** | Package updates with impact levels |
+| **Dependencies** | Concise overview of package changes (counts by prod/dev, major updates, new/removed packages) |
 | **Suggested test plan** | Profile-specific commands with rationales and targeted test suggestions |
-| **Notes** | Risk evidence or "No elevated risks detected" message |
+| **Notes** | Risk evidence (omitted entirely when risk is low with no evidence) |
+
+**Conditional Rendering:**
+- When no changes are detected (empty diff with no findings), the output is a single "No changes detected" line.
+- The Notes section is omitted when risk is low and there are no evidence bullets.
+- All sections with no relevant findings are automatically omitted.
 
 **Note:** All output is emoji-free for clean, professional terminal output.
 
@@ -115,6 +120,14 @@ branch-narrator pr-body [options]
 
 The PR body is organized into compact primary sections with extended information in a collapsible Details block:
 
+**No-Changes Short-Circuit:**
+
+When no changes are detected (empty diff with no findings and no interactive context), the output is a single line:
+```
+No changes detected.
+```
+(Plus the hidden metadata comment.)
+
 **Primary Sections:**
 
 | Section | Description |
@@ -122,14 +135,15 @@ The PR body is organized into compact primary sections with extended information
 | **Summary** | Diffstat, review attention, and key highlights |
 | **Top findings** | Prioritized list of significant findings (max 5 items) |
 | **What changed** | Files grouped by category with Primary files for small changes |
+| **Dependencies** | Concise overview of package changes (counts by prod/dev, major updates, new/removed packages) |
 | **Suggested test plan** | Profile-specific commands with rationales |
-| **Notes** | Risk level and evidence bullets |
+| **Notes** | Risk level and evidence bullets (omitted when low risk with no evidence) |
 
 **Details Block (collapsible):**
 
 Extended information is placed in a `<details>` block for reviewer convenience:
 
-- Impact Analysis (blast radius)
+- Impact Analysis (high/medium blast radius only, capped at 5 entries with 3 dependents each)
 - Routes / API tables
 - API Contracts
 - GraphQL Schema changes
@@ -138,14 +152,19 @@ Extended information is placed in a `<details>` block for reviewer convenience:
 - Config / Env tables
 - Configuration Changes (TypeScript, Tailwind, Vite, Monorepo)
 - Cloudflare changes
-- Dependencies tables
+- Dependencies tables (full version details)
 - Package API exports
 - Component API (Stencil, Angular)
 - CI / Infrastructure
 - Security-Sensitive Files
 - Convention Violations
-- Test Coverage Gaps
 - Warnings
+
+**Conditional Rendering:**
+- Sections with no relevant findings are automatically omitted.
+- The Notes section is skipped when risk is low and there are no evidence bullets.
+- The Details block is only rendered if there is extended content to show.
+- Impact Analysis only shows high and medium blast radius entries (low is omitted).
 
 **Note:** All output is emoji-free for clean, professional PR descriptions.
 
