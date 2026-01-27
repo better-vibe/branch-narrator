@@ -1,49 +1,39 @@
 # Roadmap
 
-## Current Version: 0.2.0
+## Current Version: 1.6.0
 
-### Completed Features ✅
+### MVP Exit (v1.7.x) — Polish
 
-- [x] File summary analyzer
-- [x] File category classifier (with database category)
-- [x] SvelteKit route detection
-- [x] Supabase migration scanner
-- [x] Environment variable detection
-- [x] Cloudflare config detection
-- [x] Vitest test detection
-- [x] Dependency analysis with semver
-- [x] Security file detection
-- [x] Risky package detection
-- [x] Risk scoring with evidence
-- [x] Markdown PR body generation
-- [x] JSON facts output
-- [x] Unstaged changes support
-- [x] Interactive mode
-- [x] React profile (React Router support)
-- [x] Test parity analyzer
-- [x] Impact/blast radius analyzer
-- [x] Package manager detection for actions (bun/pnpm/yarn/npm)
-- [x] `bun.lock` lockfile detection
-- [x] Improved test file detection (src/tests/ paths)
-- [x] Integrate auto-detects agent guides and supports multiple targets
-- [x] Global caching system for ChangeSet and per-analyzer findings
-- [x] Cache management CLI (`cache stats`, `cache clear`, `cache prune`)
-- [x] Global cache flags (`--no-cache`, `--clear-cache`)
-- [x] Impact analyzer cache keyed to code diffs to avoid duplicate entries
+- [ ] Align docs/README/CLI help with current behavior and schemas
+- [ ] Complete analyzer documentation coverage (infra/CI/sql/lockfiles/large-diff/API contracts)
+- [ ] Clarify defaults and caching behavior across docs
+- [ ] Tighten release checklist and examples (facts/risk/dump-diff JSON)
 
 ---
 
-## v0.3.0 - Enhanced Detection
+## Completed Features ✅
+
+- [x] Facts command (schema v2.1) with highlights, actions, and changeset warnings
+- [x] Risk report with derived flags, stable IDs, and five-level scale
+- [x] Dump-diff JSON schema v2.0 with chunking and per-file hunks
+- [x] Zoom, Snap, and Cache commands
+- [x] DOD diff parser and caching for ChangeSet + analyzers
+- [x] Profiles: SvelteKit, Next.js, React, Vue/Nuxt, Astro, Stencil, Angular, Python, Library, Vite
+- [x] Analyzers for routes, deps, config, infra, CI, SQL risks, env vars, security files, and migrations
+
+---
+
+## v1.8.0 — Enhanced Detection
 
 ### Planned Features
 
 - [ ] **Prisma migration support**
   - Detect `prisma/migrations/` changes
-  - Scan for destructive schema changes
-  - Flag model renames and deletions
+  - Flag destructive schema changes
+  - Track model renames and deletions
 
-- [ ] **OpenAPI/GraphQL detection**
-  - Detect `openapi.yaml`, `schema.graphql` changes
+- [ ] **OpenAPI / Protobuf detection**
+  - Detect `openapi.*`, `swagger.*`, `*.proto` changes
   - Summarize added/removed endpoints
   - Flag breaking changes
 
@@ -59,36 +49,13 @@
 
 ---
 
-## v0.4.0 - New Profiles
+## v2.0.0 — Extensibility
 
 ### Planned Features
 
-- [ ] **Next.js profile**
-  - App router detection
-  - API routes analysis
-  - Middleware detection
-  - Server components vs client
-
-- [ ] **Astro profile**
-  - Islands detection
-  - Content collections
-  - Integration changes
-
-- [ ] **Express/Fastify profile**
-  - Router definitions
-  - Middleware chains
-  - Route schemas
-
----
-
-## v1.0.0 - Stable Release
-
-### Planned Features
-
-- [ ] **Stable API**
-  - Documented public exports
-  - Semantic versioning guarantees
-  - Migration guides
+- [ ] **Stable public API**
+  - Documented exports and versioning guarantees
+  - Migration guides for schema changes
 
 - [ ] **Plugin system**
   - Custom analyzer hooks
@@ -97,13 +64,7 @@
 
 - [ ] **GitHub Action**
   - Official action for CI
-  - Auto-comment on PRs
   - Status checks based on risk
-
-- [ ] **VS Code extension**
-  - Preview PR description
-  - Risk indicators in editor
-  - Quick actions
 
 ---
 
@@ -111,8 +72,8 @@
 
 | Issue | Status | Workaround |
 |-------|--------|------------|
-| Monorepo support limited | 🔧 In Progress | Run from package root |
-| Large diffs slow | 📋 Backlog | Use `--mode unstaged` for incremental |
+| Monorepo detection is heuristic | 🔧 In Progress | Run from package root |
+| Large diffs can be slow | 📋 Backlog | Use `dump-diff --max-chars` to chunk |
 
 ---
 

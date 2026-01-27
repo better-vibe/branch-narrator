@@ -27,19 +27,21 @@ flowchart TB
         D2["### Routes / API"] --> D3
         D3["### API Contracts"] --> D4
         D4["### GraphQL Schema"] --> D5
-        D5["### Database"] --> D6
-        D6["### SQL Risk"] --> D7
-        D7["### Config / Env"] --> D8
-        D8["### Configuration Changes"] --> D9
-        D9["### Cloudflare"] --> D10
-        D10["### Dependencies"] --> D11
-        D11["### Package API"] --> D12
-        D12["### Component API"] --> D13
-        D13["### CI / Infrastructure"] --> D14
-        D14["### Security-Sensitive Files"] --> D15
-        D15["### Conventions"] --> D16
-        D16["### Test Coverage Gaps"] --> D17
-        D17["### Warnings"]
+        D5["### Database (Supabase)"] --> D6
+        D6["### Database (Python)"] --> D7
+        D7["### SQL Risk"] --> D8
+        D8["### Config / Env"] --> D9
+        D9["### Configuration Changes"] --> D10
+        D10["### Cloudflare"] --> D11
+        D11["### Dependencies"] --> D12
+        D12["### Package API"] --> D13
+        D13["### Component API (Stencil)"] --> D14
+        D14["### Angular Components"] --> D15
+        D15["### CI / Infrastructure"] --> D16
+        D16["### Security-Sensitive Files"] --> D17
+        D17["### Conventions"] --> D18
+        D18["### Test Coverage Gaps"] --> D19
+        D19["### Warnings"]
     end
 ```
 
@@ -238,6 +240,23 @@ Migration files with risk assessment.
 - DROP TABLE detected
 ```
 
+### Database (Python)
+
+Python migration files (Django/Alembic) with risk assessment.
+
+```markdown
+### Database (Python)
+
+**Tool:** Alembic
+**Risk Level:** MEDIUM
+
+**Files:**
+- `alembic/versions/20240101_add_users.py`
+
+**Detected patterns:**
+- drop_column detected
+```
+
 ### SQL Risk
 
 SQL files with risky operations.
@@ -268,7 +287,8 @@ Environment variable changes.
 
 ### Configuration Changes
 
-TypeScript, Tailwind, Vite, and monorepo configuration changes.
+TypeScript, Tailwind, Vite, and monorepo configuration changes. Python configuration
+changes are rendered in a separate **Python Configuration** section.
 
 ```markdown
 ### Configuration Changes
@@ -301,6 +321,18 @@ Changed Fields:
 
 Impacts:
 - Build order may change
+```
+
+### Python Configuration
+
+```markdown
+### Python Configuration
+
+**File:** `pyproject.toml` (linting)
+
+Affected Sections:
+- tool.ruff
+- tool.pytest
 ```
 
 ### Cloudflare
@@ -392,6 +424,26 @@ Stencil web component API changes grouped by component tag.
 **Slots:**
 - (default) (added)
 - "icon" (added)
+```
+
+### Angular Components
+
+Angular component and module changes grouped by type.
+
+```markdown
+### Angular Components
+
+**Components**
+
+| File | Change | Selector | Standalone |
+|------|--------|----------|------------|
+| `src/app/button.component.ts` | added | `app-button` | Yes |
+
+**Services**
+
+| File | Change | Selector | Standalone |
+|------|--------|----------|------------|
+| `src/app/auth.service.ts` | modified | - | - |
 ```
 
 ### CI / Infrastructure

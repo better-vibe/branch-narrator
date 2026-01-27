@@ -1,14 +1,57 @@
-# JSON Rendering
+# JSON Output
 
-The JSON renderer generates machine-readable output.
+branch-narrator produces two JSON shapes:
 
-## Entry Point
+1. **Facts output (canonical)** — emitted by the `facts` command and the recommended JSON contract for automation.
+2. **Legacy `renderJson` helper** — a minimal `{ profile, riskScore, findings }` envelope used only in library contexts.
+
+## Facts Output (Canonical)
+
+The `facts` command emits a schema versioned envelope (`schemaVersion: "2.1"`) that includes metadata, summary, changeset details, and findings.
 
 ```typescript
-function renderJson(context: RenderContext): string;
+interface FactsOutput {
+  schemaVersion: string;
+  generatedAt?: string;
+  git: GitInfo;
+  profile: ProfileInfo;
+  stats: Stats;
+  filters: Filters;
+  summary: Summary;
+  categories: CategoryAggregate[];
+  changeset: ChangesetInfo;
+  risk: RiskScore;
+  findings: Finding[];
+  actions: Action[];
+  skippedFiles: SkippedFile[];
+  warnings: string[];
+}
 ```
 
-## Output Structure
+### Example Output (Truncated)
+
+```json
+{
+  "schemaVersion": "2.1",
+  "git": { "base": "main", "head": "HEAD", "range": "main..HEAD" },
+  "profile": { "requested": "auto", "detected": "sveltekit", "confidence": "high" },
+  "stats": { "filesChanged": 12, "insertions": 245, "deletions": 89, "skippedFilesCount": 0 },
+  "summary": { "highlights": ["2 route(s) changed", "Lockfile mismatch detected"] },
+  "changeset": {
+    "files": { "added": ["src/routes/login/+page.svelte"], "modified": ["package.json"], "deleted": [], "renamed": [] },
+    "warnings": [{ "type": "lockfile-mismatch", "manifestChanged": true, "lockfileChanged": false }]
+  },
+  "risk": { "score": 35, "level": "medium" },
+  "findings": [
+    { "type": "route-change", "routeId": "/login", "change": "added", "routeType": "page" }
+  ]
+}
+```
+
+## Legacy `renderJson` Helper
+
+The `renderJson` helper (in `src/render/json.ts`) returns a minimal envelope used for library-only cases.
+It is **not** the same schema as `facts` and is not used by CLI commands.
 
 ```typescript
 interface JsonOutput {
@@ -18,126 +61,21 @@ interface JsonOutput {
 }
 ```
 
-## Example Output
-
-```json
-{
-  "profile": "sveltekit",
-  "riskScore": {
-    "score": 45,
-    "level": "medium",
-    "evidenceBullets": [
-      "⚠️ Major version bump: @sveltejs/kit ^1.0.0 → ^2.0.0",
-      "⚡ Security-sensitive files changed (Authentication): 2 file(s)",
-      "ℹ️ New env var: PUBLIC_API_URL"
-    ]
-  },
-  "findings": [
-    {
-      "type": "file-summary",
-      "added": ["src/routes/login/+page.svelte"],
-      "modified": ["package.json"],
-      "deleted": [],
-      "renamed": []
-    },
-    {
-      "type": "file-category",
-      "categories": {
-        "product": ["src/routes/login/+page.svelte"],
-        "tests": [],
-        "ci": [],
-        "infra": [],
-        "docs": [],
-        "dependencies": ["package.json"],
-        "config": [],
-        "other": []
-      },
-      "summary": [
-        { "category": "product", "count": 1 },
-        { "category": "dependencies", "count": 1 }
-      ]
-    },
-    {
-      "type": "route-change",
-      "routeId": "/login",
-      "file": "src/routes/login/+page.svelte",
-      "change": "added",
-      "routeType": "page"
-    },
-    {
-      "type": "dependency-change",
-      "name": "@sveltejs/kit",
-      "section": "dependencies",
-      "from": "^1.0.0",
-      "to": "^2.0.0",
-      "impact": "major"
-    }
-  ]
-}
-```
-
-## Usage with jq
-
-### Get Risk Level
+## Usage with jq (Facts Output)
 
 ```bash
-branch-narrator facts | jq -r '.riskScore.level'
-# Output: medium
-```
+# Get risk level
+branch-narrator facts | jq -r '.risk.level'
 
-### Get Risk Score
+# Get added files
+branch-narrator facts | jq -r '.changeset.files.added[]'
 
-```bash
-branch-narrator facts | jq '.riskScore.score'
-# Output: 45
-```
-
-### Filter by Finding Type
-
-```bash
-# Route changes only
+# Filter by finding type
 branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
-
-# Dependencies only
-branch-narrator facts | jq '.findings[] | select(.type == "dependency-change")'
-```
-
-### Extract File Lists
-
-```bash
-# All added files
-branch-narrator facts | jq -r '.findings[] | select(.type == "file-summary") | .added[]'
-
-# Files by category
-branch-narrator facts | jq '.findings[] | select(.type == "file-category") | .categories.product'
-```
-
-### Evidence Bullets
-
-```bash
-branch-narrator facts | jq -r '.riskScore.evidenceBullets[]'
-```
-
-## Programmatic Usage
-
-```typescript
-import { execSync } from "child_process";
-
-const output = execSync("npx branch-narrator facts").toString();
-const facts = JSON.parse(output);
-
-// Access data
-console.log(`Risk: ${facts.riskScore.level}`);
-console.log(`Score: ${facts.riskScore.score}/100`);
-
-// Filter findings
-const routes = facts.findings.filter(f => f.type === "route-change");
-const deps = facts.findings.filter(f => f.type === "dependency-change");
 ```
 
 ## Schema Validation
 
-The JSON output follows the TypeScript types exactly. Each finding has a `type` discriminator field that determines its structure.
-
-See [Types: Findings](../04-types/findings.md) for complete type definitions.
+Facts output follows the TypeScript definitions in `src/core/types.ts`.
+Each finding uses a `type` discriminator. See [Types: Findings](../04-types/findings.md) for the full schema.
 

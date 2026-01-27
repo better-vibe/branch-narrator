@@ -189,7 +189,7 @@ program
   .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
   .action(async (options, command) => {
@@ -252,7 +252,7 @@ program
   .option("--head <ref>", "Head branch (branch mode; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
   .option("--interactive", "Prompt for additional context", false)
@@ -330,7 +330,7 @@ program
   .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
   .option("--format <type>", "Output format: json|sarif", "json")
@@ -833,7 +833,7 @@ program
   .option("--head <ref>", "Head git reference (branch mode only; defaults to HEAD)")
   .option(
     "--profile <name>",
-    "Profile to use (auto|sveltekit|react|stencil|next)",
+    "Profile to use (auto|sveltekit|next|react|vue|astro|stencil|angular|library|python|vite)",
     "auto"
   )
   .option("--format <type>", "Output format: json|md|text", "json")

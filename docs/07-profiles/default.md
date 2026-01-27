@@ -24,29 +24,10 @@ The default profile is used when:
 | `graphql` | Detect GraphQL schema changes |
 | `large-diff` | Detect large changesets |
 | `lockfiles` | Detect lockfile/manifest mismatches |
-| `test-gaps` | Detect production code changes without tests |
 | `sql-risks` | Detect risky SQL in migrations |
 | `ci-workflows` | Detect CI/CD workflow changes |
 | `infra` | Detect infrastructure changes |
 | `api-contracts` | Detect API contract changes |
-
-## Opt-In Analyzers
-
-These analyzers are NOT included by default but can be enabled via CLI flags:
-
-| Analyzer | Flag | Purpose |
-|----------|------|---------|
-| `test-parity` | `--test-parity` | Check if each source file has a corresponding test file |
-
-### Enabling Test Parity
-
-Test parity checking is opt-in because it requires git file system operations that can be slow on large repositories:
-
-```bash
-# Enable test parity checking
-branch-narrator facts --mode branch --base main --test-parity
-branch-narrator risk-report --mode branch --base main --test-parity
-```
 
 ## What's NOT Included
 
@@ -112,7 +93,6 @@ export const defaultProfile: Profile = {
     graphqlAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
-    analyzeTestGaps,
     analyzeSQLRisks,
     analyzeCIWorkflows,
     analyzeInfra,

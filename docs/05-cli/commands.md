@@ -17,7 +17,7 @@ branch-narrator pretty [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `library`, `python` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
 
 ### Diff Modes
 
@@ -99,7 +99,7 @@ branch-narrator pr-body [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
 | `--interactive` | `false` | Prompt for context |
 
 ### Diff Modes
@@ -188,8 +188,8 @@ branch-narrator facts [options]
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
-| `--format <type>` | `json` | Output format: `json` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
+| `--format <type>` | `json` | Output format: `json`, `sarif` |
 | `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
 | `--redact` | `false` | Redact obvious secret values in evidence excerpts |
 | `--exclude <glob>` | (none) | Additional exclusion glob (repeatable) |
@@ -230,7 +230,7 @@ branch-narrator facts --mode all
 branch-narrator facts | jq '.findings[] | select(.type == "route-change")'
 
 # Get risk level
-branch-narrator facts | jq -r '.riskScore.level'
+branch-narrator facts | jq -r '.risk.level'
 
 # Write to file
 branch-narrator facts --out facts.json
@@ -746,7 +746,7 @@ Either `--finding <id>` or `--flag <id>` must be provided.
 | `--mode <type>` | `unstaged` | Diff mode: `branch`, `unstaged`, `staged`, `all` |
 | `--base <ref>` | auto-detected | Base git reference (branch mode only; auto-detected from remote HEAD, falls back to `main`) |
 | `--head <ref>` | `HEAD` | Head git reference (branch mode only) |
-| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `stencil`, `next`, or `react` |
+| `--profile <name>` | `auto` | Profile: `auto`, `sveltekit`, `next`, `react`, `vue`, `astro`, `stencil`, `angular`, `library`, `python`, `vite` |
 | `--format <type>` | `json` | Output format: `json`, `md`, or `text` |
 | `--unified <n>` | `3` | Lines of unified context for patch hunks |
 | `--no-patch` | (off) | Do not include patch context, only evidence |
@@ -809,7 +809,7 @@ branch-narrator zoom --flag "flag.security.workflow_permissions_broadened#def789
 branch-narrator zoom --finding "finding.route-change#abc123" --out zoom-output.md
 
 # Deterministic output for testing
-branch-narrator zoom --finding "finding.test-gap#xyz789" --no-timestamp --format json
+branch-narrator zoom --finding "finding.ci-workflow#xyz789" --no-timestamp --format json
 
 # Text format for simple terminal output
 branch-narrator zoom --finding "finding.sql-risk#abc456" --format text

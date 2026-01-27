@@ -64,7 +64,14 @@ All profiles share a common set of core analyzers for comprehensive coverage:
 |----------|---------|
 | `file-summary` | Summarize file changes |
 | `file-category` | Categorize files by type |
-| `dependencies` | Analyze package.json |
+| `impact` | Blast radius analysis |
+| `large-diff` | Detect large changesets |
+| `lockfiles` | Detect lockfile/manifest mismatches |
+| `ci-workflows` | Detect CI/CD workflow changes |
+| `api-contracts` | Detect API contract changes |
+
+**Note:** Dependency analysis uses `dependencies` for JS profiles and
+`python-dependencies` for the Python profile.
 
 ### Frontend Profile Analyzers
 
@@ -79,7 +86,6 @@ These analyzers are included in all frontend profiles (SvelteKit, Next.js, React
 | `impact` | Analyze blast radius of changes |
 | `large-diff` | Detect large changesets |
 | `lockfiles` | Detect lockfile/manifest mismatches |
-| `test-gaps` | Detect missing test coverage |
 | `sql-risks` | Detect risky SQL in migrations |
 | `ci-workflows` | Detect CI/CD changes |
 | `infra` | Detect infrastructure changes |
@@ -104,8 +110,41 @@ These analyzers are included in all frontend profiles (SvelteKit, Next.js, React
 - `tailwind` - Tailwind CSS config changes
 - `typescript-config` - TypeScript config changes
 
+**Vue/Nuxt-specific:**
+- `vue-routes` - Vue Router and Nuxt route detection
+- `tailwind` - Tailwind CSS config changes
+- `typescript-config` - TypeScript config changes
+
+**Astro-specific:**
+- `astro-routes` - Astro file-based routes and endpoints
+- `tailwind` - Tailwind CSS config changes
+- `typescript-config` - TypeScript config changes
+
 **Stencil-specific:**
 - `stencil` - Web component analysis (props, events, methods, slots)
+- `typescript-config` - TypeScript config changes
+
+**Angular-specific:**
+- `angular-routes` - Angular Router configuration changes
+- `angular-components` - Component/module/service changes
+- `graphql` - GraphQL schema changes
+- `tailwind` - Tailwind CSS config changes
+- `typescript-config` - TypeScript config changes
+
+**Python-specific:**
+- `python-dependencies` - Python dependency changes
+- `python-routes` - Python route detection
+- `python-migrations` - Django/Alembic migrations
+- `python-config` - Python tooling config changes
+
+**Vite-specific:**
+- `vite-config` - Vite configuration changes
+- `tailwind` - Tailwind CSS config changes
+- `typescript-config` - TypeScript config changes
+
+**Library-specific:**
+- `package-exports` - Package exports and entry points
+- `monorepo` - Monorepo configuration changes
 - `typescript-config` - TypeScript config changes
 
 ## API
@@ -149,8 +188,10 @@ When a profile is auto-detected, the `facts` command includes detailed reasons e
 | `react` | "Found react and react-dom in package.json dependencies", "Found react-router or react-router-dom in package.json dependencies" |
 | `vue` | "Found vue in package.json dependencies", "Found pages/ directory (Nuxt file-based routing)" |
 | `astro` | "Found astro in package.json dependencies", "Found astro.config.{mjs,ts,js}" |
+| `angular` | "Found @angular/core or @angular/common in package.json dependencies", "Found angular.json or .angular-cli.json" |
 | `library` | "Found exports field in package.json", "Found bin field in package.json (CLI tool)", "Package marked as public (private: false)" |
 | `python` | "Found Python project files (pyproject.toml, requirements.txt, etc.)", "Found Python web framework markers (manage.py, main.py, etc.)" |
+| `vite` | "Found vite in package.json dependencies", "Found vite.config.{ts,js,mjs,mts}" |
 | `auto` | "No framework-specific markers detected, using default analyzers" |
 
 Example output:
@@ -180,26 +221,28 @@ branch-narrator pr-body --profile sveltekit
 
 ## Analyzer Coverage Matrix
 
-| Analyzer | default | sveltekit | next | react | vue | astro | stencil | library |
-|----------|---------|-----------|------|-------|-----|-------|---------|---------|
-| file-summary | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| file-category | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| dependencies | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| env-var | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| cloudflare | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| vitest | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| security-files | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| impact | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| large-diff | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| lockfiles | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| test-gaps | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| sql-risks | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| ci-workflows | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| infra | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| api-contracts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| graphql | ✅ | - | - | - | - | - | - | - |
-| tailwind | - | ✅ | ✅ | ✅ | ✅ | ✅ | - | - |
-| typescript-config | - | - | - | ✅ | ✅ | ✅ | ✅ | ✅ |
+This matrix is a high-level subset of analyzers. See each profile doc for full
+lists (including Python-specific analyzers and package/library analyzers).
+
+| Analyzer | default | sveltekit | next | react | vue | astro | stencil | angular | python | vite | library |
+|----------|---------|-----------|------|-------|-----|-------|---------|---------|--------|------|---------|
+| file-summary | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| file-category | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| dependencies | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ |
+| env-var | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| cloudflare | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | - |
+| vitest | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ |
+| security-files | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| impact | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| large-diff | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| lockfiles | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| sql-risks | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| ci-workflows | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| infra | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| api-contracts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| graphql | ✅ | - | - | - | - | - | - | ✅ | - | - | - |
+| tailwind | - | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | - | ✅ | - |
+| typescript-config | - | - | - | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ |
 
 ## Planned Profiles
 

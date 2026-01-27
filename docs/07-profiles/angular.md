@@ -39,7 +39,6 @@ branch-narrator --profile angular
 | `graphql` | GraphQL schema changes |
 | `large-diff` | Large changeset warnings |
 | `lockfiles` | Lockfile mismatch detection |
-| `test-gaps` | Test coverage gaps |
 | `sql-risks` | SQL risk patterns |
 | `ci-workflows` | CI/CD security |
 | `infra` | Infrastructure changes |

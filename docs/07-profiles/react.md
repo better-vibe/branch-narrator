@@ -29,7 +29,6 @@ The React profile is auto-detected when:
 | `typescript-config` | Detect TypeScript config changes |
 | `large-diff` | Detect large changesets |
 | `lockfiles` | Detect lockfile/manifest mismatches |
-| `test-gaps` | Detect production code changes without tests |
 | `sql-risks` | Detect risky SQL in migrations |
 | `ci-workflows` | Detect CI/CD workflow changes |
 | `infra` | Detect infrastructure changes |
@@ -167,7 +166,6 @@ export const reactProfile: Profile = {
     typescriptConfigAnalyzer,
     analyzeLargeDiff,
     analyzeLockfiles,
-    analyzeTestGaps,
     analyzeSQLRisks,
     analyzeCIWorkflows,
     analyzeInfra,

@@ -52,39 +52,51 @@ The diff parsing uses a Data-Oriented Design approach for optimal performance:
 
 ```mermaid
 flowchart LR
-    CS[ChangeSet] --> A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9
+    CS[ChangeSet] --> Runner[runAnalyzersInParallel]
 
-    A1[file-summary] --> F[Finding[]]
-    A2[file-category] --> F
-    A3[route-detector] --> F
-    A4[supabase] --> F
-    A5[env-var] --> F
-    A6[cloudflare] --> F
-    A7[vitest] --> F
-    A8[dependencies] --> F
-    A9[security-files] --> F
+    Runner --> fileSummary["file-summary"]
+    Runner --> fileCategory["file-category"]
+    Runner --> impact["impact"]
+    Runner --> routes["route analyzers"]
+    Runner --> deps["dependencies/lockfiles/package-exports"]
+    Runner --> config["typescript/tailwind/vite/config"]
+    Runner --> infra["infra/ci/sql-risk/security"]
+    Runner --> tests["test analyzers"]
+
+    fileSummary --> F[Finding[]]
+    fileCategory --> F
+    impact --> F
+    routes --> F
+    deps --> F
+    config --> F
+    infra --> F
+    tests --> F
 ```
 
 ## Risk Score Computation
 
+### Facts Risk Score (Summary)
+
+The `facts` command uses a fast heuristic score used for summaries and highlights.
+This is computed in `src/render/risk-score.ts` and produces `low`, `medium`, or `high`.
+
 ```mermaid
 flowchart TD
-    F[Finding[]] --> RS[computeRiskScore]
+    Findings[Finding[]] --> FactsScore["computeRiskScore()"]
+    FactsScore --> FactsLevel["low / medium / high"]
+```
 
-    RS --> |risk-flag high| P40["+40 points"]
-    RS --> |risk-flag medium| P20["+20 points"]
-    RS --> |db-migration high| P30["+30 points"]
-    RS --> |route deleted| P10["+10 points"]
-    RS --> |dep major bump| P15["+15 points"]
-    RS --> |security-file| P15b["+15 points"]
-    RS --> |docs only| M15["-15 points"]
-    RS --> |tests only| M10["-10 points"]
+### Risk Report (Flags and Five-Level Scale)
 
-    P40 & P20 & P30 & P10 & P15 & P15b & M15 & M10 --> SUM[Sum & Cap 0-100]
+`risk-report` derives flags from findings, then computes a weighted score
+with five levels: `low`, `moderate`, `elevated`, `high`, `critical`.
 
-    SUM --> |0-19| LOW[LOW 🟢]
-    SUM --> |20-49| MED[MEDIUM 🟡]
-    SUM --> |50-100| HIGH[HIGH 🔴]
+```mermaid
+flowchart TD
+    Findings2[Finding[]] --> Flags[findingsToFlags]
+    Flags --> CategoryScores[categoryScores]
+    CategoryScores --> OverallScore["riskScore (0-100)"]
+    OverallScore --> RiskLevel["low/moderate/elevated/high/critical"]
 ```
 
 ## Render Flow
@@ -99,7 +111,9 @@ flowchart TD
     end
 
     Context --> MD[renderMarkdown]
+    Context --> TERM[renderTerminal]
     Context --> JSON[renderJson]
+    Context --> SARIF[renderSarif]
 
     MD --> S1["## Summary"]
     MD --> S2["## What Changed"]
@@ -110,24 +124,21 @@ flowchart TD
     MD --> S7["## Test Plan"]
     MD --> S8["## Risks"]
 
-    JSON --> OUT["{
-        profile,
-        riskScore,
-        findings
-    }"]
+    JSON --> OUT["facts JSON envelope"]
 ```
 
 ## File Filtering
 
 ```mermaid
 flowchart TD
-    FILE[Changed File] --> CHECK{Matches exclude pattern?}
+    FILE[ChangedFile] --> CHECK{Matches exclude pattern?}
 
     CHECK --> |dist/| SKIP[Skip]
     CHECK --> |node_modules/| SKIP
     CHECK --> |.svelte-kit/| SKIP
     CHECK --> |*.map| SKIP
     CHECK --> |*.d.ts| SKIP
+    CHECK --> |lockfiles| SKIP
     CHECK --> |No match| ANALYZE[Include in analysis]
 ```
 

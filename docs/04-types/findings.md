@@ -14,10 +14,12 @@ In schema version 2.0, findings are split into two categories:
    - `large-diff` → `changeset.warnings`
    - `lockfile-mismatch` → `changeset.warnings`
 
-## Finding Union (Domain Findings)
+## Finding Union (All Findings)
 
 ```typescript
 type Finding =
+  | FileSummaryFinding
+  | FileCategoryFinding
   | DependencyChangeFinding
   | RouteChangeFinding
   | EnvVarFinding
@@ -25,18 +27,34 @@ type Finding =
   | CloudflareChangeFinding
   | TestChangeFinding
   | RiskFlagFinding
+  | ImpactAnalysisFinding
   | SecurityFileFinding
   | ConventionViolationFinding
-  | TestParityViolationFinding  // Opt-in via --test-parity flag
-  | ImpactAnalysisFinding
-  | SQLRiskFinding
   | CIWorkflowFinding
+  | SQLRiskFinding
   | InfraChangeFinding
   | APIContractChangeFinding
-  | TestGapFinding;
+  | LargeDiffFinding
+  | LockfileFinding
+  | StencilComponentChangeFinding
+  | StencilPropChangeFinding
+  | StencilEventChangeFinding
+  | StencilMethodChangeFinding
+  | StencilSlotChangeFinding
+  | GraphQLChangeFinding
+  | TypeScriptConfigFinding
+  | TailwindConfigFinding
+  | ViteConfigFinding
+  | MonorepoConfigFinding
+  | PackageExportsFinding
+  | PythonMigrationFinding
+  | PythonConfigFinding
+  | AngularComponentChangeFinding;
 ```
 
 ## Class Diagram
+
+This diagram is illustrative and not exhaustive.
 
 ```mermaid
 classDiagram
@@ -303,8 +321,13 @@ type RiskLevel = "high" | "medium" | "low";
 
 interface RiskFlagFinding {
   type: "risk-flag";
+  kind: "risk-flag";
+  category: Category;
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
   risk: RiskLevel;
-  evidence: string;
+  evidenceText: string;
+  findingId?: string;
 }
 ```
 
@@ -342,65 +365,280 @@ interface ConventionViolationFinding {
 
 ---
 
-## TestParityViolationFinding
-
-Emitted when a source file is modified/added without a corresponding test file. This finding is only generated when the `--test-parity` flag is used (opt-in).
-
-```typescript
-interface TestParityViolationFinding {
-  type: "test-parity-violation";
-  kind: "test-parity-violation";
-  category: "tests";
-  confidence: "high" | "medium" | "low";
-  evidence: Evidence[];
-  sourceFile: string;
-  expectedTestLocations: string[];
-  findingId?: string;
-}
-```
-
-### Confidence Levels
-
-- **high**: Core business logic files (services, handlers, commands)
-- **medium**: Utility/helper files
-- **low**: Small changes or edge cases
-
-### Example
-
-```json
-{
-  "type": "test-parity-violation",
-  "kind": "test-parity-violation",
-  "category": "tests",
-  "confidence": "high",
-  "sourceFile": "src/services/auth.ts",
-  "expectedTestLocations": [
-    "src/services/auth.test.ts",
-    "tests/services/auth.test.ts",
-    "tests/auth.test.ts"
-  ],
-  "evidence": [
-    {
-      "file": "src/services/auth.ts",
-      "excerpt": "Source file modified without corresponding test: src/services/auth.ts"
-    }
-  ]
-}
-```
-
----
-
 ## ImpactAnalysisFinding
 
 ```typescript
 interface ImpactAnalysisFinding {
   type: "impact-analysis";
+  kind: "impact-analysis";
+  category: Category;
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
   sourceFile: string;
   affectedFiles: string[];
   importedSymbols?: string[]; // e.g. ["User", "login"]
   usageContext?: string; // e.g. "import { User } from './user'"
-  isTestFile?: boolean; // true if all affected files are tests
   blastRadius: "low" | "medium" | "high";
+  findingId?: string;
+}
+```
+
+---
+
+## CIWorkflowFinding
+
+```typescript
+type CIWorkflowRisk =
+  | "permissions_broadened"
+  | "pull_request_target"
+  | "remote_script_download"
+  | "pipeline_changed";
+
+interface CIWorkflowFinding {
+  type: "ci-workflow";
+  file: string;
+  riskType: CIWorkflowRisk;
+  details: string;
+}
+```
+
+---
+
+## SQLRiskFinding
+
+```typescript
+type SQLRisk = "destructive" | "schema_change" | "unscoped_modification";
+
+interface SQLRiskFinding {
+  type: "sql-risk";
+  file: string;
+  riskType: SQLRisk;
+  details: string;
+}
+```
+
+---
+
+## InfraChangeFinding
+
+```typescript
+type InfraChangeType = "dockerfile" | "terraform" | "k8s";
+
+interface InfraChangeFinding {
+  type: "infra-change";
+  infraType: InfraChangeType;
+  files: string[];
+}
+```
+
+---
+
+## APIContractChangeFinding
+
+```typescript
+interface APIContractChangeFinding {
+  type: "api-contract-change";
+  files: string[];
+}
+```
+
+---
+
+## GraphQLChangeFinding
+
+```typescript
+interface GraphQLChangeFinding {
+  type: "graphql-change";
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  breakingChanges: string[];
+  addedElements: string[];
+}
+```
+
+---
+
+## TypeScriptConfigFinding
+
+```typescript
+interface TypeScriptConfigFinding {
+  type: "typescript-config";
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  changedOptions: {
+    added: string[];
+    removed: string[];
+    modified: string[];
+  };
+  strictnessChanges: string[];
+}
+```
+
+---
+
+## TailwindConfigFinding
+
+```typescript
+type TailwindConfigType = "tailwind" | "postcss";
+
+interface TailwindConfigFinding {
+  type: "tailwind-config";
+  file: string;
+  status: FileStatus;
+  configType: TailwindConfigType;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+}
+```
+
+---
+
+## ViteConfigFinding
+
+```typescript
+interface ViteConfigFinding {
+  type: "vite-config";
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+  pluginsDetected: string[];
+}
+```
+
+---
+
+## MonorepoConfigFinding
+
+```typescript
+type MonorepoTool =
+  | "turborepo"
+  | "pnpm"
+  | "lerna"
+  | "nx"
+  | "yarn"
+  | "npm"
+  | "changesets";
+
+interface MonorepoConfigFinding {
+  type: "monorepo-config";
+  file: string;
+  status: FileStatus;
+  tool: MonorepoTool;
+  affectedFields: string[];
+  impacts: string[];
+}
+```
+
+---
+
+## PackageExportsFinding
+
+```typescript
+interface PackageExportsFinding {
+  type: "package-exports";
+  isBreaking: boolean;
+  addedExports: string[];
+  removedExports: string[];
+  legacyFieldChanges: Array<{ field: string; from?: string; to?: string }>;
+  binChanges: { added: string[]; removed: string[] };
+}
+```
+
+---
+
+## Stencil Component API Findings
+
+```typescript
+interface StencilComponentChangeFinding {
+  type: "stencil-component-change";
+  tag: string;
+  change: "added" | "removed" | "tag-changed" | "shadow-changed";
+  file: string;
+}
+
+interface StencilPropChangeFinding {
+  type: "stencil-prop-change";
+  tag: string;
+  propName: string;
+  change: "added" | "removed" | "changed";
+  file: string;
+}
+
+interface StencilEventChangeFinding {
+  type: "stencil-event-change";
+  tag: string;
+  eventName: string;
+  change: "added" | "removed" | "changed";
+  file: string;
+}
+
+interface StencilMethodChangeFinding {
+  type: "stencil-method-change";
+  tag: string;
+  methodName: string;
+  change: "added" | "removed" | "changed";
+  file: string;
+}
+
+interface StencilSlotChangeFinding {
+  type: "stencil-slot-change";
+  tag: string;
+  slotName: string; // "default" or named
+  change: "added" | "removed";
+  file: string;
+}
+```
+
+---
+
+## PythonMigrationFinding
+
+```typescript
+type PythonMigrationTool = "alembic" | "django";
+
+interface PythonMigrationFinding {
+  type: "python-migration";
+  tool: PythonMigrationTool;
+  files: string[];
+  risk: "high" | "medium" | "low";
+  reasons: string[];
+}
+```
+
+---
+
+## PythonConfigFinding
+
+```typescript
+interface PythonConfigFinding {
+  type: "python-config";
+  file: string;
+  status: FileStatus;
+  configType: string;
+  configCategory: string;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+}
+```
+
+---
+
+## AngularComponentChangeFinding
+
+```typescript
+interface AngularComponentChangeFinding {
+  type: "angular-component-change";
+  file: string;
+  change: "added" | "modified" | "deleted";
+  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor";
+  selector?: string;
+  standalone?: boolean;
 }
 ```
 
@@ -410,14 +648,15 @@ interface ImpactAnalysisFinding {
 
 ```json
 {
-  "findings": [
-    {
-      "type": "file-summary",
+  "changeset": {
+    "files": {
       "added": ["src/routes/login/+page.svelte"],
       "modified": ["package.json"],
       "deleted": [],
       "renamed": []
-    },
+    }
+  },
+  "findings": [
     {
       "type": "route-change",
       "routeId": "/login",
@@ -436,7 +675,7 @@ interface ImpactAnalysisFinding {
     {
       "type": "risk-flag",
       "risk": "medium",
-      "evidence": "New Authentication/Security package: lucia"
+      "evidenceText": "New Authentication/Security package: lucia"
     }
   ]
 }
