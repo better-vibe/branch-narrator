@@ -407,7 +407,7 @@ describe("buildHighlights", () => {
 
       const highlights = buildHighlights(findings);
 
-      expect(highlights).toContain("3 route(s) changed");
+      expect(highlights.some(h => h.startsWith("3 route(s) changed"))).toBe(true);
     });
 
     it("should distinguish breaking vs non-breaking config changes", () => {

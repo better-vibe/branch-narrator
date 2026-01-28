@@ -252,10 +252,40 @@ export function buildHighlights(findings: Finding[]): string[] {
     add(`${majorChanges.length} major dependency update(s)`, HIGHLIGHT_PRIORITY.MAJOR_DEPS);
   }
 
+  // Next.js config changes
+  const nextConfigChanges = findings.filter(f => f.type === "next-config-change");
+  if (nextConfigChanges.length > 0) {
+    const features = nextConfigChanges.flatMap(c => c.detectedFeatures);
+    const hasExperimental = features.includes("experimental");
+    const hasRewrites = features.includes("rewrites") || features.includes("redirects");
+    if (hasExperimental) {
+      add("Next.js config changed (experimental features)", HIGHLIGHT_PRIORITY.BREAKING_CONFIG);
+    } else if (hasRewrites) {
+      add("Next.js config changed (routing rules)", HIGHLIGHT_PRIORITY.ROUTE_CHANGES);
+    } else {
+      add("Next.js config modified", HIGHLIGHT_PRIORITY.NON_BREAKING_CONFIG);
+    }
+  }
+
   // Route changes
   const routeChanges = findings.filter(f => f.type === "route-change");
   if (routeChanges.length > 0) {
-    add(`${routeChanges.length} route(s) changed`, HIGHLIGHT_PRIORITY.ROUTE_CHANGES);
+    // Enrich route highlight with detail about what kinds of routes changed
+    const endpoints = routeChanges.filter(r => r.routeType === "endpoint");
+    const pages = routeChanges.filter(r => r.routeType === "page");
+    const layouts = routeChanges.filter(r => r.routeType === "layout");
+    const parts: string[] = [];
+    if (pages.length > 0) parts.push(`${pages.length} page(s)`);
+    if (endpoints.length > 0) parts.push(`${endpoints.length} endpoint(s)`);
+    if (layouts.length > 0) parts.push(`${layouts.length} layout(s)`);
+    const others = routeChanges.length - pages.length - endpoints.length - layouts.length;
+    if (others > 0) parts.push(`${others} other`);
+
+    if (parts.length > 0) {
+      add(`${routeChanges.length} route(s) changed: ${parts.join(", ")}`, HIGHLIGHT_PRIORITY.ROUTE_CHANGES);
+    } else {
+      add(`${routeChanges.length} route(s) changed`, HIGHLIGHT_PRIORITY.ROUTE_CHANGES);
+    }
   }
 
   // API contract changes

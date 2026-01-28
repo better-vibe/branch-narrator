@@ -21,6 +21,7 @@ import type {
   LargeDiffFinding,
   LockfileFinding,
   MonorepoConfigFinding,
+  NextConfigChangeFinding,
   PackageExportsFinding,
   PythonConfigFinding,
   PythonMigrationFinding,
@@ -802,6 +803,31 @@ function renderConfiguration(
 }
 
 /**
+ * Render Next.js Configuration changes.
+ */
+function renderNextConfig(configs: NextConfigChangeFinding[]): string {
+  if (configs.length === 0) {
+    return "";
+  }
+
+  let output = "### Next.js Configuration\n\n";
+
+  for (const config of configs) {
+    output += `**File:** \`${config.file}\` (${config.status})\n\n`;
+
+    if (config.detectedFeatures.length > 0) {
+      output += "Affected features:\n";
+      for (const feature of config.detectedFeatures) {
+        output += `- \`${feature}\`\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
  * Render Package Exports / API section.
  */
 function renderPackageExports(exports: PackageExportsFinding[]): string {
@@ -1365,6 +1391,10 @@ function renderDetails(
     viteConfigs
   );
   detailsContent += renderPythonConfig(pythonConfigs);
+
+  // Next.js Configuration
+  const nextConfigs = getFindings<NextConfigChangeFinding>(groups, "next-config-change");
+  detailsContent += renderNextConfig(nextConfigs);
 
   // Cloudflare
   const cloudflare = getFindings<CloudflareChangeFinding>(groups, "cloudflare-change");

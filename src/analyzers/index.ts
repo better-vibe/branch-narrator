@@ -20,7 +20,24 @@ export * from "./ci-workflows.js";
 export * from "./infra.js";
 export * from "./api-contracts.js";
 export { stencilAnalyzer } from "./stencil.js";
-export { nextRoutesAnalyzer } from "./next-routes.js";
+export {
+  nextRoutesAnalyzer,
+  isNextRouteFile,
+  isNextMetadataFile,
+  isNextConfigFile,
+  isMiddlewareFile,
+  isInstrumentationFile,
+  getRouteType,
+  pathToRouteId,
+  detectMethods,
+  detectConfigFeatures,
+  hasServerActions,
+  hasGenerateStaticParams,
+  hasMetadataExport,
+  hasParallelSegment,
+  extractParallelSlots,
+  hasInterceptingSegment,
+} from "./next-routes.js";
 export { graphqlAnalyzer } from "./graphql.js";
 export { typescriptConfigAnalyzer } from "./typescript-config.js";
 export { tailwindAnalyzer } from "./tailwind.js";

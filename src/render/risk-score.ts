@@ -241,10 +241,10 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
       case "large-diff":
         {
           const largeDiffFinding = finding as LargeDiffFinding;
-          const weight = largeDiffFinding.linesChanged > 1000 
-            ? 15 
-            : largeDiffFinding.linesChanged > 500 
-            ? 10 
+          const weight = largeDiffFinding.linesChanged > 1000
+            ? 15
+            : largeDiffFinding.linesChanged > 500
+            ? 10
             : 5;
           score += weight;
           evidenceBullets.push(
@@ -255,6 +255,26 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
             weight,
             explanation: `Large diff: ${largeDiffFinding.filesChanged} files, ${largeDiffFinding.linesChanged} lines`,
             evidence: largeDiffFinding.evidence,
+          });
+        }
+        break;
+
+      case "next-config-change":
+        {
+          // Next.js config changes with experimental features are higher risk
+          const hasExperimental = finding.detectedFeatures.includes("experimental");
+          const hasOutput = finding.detectedFeatures.includes("output");
+          const weight = hasExperimental ? 15 : hasOutput ? 10 : 5;
+          score += weight;
+          const featureStr = finding.detectedFeatures.length > 0
+            ? `: ${finding.detectedFeatures.join(", ")}`
+            : "";
+          evidenceBullets.push(`ℹ️ Next.js config changed${featureStr}`);
+          factors.push({
+            kind: "next-config-change",
+            weight,
+            explanation: `Next.js config changed: ${finding.file}${featureStr}`,
+            evidence: finding.evidence,
           });
         }
         break;
