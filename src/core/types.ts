@@ -100,7 +100,7 @@ export interface DependencyChangeFinding {
   findingId?: string; // Stable ID, format: "finding.dependency-change#<hash>"
 }
 
-export type RouteType = "page" | "layout" | "endpoint" | "error" | "unknown";
+export type RouteType = "page" | "layout" | "endpoint" | "error" | "loading" | "template" | "default" | "metadata" | "unknown";
 
 export interface RouteChangeFinding {
   type: "route-change";
@@ -638,6 +638,44 @@ export interface AngularComponentChangeFinding {
   findingId?: string;
 }
 
+// ============================================================================
+// Next.js Config Finding Types
+// ============================================================================
+
+export interface NextConfigChangeFinding {
+  type: "next-config-change";
+  kind: "next-config-change";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  /** Detected config features from diff content */
+  detectedFeatures: NextConfigFeature[];
+  tags?: string[];
+  findingId?: string;
+}
+
+export type NextConfigFeature =
+  | "rewrites"
+  | "redirects"
+  | "headers"
+  | "images"
+  | "i18n"
+  | "webpack"
+  | "turbopack"
+  | "experimental"
+  | "output"
+  | "basePath"
+  | "env"
+  | "middleware"
+  | "serverActions"
+  | "appDir"
+  | "ppr"
+  | "dynamicIO"
+  | "serverExternalPackages"
+  | "transpilePackages";
+
 export type RiskyPackageCategory =
   | "auth"
   | "database"
@@ -676,7 +714,8 @@ export type Finding =
   | PackageExportsFinding
   | PythonMigrationFinding
   | PythonConfigFinding
-  | AngularComponentChangeFinding;
+  | AngularComponentChangeFinding
+  | NextConfigChangeFinding;
 
 // ============================================================================
 // Risk Score
