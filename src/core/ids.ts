@@ -289,6 +289,14 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "next-config-change": {
+      // Fingerprint: type + file + status + sorted(detectedFeatures)
+      const file = normalizePathForHash(finding.file);
+      const features = sortForHash(finding.detectedFeatures).join(",");
+      fingerprint = `next-config-change:${file}:${finding.status}:${features}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;
