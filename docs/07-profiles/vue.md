@@ -5,7 +5,7 @@
 
 ## Purpose
 
-The Vue profile provides analyzers optimized for Vue.js and Nuxt projects, with support for Vue Router and Nuxt file-based routing.
+The Vue profile provides analyzers optimized for Vue.js and Nuxt projects, with comprehensive support for Vue Router and Nuxt file-based routing, including feature detection via diff content analysis.
 
 ## Detection
 
@@ -26,7 +26,7 @@ branch-narrator --profile vue
 |----------|---------|
 | `file-summary` | File change summary |
 | `file-category` | File categorization |
-| `vue-routes` | Vue Router and Nuxt route changes |
+| `vue-routes` | Vue Router, Nuxt routes, middleware, error pages, app files |
 | `env-var` | Environment variable changes |
 | `cloudflare` | Cloudflare configuration |
 | `vitest` | Test file changes |
@@ -47,23 +47,25 @@ branch-narrator --profile vue
 ### Nuxt Pages
 ```
 pages/
-├── index.vue        → /
-├── about.vue        → /about
+├── index.vue          → /
+├── about.vue          → /about
 ├── users/
-│   ├── index.vue    → /users
-│   └── [id].vue     → /users/:id
-└── [...slug].vue    → /:slug*
+│   ├── index.vue      → /users
+│   ├── [id].vue       → /users/:id
+│   └── [[id]].vue     → /users/:id? (optional)
+└── [...slug].vue      → /:slug*
 ```
 
 ### Nuxt Server Routes
 ```
 server/
 ├── api/
-│   ├── users.ts        → All methods
-│   ├── users.get.ts    → GET only
-│   └── users.post.ts   → POST only
+│   ├── users.ts          → /api/users (all methods)
+│   ├── users.get.ts      → /api/users (GET)
+│   ├── users.post.ts     → /api/users (POST)
+│   └── users/[id].get.ts → /api/users/:id (GET)
 ├── routes/
-│   └── health.ts
+│   └── health.ts         → /health
 └── middleware/
     └── auth.ts
 ```
@@ -71,8 +73,22 @@ server/
 ### Nuxt Layouts
 ```
 layouts/
-├── default.vue
-└── admin.vue
+├── default.vue    → route type: "default"
+└── admin.vue      → route type: "layout"
+```
+
+### Nuxt Middleware (App-level)
+```
+middleware/
+├── auth.ts        → middleware:auth (route type: "metadata")
+└── redirect.ts    → middleware:redirect (route type: "metadata")
+```
+
+### Nuxt App-level Files
+```
+error.vue          → route type: "error"
+app.vue            → route type: "template"
+app.config.ts      → route type: "template"
 ```
 
 ### Vue Router Config
@@ -81,8 +97,18 @@ src/
 ├── router.ts
 ├── routes.ts
 └── router/
-    └── index.ts
+    ├── index.ts
+    └── routes.ts
 ```
+
+## Feature Detection (Tags)
+
+The analyzer extracts feature tags from diff content for richer findings:
+
+- **Page features:** `definePageMeta`, `useFetch`, `useAsyncData`, `useRoute`, `useRouter`, `navigateTo`, `middleware`
+- **Server handler features:** `defineEventHandler`, `defineCachedEventHandler`, `defineWebSocketHandler`, `readValidatedBody`, `getValidatedQuery`, `setResponseStatus`, `sendRedirect`
+- **Middleware features:** `defineNuxtRouteMiddleware`
+- **Router config features:** `createRouter`, `createWebHistory`, `beforeEach`, `beforeResolve`, `afterEach`, `scrollBehavior`, lazy loading, route guards, meta, nested routes, redirects, aliases
 
 ## Example Output
 
@@ -96,6 +122,7 @@ src/
 | `/dashboard` | page | added | - |
 | `/api/users` | endpoint | added | GET, POST |
 | `/users/:id` | page | modified | - |
+| `middleware:auth` | metadata | added | - |
 ```
 
 ### JSON Finding
@@ -106,7 +133,8 @@ src/
   "routeId": "/users/:id",
   "file": "pages/users/[id].vue",
   "change": "modified",
-  "routeType": "page"
+  "routeType": "page",
+  "tags": ["has-page-meta", "has-fetch"]
 }
 ```
 
