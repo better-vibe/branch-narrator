@@ -1039,18 +1039,25 @@ function renderAngularChanges(groups: Map<string, Finding[]>): string {
   for (const [type, changes] of byType) {
     const typeLabel = type.charAt(0).toUpperCase() + type.slice(1) + "s";
     output += `**${typeLabel}**\n\n`;
-    output += "| File | Change | Selector | Standalone |\n";
-    output += "|------|--------|----------|------------|\n";
+    output += "| File | Change | Selector | Details |\n";
+    output += "|------|--------|----------|---------|\n";
 
     for (const change of changes) {
       const selector = change.selector || "-";
-      const standalone =
-        change.standalone !== undefined
-          ? change.standalone
-            ? "Yes"
-            : "No"
-          : "-";
-      output += `| \`${change.file}\` | ${change.change} | \`${selector}\` | ${standalone} |\n`;
+      const details: string[] = [];
+      if (change.standalone) details.push("standalone");
+      if (change.changeDetection) details.push(`CD: ${change.changeDetection}`);
+      if (change.inputs && change.inputs.length > 0) {
+        details.push(`inputs: ${change.inputs.join(", ")}`);
+      }
+      if (change.outputs && change.outputs.length > 0) {
+        details.push(`outputs: ${change.outputs.join(", ")}`);
+      }
+      if (change.providers && change.providers.length > 0) {
+        details.push(`providers: ${change.providers.length}`);
+      }
+      const detailStr = details.length > 0 ? details.join("; ") : "-";
+      output += `| \`${change.file}\` | ${change.change} | \`${selector}\` | ${detailStr} |\n`;
     }
     output += "\n";
   }
