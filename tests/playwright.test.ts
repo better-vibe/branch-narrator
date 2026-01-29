@@ -69,10 +69,45 @@ describe("playwrightAnalyzer", () => {
         diffs: [
           createFileDiff("src/index.ts", ["export const foo = 1;"]),
         ],
+        headPackageJson: {
+          devDependencies: { "@playwright/test": "^1.40.0" },
+        },
       });
 
       const findings = playwrightAnalyzer.analyze(changeSet);
       expect(findings).toHaveLength(0);
+    });
+
+    it("should skip entirely when project has no playwright dependency and no playwright files", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("src/index.ts", ["export const foo = 1;"]),
+        ],
+        headPackageJson: {
+          devDependencies: { vitest: "^1.0.0" },
+        },
+      });
+
+      const findings = playwrightAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(0);
+    });
+
+    it("should still analyze when playwright files are present even without dependency", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("playwright.config.ts", [
+            "export default defineConfig({",
+            '  testDir: "./e2e",',
+            "});",
+          ]),
+        ],
+        headPackageJson: {
+          devDependencies: { jest: "^29.0.0" },
+        },
+      });
+
+      const findings = playwrightAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(1);
     });
   });
 });

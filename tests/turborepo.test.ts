@@ -114,10 +114,45 @@ describe("turborepoAnalyzer", () => {
         diffs: [
           createFileDiff("package.json", ['  "name": "test"']),
         ],
+        headPackageJson: {
+          devDependencies: { turbo: "^2.0.0" },
+        },
       });
 
       const findings = turborepoAnalyzer.analyze(changeSet);
       expect(findings).toHaveLength(0);
+    });
+
+    it("should skip entirely when project has no turbo dependency and no turbo files", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("src/index.ts", ["export const foo = 1;"]),
+        ],
+        headPackageJson: {
+          devDependencies: { vitest: "^1.0.0" },
+        },
+      });
+
+      const findings = turborepoAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(0);
+    });
+
+    it("should still analyze when turbo files are present even without dependency", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("turbo.json", [
+            '  "tasks": {',
+            '    "build": {}',
+            '  }',
+          ]),
+        ],
+        headPackageJson: {
+          devDependencies: { vitest: "^1.0.0" },
+        },
+      });
+
+      const findings = turborepoAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(1);
     });
   });
 });

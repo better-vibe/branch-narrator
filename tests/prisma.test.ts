@@ -107,10 +107,45 @@ describe("prismaAnalyzer", () => {
         diffs: [
           createFileDiff("src/index.ts", ["export const foo = 1;"]),
         ],
+        headPackageJson: {
+          dependencies: { "@prisma/client": "^5.0.0" },
+        },
       });
 
       const findings = prismaAnalyzer.analyze(changeSet);
       expect(findings).toHaveLength(0);
+    });
+
+    it("should skip entirely when project has no prisma dependency and no prisma files", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("src/index.ts", ["export const foo = 1;"]),
+        ],
+        headPackageJson: {
+          dependencies: { react: "^18.0.0" },
+        },
+      });
+
+      const findings = prismaAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(0);
+    });
+
+    it("should still analyze when prisma files are present even without dependency", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("prisma/schema.prisma", [
+            "model User {",
+            "  id Int @id",
+            "}",
+          ]),
+        ],
+        headPackageJson: {
+          dependencies: { react: "^18.0.0" },
+        },
+      });
+
+      const findings = prismaAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(1);
     });
 
     it("should skip migration SQL files", () => {

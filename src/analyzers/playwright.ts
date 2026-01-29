@@ -92,6 +92,30 @@ function detectBreakingChanges(
   return reasons;
 }
 
+/**
+ * Check if the project uses Playwright based on package.json dependencies.
+ */
+function hasPlaywrightDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  return Boolean(
+    deps?.["@playwright/test"] || devDeps?.["@playwright/test"] ||
+    deps?.["playwright"] || devDeps?.["playwright"] ||
+    deps?.["@playwright/experimental-ct-react"] || devDeps?.["@playwright/experimental-ct-react"] ||
+    deps?.["@playwright/experimental-ct-vue"] || devDeps?.["@playwright/experimental-ct-vue"] ||
+    deps?.["@playwright/experimental-ct-svelte"] || devDeps?.["@playwright/experimental-ct-svelte"]
+  );
+}
+
+/**
+ * Check if any Playwright config files are in the changeset.
+ */
+function hasPlaywrightFiles(changeSet: ChangeSet): boolean {
+  return changeSet.diffs.some((d) => isPlaywrightConfig(d.path));
+}
+
 export const playwrightAnalyzer: Analyzer = {
   name: "playwright",
   cache: {
@@ -99,6 +123,11 @@ export const playwrightAnalyzer: Analyzer = {
   },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use Playwright and no Playwright files changed
+    if (!hasPlaywrightDependency(changeSet) && !hasPlaywrightFiles(changeSet)) {
+      return [];
+    }
+
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {

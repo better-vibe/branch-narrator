@@ -101,6 +101,29 @@ function detectBreakingChanges(deletions: string[]): string[] {
   return breakingChanges;
 }
 
+/**
+ * Check if the project uses Prisma based on package.json dependencies.
+ */
+function hasPrismaDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  return Boolean(
+    deps?.["prisma"] || devDeps?.["prisma"] ||
+    deps?.["@prisma/client"] || devDeps?.["@prisma/client"]
+  );
+}
+
+/**
+ * Check if any prisma-related files are in the changeset.
+ */
+function hasPrismaFiles(changeSet: ChangeSet): boolean {
+  return changeSet.diffs.some(
+    (d) => isPrismaSchema(d.path) || isPrismaMigration(d.path)
+  );
+}
+
 export const prismaAnalyzer: Analyzer = {
   name: "prisma",
   cache: {
@@ -108,6 +131,11 @@ export const prismaAnalyzer: Analyzer = {
   },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use Prisma and no Prisma files changed
+    if (!hasPrismaDependency(changeSet) && !hasPrismaFiles(changeSet)) {
+      return [];
+    }
+
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {

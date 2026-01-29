@@ -97,6 +97,26 @@ function detectBreakingChanges(
   return reasons;
 }
 
+/**
+ * Check if the project uses Turborepo based on package.json dependencies.
+ */
+function hasTurborepoDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  return Boolean(
+    deps?.["turbo"] || devDeps?.["turbo"]
+  );
+}
+
+/**
+ * Check if any Turborepo config files are in the changeset.
+ */
+function hasTurborepoFiles(changeSet: ChangeSet): boolean {
+  return changeSet.diffs.some((d) => isTurborepoConfig(d.path));
+}
+
 export const turborepoAnalyzer: Analyzer = {
   name: "turborepo",
   cache: {
@@ -104,6 +124,11 @@ export const turborepoAnalyzer: Analyzer = {
   },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use Turborepo and no turbo files changed
+    if (!hasTurborepoDependency(changeSet) && !hasTurborepoFiles(changeSet)) {
+      return [];
+    }
+
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {

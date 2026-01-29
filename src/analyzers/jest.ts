@@ -90,6 +90,28 @@ function detectBreakingChanges(
   return reasons;
 }
 
+/**
+ * Check if the project uses Jest based on package.json dependencies.
+ */
+function hasJestDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  return Boolean(
+    deps?.["jest"] || devDeps?.["jest"] ||
+    deps?.["ts-jest"] || devDeps?.["ts-jest"] ||
+    deps?.["@jest/core"] || devDeps?.["@jest/core"]
+  );
+}
+
+/**
+ * Check if any Jest config files are in the changeset.
+ */
+function hasJestFiles(changeSet: ChangeSet): boolean {
+  return changeSet.diffs.some((d) => isJestConfig(d.path));
+}
+
 export const jestAnalyzer: Analyzer = {
   name: "jest",
   cache: {
@@ -97,6 +119,11 @@ export const jestAnalyzer: Analyzer = {
   },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use Jest and no Jest files changed
+    if (!hasJestDependency(changeSet) && !hasJestFiles(changeSet)) {
+      return [];
+    }
+
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {

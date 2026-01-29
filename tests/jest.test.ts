@@ -83,10 +83,45 @@ describe("jestAnalyzer", () => {
         diffs: [
           createFileDiff("src/index.ts", ["export const foo = 1;"]),
         ],
+        headPackageJson: {
+          devDependencies: { jest: "^29.0.0" },
+        },
       });
 
       const findings = jestAnalyzer.analyze(changeSet);
       expect(findings).toHaveLength(0);
+    });
+
+    it("should skip entirely when project has no jest dependency and no jest files", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("src/index.ts", ["export const foo = 1;"]),
+        ],
+        headPackageJson: {
+          devDependencies: { vitest: "^1.0.0" },
+        },
+      });
+
+      const findings = jestAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(0);
+    });
+
+    it("should still analyze when jest files are present even without dependency", () => {
+      const changeSet = createChangeSet({
+        diffs: [
+          createFileDiff("jest.config.ts", [
+            'export default {',
+            '  testEnvironment: "jsdom",',
+            '};',
+          ]),
+        ],
+        headPackageJson: {
+          devDependencies: { vitest: "^1.0.0" },
+        },
+      });
+
+      const findings = jestAnalyzer.analyze(changeSet);
+      expect(findings).toHaveLength(1);
     });
   });
 });
