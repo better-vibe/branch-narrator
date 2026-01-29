@@ -52,4 +52,9 @@ export { pythonConfigAnalyzer } from "./python-config.js";
 export { angularRoutesAnalyzer } from "./angular-routes.js";
 export { angularComponentsAnalyzer } from "./angular-components.js";
 export { viteConfigAnalyzer } from "./vite-config.js";
-
+export { prismaAnalyzer } from "./prisma.js";
+export { jestAnalyzer } from "./jest.js";
+export { linterConfigAnalyzer } from "./linter-config.js";
+export { playwrightAnalyzer } from "./playwright.js";
+export { dockerAnalyzer } from "./docker.js";
+export { turborepoAnalyzer } from "./turborepo.js";
