@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Detects changes to Angular components, modules, services, directives, pipes, guards, and interceptors.
+Detects changes to Angular components, modules, services, directives, pipes, guards, interceptors, and resolvers. Extracts rich metadata including @Input/@Output properties, change detection strategy, signal-based APIs, lifecycle hooks, and companion template/style file changes.
 
 ## Finding Type
 
@@ -18,10 +18,14 @@ interface AngularComponentChangeFinding {
   evidence: Evidence[];
   file: string;
   change: "added" | "modified" | "deleted";
-  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor";
+  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor" | "resolver";
   selector?: string;
   standalone?: boolean;
   providers?: string[];
+  changeDetection?: "OnPush" | "Default";
+  inputs?: string[];
+  outputs?: string[];
+  tags?: string[];
 }
 ```
 
@@ -37,25 +41,108 @@ interface AngularComponentChangeFinding {
 | `*.pipe.ts` | Pipe |
 | `*.guard.ts` | Guard |
 | `*.interceptor.ts` | Interceptor |
+| `*.resolver.ts` | Resolver |
+
+### Companion File Detection
+Template and style files are associated with their component:
+| Pattern | Tag |
+|---------|-----|
+| `*.component.html` | `template-changed` |
+| `*.component.css` / `*.component.scss` | `style-changed` |
+| Any companion change | `has-template-style-changes` |
 
 ## Decorator Detection
 
-The analyzer extracts information from Angular decorators:
+The analyzer extracts information from Angular decorators via AST parsing with regex fallback:
 
 ### @Component Decorator
 - **selector**: Component selector (e.g., `app-user`)
 - **standalone**: Whether the component is standalone
 - **providers**: Array of provided services
+- **changeDetection**: `OnPush` or `Default`
+- **templateUrl**: External template path
+- **styleUrls**: External style paths
 
-### @NgModule Decorator
-- **providers**: Module-level providers
+### @Input / @Output Properties
+Extracted via both AST and regex:
+- `@Input() name: string` - Decorator-based input
+- `@Output() clicked = new EventEmitter()` - Decorator-based output
+- `name = input<string>()` - Signal-based input (Angular 17+)
+- `name = input.required<number>()` - Required signal input
+- `clicked = output<void>()` - Signal-based output
 
-### @Injectable Decorator
-- **providers**: Service providers
+## Feature Tags
+
+### Lifecycle Hooks
+| Pattern | Tag |
+|---------|-----|
+| `ngOnInit()` | `on-init` |
+| `ngOnDestroy()` | `on-destroy` |
+| `ngOnChanges()` | `on-changes` |
+| `ngAfterViewInit()` | `after-view-init` |
+| `ngAfterContentInit()` | `after-content-init` |
+| `ngDoCheck()` | `do-check` |
+
+### Dependency Injection
+| Pattern | Tag |
+|---------|-----|
+| `inject()` | `inject-fn` |
+| `constructor()` | `constructor-di` |
+| `providedIn: 'root'` | `provided-in-root` |
+| `providedIn: 'any'` | `provided-in-any` |
+
+### RxJS Patterns
+| Pattern | Tag |
+|---------|-----|
+| `Observable` | `uses-observable` |
+| `Subject` | `uses-subject` |
+| `BehaviorSubject` | `uses-behavior-subject` |
+| `switchMap` | `uses-switchmap` |
+| `mergeMap` | `uses-mergemap` |
+| `takeUntilDestroyed` | `take-until-destroyed` |
+
+### Signals (Angular 16+)
+| Pattern | Tag |
+|---------|-----|
+| `signal()` | `uses-signals` |
+| `computed()` | `uses-computed` |
+| `effect()` | `uses-effect` |
+| `input()` | `signal-input` |
+| `output()` | `signal-output` |
+| `model()` | `signal-model` |
+| `input.required` | `required-input` |
+
+### Template Features
+| Pattern | Tag |
+|---------|-----|
+| `@if` | `control-flow` |
+| `@for` | `control-flow` |
+| `@switch` | `control-flow` |
+| `@defer` | `defer-block` |
+
+### Forms
+| Pattern | Tag |
+|---------|-----|
+| `FormGroup` / `FormControl` / `FormBuilder` | `reactive-forms` |
+| `ngModel` | `template-forms` |
+
+### HTTP
+| Pattern | Tag |
+|---------|-----|
+| `HttpClient` | `http-client` |
+| `HttpInterceptor` | `http-interceptor` |
+
+### View Queries
+| Pattern | Tag |
+|---------|-----|
+| `@ViewChild()` / `viewChild()` | `view-child` |
+| `@ContentChild()` / `contentChild()` | `content-child` |
+| `@ViewChildren()` | `view-children` |
+| `@ContentChildren()` | `content-children` |
 
 ## Example Output
 
-### Component Change
+### Component with Inputs/Outputs
 
 ```json
 {
@@ -63,45 +150,19 @@ The analyzer extracts information from Angular decorators:
   "kind": "angular-component-change",
   "category": "api",
   "confidence": "high",
-  "file": "src/app/user/user.component.ts",
+  "file": "src/app/card/card.component.ts",
   "change": "modified",
   "componentType": "component",
-  "selector": "app-user"
+  "selector": "app-card",
+  "standalone": true,
+  "changeDetection": "OnPush",
+  "inputs": ["title", "subtitle", "imageUrl"],
+  "outputs": ["clicked", "dismissed"],
+  "tags": ["on-init", "uses-signals", "template-changed"]
 }
 ```
 
-### Standalone Component
-
-```json
-{
-  "type": "angular-component-change",
-  "kind": "angular-component-change",
-  "category": "api",
-  "confidence": "high",
-  "file": "src/app/standalone/standalone.component.ts",
-  "change": "added",
-  "componentType": "component",
-  "selector": "app-standalone",
-  "standalone": true
-}
-```
-
-### Module Change
-
-```json
-{
-  "type": "angular-component-change",
-  "kind": "angular-component-change",
-  "category": "api",
-  "confidence": "high",
-  "file": "src/app/feature/feature.module.ts",
-  "change": "modified",
-  "componentType": "module",
-  "providers": ["FeatureService"]
-}
-```
-
-### Service Change
+### Service with Modern DI
 
 ```json
 {
@@ -111,86 +172,24 @@ The analyzer extracts information from Angular decorators:
   "confidence": "high",
   "file": "src/app/services/data.service.ts",
   "change": "added",
-  "componentType": "service"
+  "componentType": "service",
+  "tags": ["inject-fn", "provided-in-root", "http-client", "uses-observable"]
 }
 ```
 
-### Directive Change
+## Rendering
 
-```json
-{
-  "type": "angular-component-change",
-  "kind": "angular-component-change",
-  "category": "api",
-  "confidence": "high",
-  "file": "src/app/directives/highlight.directive.ts",
-  "change": "modified",
-  "componentType": "directive",
-  "selector": "appHighlight"
-}
+In the markdown PR body, Angular component changes are rendered as tables grouped by type:
+
 ```
+### Angular Components
 
-### Pipe Change
+**Components**
 
-```json
-{
-  "type": "angular-component-change",
-  "kind": "angular-component-change",
-  "category": "api",
-  "confidence": "high",
-  "file": "src/app/pipes/format.pipe.ts",
-  "change": "modified",
-  "componentType": "pipe"
-}
+| File | Change | Selector | Details |
+|------|--------|----------|---------|
+| `src/app/card.component.ts` | modified | `app-card` | standalone; CD: OnPush; inputs: title, subtitle |
 ```
-
-### Guard Change
-
-```json
-{
-  "type": "angular-component-change",
-  "kind": "angular-component-change",
-  "category": "api",
-  "confidence": "high",
-  "file": "src/app/guards/auth.guard.ts",
-  "change": "modified",
-  "componentType": "guard"
-}
-```
-
-### Interceptor Change
-
-```json
-{
-  "type": "angular-component-change",
-  "kind": "angular-component-change",
-  "category": "api",
-  "confidence": "high",
-  "file": "src/app/interceptors/auth.interceptor.ts",
-  "change": "added",
-  "componentType": "interceptor"
-}
-```
-
-## Implementation Details
-
-The analyzer:
-
-1. Identifies Angular files by naming conventions
-2. Extracts evidence from git diffs
-3. Attempts to parse decorator information using Babel
-4. Extracts selector, standalone flag, and providers
-5. Reports changes with extracted metadata
-
-## Use Cases
-
-This analyzer helps track:
-
-- **Component API changes** - Modified selectors, inputs, outputs
-- **Module restructuring** - Changes to module declarations and imports
-- **Service additions** - New services being introduced
-- **Standalone migration** - Tracking migration to standalone components
-- **Dependency injection changes** - Provider modifications
 
 ## Profiles
 

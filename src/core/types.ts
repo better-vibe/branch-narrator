@@ -630,10 +630,13 @@ export interface AngularComponentChangeFinding {
   evidence: Evidence[];
   file: string;
   change: "added" | "modified" | "deleted";
-  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor";
+  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor" | "resolver";
   selector?: string;
   standalone?: boolean;
   providers?: string[];
+  changeDetection?: "OnPush" | "Default";
+  inputs?: string[];
+  outputs?: string[];
   tags?: string[];
   findingId?: string;
 }

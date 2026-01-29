@@ -1,6 +1,17 @@
 /**
  * Angular route detector - detects changes in Angular Router routes.
- * Supports route configuration in routing modules and component files.
+ *
+ * Detection capabilities:
+ * - RouterModule.forRoot() and RouterModule.forChild() (NgModule pattern)
+ * - provideRouter() (standalone API, Angular 14+)
+ * - const routes: Routes = [...] declarations
+ * - Lazy-loaded routes via loadChildren and loadComponent
+ * - Nested routes with children arrays
+ * - Redirect routes with redirectTo
+ * - Route guards: canActivate, canDeactivate, canMatch, canLoad
+ * - Route resolvers: resolve
+ * - Route data and title
+ * - Feature tags from diff content (guards, resolvers, lazy loading, etc.)
  */
 
 import { parse } from "@babel/parser";
@@ -11,6 +22,7 @@ import type {
   ChangeSet,
   Finding,
   RouteChangeFinding,
+  RouteType,
 } from "../core/types.js";
 import { createEvidence } from "../core/evidence.js";
 import { batchGetFileContent as defaultBatchGetFileContent } from "../git/batch.js";
@@ -27,15 +39,69 @@ export const dependencies = {
 interface ExtractedRoute {
   path: string;
   file: string;
+  routeType: RouteType;
   loadChildren?: boolean;
+  loadComponent?: boolean;
   redirectTo?: string;
+  guards?: string[];
+  hasResolvers?: boolean;
+  hasData?: boolean;
+  title?: string;
+  tags: string[];
 }
+
+/** Keywords indicating Angular Router usage - used for fast filtering */
+const ROUTER_KEYWORDS = [
+  "RouterModule",
+  "provideRouter",
+  "Routes",
+  "@angular/router",
+  "loadChildren",
+  "loadComponent",
+] as const;
+
+/** Angular route feature patterns for tag extraction from diff content */
+const ANGULAR_ROUTE_FEATURE_PATTERNS: Array<{ pattern: RegExp; tag: string }> = [
+  // Guard patterns
+  { pattern: /canActivate\s*:/, tag: "has-guard" },
+  { pattern: /canDeactivate\s*:/, tag: "has-guard" },
+  { pattern: /canMatch\s*:/, tag: "has-guard" },
+  { pattern: /canLoad\s*:/, tag: "has-guard" },
+  { pattern: /canActivateChild\s*:/, tag: "has-guard" },
+  // Resolver patterns
+  { pattern: /resolve\s*:/, tag: "has-resolver" },
+  // Lazy loading patterns
+  { pattern: /loadChildren\s*:/, tag: "lazy-loading" },
+  { pattern: /loadComponent\s*:/, tag: "lazy-component" },
+  // Router features
+  { pattern: /data\s*:\s*\{/, tag: "has-route-data" },
+  { pattern: /title\s*:\s*['"`]/, tag: "has-title" },
+  { pattern: /outlet\s*:\s*['"`]/, tag: "named-outlet" },
+  { pattern: /pathMatch\s*:\s*['"`]/, tag: "has-path-match" },
+  // Standalone API features
+  { pattern: /provideRouter\s*\(/, tag: "standalone-api" },
+  { pattern: /withComponentInputBinding\s*\(/, tag: "input-binding" },
+  { pattern: /withRouterConfig\s*\(/, tag: "router-config" },
+  { pattern: /withPreloading\s*\(/, tag: "preloading" },
+  { pattern: /withDebugTracing\s*\(/, tag: "debug-tracing" },
+  { pattern: /withHashLocation\s*\(/, tag: "hash-location" },
+  { pattern: /withNavigationErrorHandler\s*\(/, tag: "error-handler" },
+  { pattern: /withViewTransitions\s*\(/, tag: "view-transitions" },
+  // Navigation patterns
+  { pattern: /router\.navigate\s*\(/, tag: "programmatic-nav" },
+  { pattern: /router\.navigateByUrl\s*\(/, tag: "programmatic-nav" },
+  { pattern: /routerLink/, tag: "router-link" },
+  { pattern: /routerLinkActive/, tag: "router-link-active" },
+  // Route events
+  { pattern: /NavigationStart/, tag: "route-events" },
+  { pattern: /NavigationEnd/, tag: "route-events" },
+  { pattern: /RouteConfigLoadStart/, tag: "route-events" },
+];
 
 /**
  * Check if file is an Angular routing module or component with routes.
  */
 function isCandidateFile(path: string): boolean {
-  // Check extension
   const validExtensions = [".ts", ".js"];
   if (!validExtensions.some((ext) => path.endsWith(ext))) {
     return false;
@@ -46,10 +112,14 @@ function isCandidateFile(path: string): boolean {
     path.includes("-routing.module") ||
     path.includes(".routing.module") ||
     path.includes("app.routes") ||
-    path.includes(".routes.ts");
+    path.includes(".routes.ts") ||
+    path.includes(".routes.js");
 
-  // Also check regular module files and components
-  const isModuleOrComponent = path.includes(".module.") || path.includes(".component.");
+  // Also check regular module files, components, and config files
+  const isModuleOrComponent =
+    path.includes(".module.") ||
+    path.includes(".component.") ||
+    path.includes("app.config.");
 
   return isRoutingModule || isModuleOrComponent;
 }
@@ -58,14 +128,10 @@ function isCandidateFile(path: string): boolean {
  * Normalize route path.
  */
 export function normalizePath(path: string): string {
-  // Collapse multiple slashes
   let normalized = path.replace(/\/+/g, "/");
-
-  // Remove trailing slash unless it's the root path
   if (normalized !== "/" && normalized.endsWith("/")) {
     normalized = normalized.slice(0, -1);
   }
-
   return normalized;
 }
 
@@ -73,17 +139,12 @@ export function normalizePath(path: string): string {
  * Join parent and child paths.
  */
 export function joinPaths(parent: string, child: string): string {
-  // If child starts with "/", treat as absolute
   if (child.startsWith("/")) {
     return normalizePath(child);
   }
-
-  // If child is empty string, return parent
   if (child === "") {
     return normalizePath(parent);
   }
-
-  // Join with "/"
   const joined = parent === "/" ? `/${child}` : `${parent}/${child}`;
   return normalizePath(joined);
 }
@@ -95,30 +156,90 @@ function extractRouteConfig(obj: t.ObjectExpression): {
   path?: string;
   redirectTo?: string;
   loadChildren?: boolean;
+  loadComponent?: boolean;
   children?: t.ArrayExpression;
+  guards: string[];
+  hasResolvers: boolean;
+  hasData: boolean;
+  title?: string;
+  outlet?: string;
 } {
-  const config: {
-    path?: string;
-    redirectTo?: string;
-    loadChildren?: boolean;
-    children?: t.ArrayExpression;
-  } = {};
+  const config: ReturnType<typeof extractRouteConfig> = {
+    guards: [],
+    hasResolvers: false,
+    hasData: false,
+  };
 
   for (const prop of obj.properties) {
     if (t.isObjectProperty(prop) && t.isIdentifier(prop.key)) {
-      if (prop.key.name === "path" && t.isStringLiteral(prop.value)) {
-        config.path = prop.value.value;
-      } else if (prop.key.name === "redirectTo" && t.isStringLiteral(prop.value)) {
-        config.redirectTo = prop.value.value;
-      } else if (prop.key.name === "loadChildren") {
-        config.loadChildren = true;
-      } else if (prop.key.name === "children" && t.isArrayExpression(prop.value)) {
-        config.children = prop.value;
+      switch (prop.key.name) {
+        case "path":
+          if (t.isStringLiteral(prop.value)) {
+            config.path = prop.value.value;
+          }
+          break;
+        case "redirectTo":
+          if (t.isStringLiteral(prop.value)) {
+            config.redirectTo = prop.value.value;
+          }
+          break;
+        case "loadChildren":
+          config.loadChildren = true;
+          break;
+        case "loadComponent":
+          config.loadComponent = true;
+          break;
+        case "children":
+          if (t.isArrayExpression(prop.value)) {
+            config.children = prop.value;
+          }
+          break;
+        case "canActivate":
+        case "canDeactivate":
+        case "canMatch":
+        case "canLoad":
+        case "canActivateChild":
+          config.guards.push(prop.key.name);
+          break;
+        case "resolve":
+          config.hasResolvers = true;
+          break;
+        case "data":
+          config.hasData = true;
+          break;
+        case "title":
+          if (t.isStringLiteral(prop.value)) {
+            config.title = prop.value.value;
+          }
+          break;
+        case "outlet":
+          if (t.isStringLiteral(prop.value)) {
+            config.outlet = prop.value.value;
+          }
+          break;
       }
     }
   }
 
   return config;
+}
+
+/**
+ * Determine route type from route config.
+ */
+function determineRouteType(config: {
+  loadChildren?: boolean;
+  loadComponent?: boolean;
+  redirectTo?: string;
+  children?: t.ArrayExpression;
+  path?: string;
+}): RouteType {
+  if (config.redirectTo) return "page"; // redirect routes are still page-level
+  if (config.loadChildren) return "page"; // lazy modules
+  if (config.loadComponent) return "page"; // lazy standalone components
+  if (config.children) return "layout"; // routes with children act as layouts
+  if (config.path === "**") return "error"; // wildcard catch-all
+  return "page";
 }
 
 /**
@@ -137,11 +258,34 @@ function extractRoutesFromArray(
 
       if (routeConfig.path !== undefined) {
         const fullPath = joinPaths(parentPath, routeConfig.path);
+        const routeType = determineRouteType({ ...routeConfig, path: routeConfig.path });
+
+        const tags: string[] = [];
+        if (routeConfig.loadChildren) tags.push("lazy-loading");
+        if (routeConfig.loadComponent) tags.push("lazy-component");
+        if (routeConfig.guards.length > 0) {
+          tags.push("has-guard");
+          tags.push(...routeConfig.guards.map((g) => `guard:${g}`));
+        }
+        if (routeConfig.hasResolvers) tags.push("has-resolver");
+        if (routeConfig.hasData) tags.push("has-route-data");
+        if (routeConfig.title) tags.push("has-title");
+        if (routeConfig.outlet) tags.push("named-outlet");
+        if (routeConfig.redirectTo) tags.push("has-redirect");
+        if (routeConfig.path === "**") tags.push("catch-all");
+
         routes.push({
           path: fullPath,
           file: filePath,
+          routeType,
           loadChildren: routeConfig.loadChildren,
+          loadComponent: routeConfig.loadComponent,
           redirectTo: routeConfig.redirectTo,
+          guards: routeConfig.guards.length > 0 ? routeConfig.guards : undefined,
+          hasResolvers: routeConfig.hasResolvers || undefined,
+          hasData: routeConfig.hasData || undefined,
+          title: routeConfig.title,
+          tags,
         });
 
         // Process children routes
@@ -165,23 +309,20 @@ function extractRoutesFromArray(
  */
 function isRoutesTypeAnnotation(typeAnnotation: any): boolean {
   if (!typeAnnotation) return false;
-  
-  // Handle TSTypeAnnotation wrapper
+
   const type = typeAnnotation.typeAnnotation || typeAnnotation;
-  
-  // Check for Routes type reference
+
   if (t.isTSTypeReference(type) && t.isIdentifier(type.typeName)) {
     return type.typeName.name === "Routes";
   }
-  
-  // Check for Route[] array type
+
   if (t.isTSArrayType(type)) {
     const elementType = type.elementType;
     if (t.isTSTypeReference(elementType) && t.isIdentifier(elementType.typeName)) {
       return elementType.typeName.name === "Route";
     }
   }
-  
+
   return false;
 }
 
@@ -205,12 +346,9 @@ export function extractAngularRoutes(
   traverse(ast, {
     VariableDeclarator(path: any) {
       if (t.isIdentifier(path.node.id) && t.isArrayExpression(path.node.init)) {
-        // Check if variable has a Routes type annotation
         const hasRoutesType = isRoutesTypeAnnotation(path.node.id.typeAnnotation);
-        
-        // Also check by variable name pattern (routes, appRoutes, etc.)
         const hasRoutesName = /routes/i.test(path.node.id.name);
-        
+
         if (hasRoutesType || hasRoutesName) {
           routeConfigs.set(path.node.id.name, path.node.init);
         }
@@ -224,7 +362,6 @@ export function extractAngularRoutes(
       let routesArray: t.ArrayExpression | null = null;
       let routeVarName: string | null = null;
 
-      // Check for RouterModule.forRoot(routes) or RouterModule.forChild(routes)
       if (t.isMemberExpression(path.node.callee)) {
         const obj = path.node.callee.object;
         const prop = path.node.callee.property;
@@ -247,9 +384,7 @@ export function extractAngularRoutes(
             }
           }
         }
-      }
-      // Check for provideRouter(routes) - Angular standalone API
-      else if (t.isIdentifier(path.node.callee)) {
+      } else if (t.isIdentifier(path.node.callee)) {
         if (path.node.callee.name === "provideRouter") {
           const firstArg = path.node.arguments[0];
 
@@ -276,7 +411,6 @@ export function extractAngularRoutes(
   });
 
   // Third pass: extract routes from standalone declarations not used in RouterModule/provideRouter
-  // This handles cases like: const routes: Routes = [...] without explicit usage
   if (routes.length === 0) {
     for (const [varName, arrayExpr] of routeConfigs) {
       if (!usedRouteVars.has(varName)) {
@@ -304,9 +438,24 @@ export function extractRoutesFromContent(
 
     return extractAngularRoutes(ast, filePath);
   } catch (error) {
-    // Parsing failed, skip silently
     return [];
   }
+}
+
+/**
+ * Extract feature tags from diff content lines.
+ */
+function extractTags(lines: string[]): string[] {
+  const tags = new Set<string>();
+  const combined = lines.join("\n");
+
+  for (const { pattern, tag } of ANGULAR_ROUTE_FEATURE_PATTERNS) {
+    if (pattern.test(combined)) {
+      tags.add(tag);
+    }
+  }
+
+  return [...tags];
 }
 
 // ============================================================================
@@ -315,7 +464,7 @@ export function extractRoutesFromContent(
 
 export const angularRoutesAnalyzer: Analyzer = {
   name: "angular-routes",
-  cache: { includeGlobs: ["**/*.ts", "**/*.html"] },
+  cache: { includeGlobs: ["**/*.ts", "**/*.js"] },
 
   async analyze(changeSet: ChangeSet): Promise<Finding[]> {
     const findings: Finding[] = [];
@@ -346,10 +495,7 @@ export const angularRoutesAnalyzer: Analyzer = {
 
       // Heuristic: If content doesn't contain Angular router keywords, skip
       const hasRouterKeywords = (content: string) =>
-        content.includes("RouterModule") ||
-        content.includes("provideRouter") ||
-        content.includes("Routes") ||
-        content.includes("@angular/router");
+        ROUTER_KEYWORDS.some((kw) => content.includes(kw));
 
       if (
         baseContent &&
@@ -367,17 +513,25 @@ export const angularRoutesAnalyzer: Analyzer = {
         ? extractRoutesFromContent(headContent, file.path)
         : [];
 
-      // Create sets for comparison
-      const basePaths = new Set(baseRoutes.map((r) => r.path));
-      const headPaths = new Set(headRoutes.map((r) => r.path));
+      // Create maps for comparison (by path)
+      const baseByPath = new Map(baseRoutes.map((r) => [r.path, r]));
+      const headByPath = new Map(headRoutes.map((r) => [r.path, r]));
+
+      // Extract diff-level tags for enrichment
+      const diff = changeSet.diffs.find((d) => d.path === file.path);
+      const diffAdditions = diff
+        ? diff.hunks.flatMap((h) => h.additions)
+        : [];
+      const diffTags = extractTags(diffAdditions);
 
       // Find added routes
-      for (const route of headRoutes) {
-        if (!basePaths.has(route.path)) {
-          const routeType = route.loadChildren ? "lazy" : route.redirectTo ? "redirect" : "page";
+      for (const [path, route] of headByPath) {
+        if (!baseByPath.has(path)) {
           const evidence = route.redirectTo
             ? `Route: ${route.path} → ${route.redirectTo}`
             : `Route: ${route.path}`;
+
+          const tags = [...new Set([...route.tags, ...diffTags])];
 
           const finding: RouteChangeFinding = {
             type: "route-change",
@@ -388,19 +542,21 @@ export const angularRoutesAnalyzer: Analyzer = {
             routeId: route.path,
             file: file.path,
             change: "added",
-            routeType: routeType as any,
+            routeType: route.routeType,
           };
+          if (tags.length > 0) finding.tags = tags;
           findings.push(finding);
         }
       }
 
       // Find deleted routes
-      for (const route of baseRoutes) {
-        if (!headPaths.has(route.path)) {
-          const routeType = route.loadChildren ? "lazy" : route.redirectTo ? "redirect" : "page";
+      for (const [path, route] of baseByPath) {
+        if (!headByPath.has(path)) {
           const evidence = route.redirectTo
             ? `Route: ${route.path} → ${route.redirectTo}`
             : `Route: ${route.path}`;
+
+          const tags = [...route.tags];
 
           const finding: RouteChangeFinding = {
             type: "route-change",
@@ -411,8 +567,50 @@ export const angularRoutesAnalyzer: Analyzer = {
             routeId: route.path,
             file: file.path,
             change: "deleted",
-            routeType: routeType as any,
+            routeType: route.routeType,
           };
+          if (tags.length > 0) finding.tags = tags;
+          findings.push(finding);
+        }
+      }
+
+      // Detect modified routes (same path, but guards/resolvers/type changed)
+      for (const [path, headRoute] of headByPath) {
+        const baseRoute = baseByPath.get(path);
+        if (!baseRoute) continue;
+
+        const guardsChanged =
+          JSON.stringify(baseRoute.guards || []) !== JSON.stringify(headRoute.guards || []);
+        const resolversChanged = baseRoute.hasResolvers !== headRoute.hasResolvers;
+        const typeChanged = baseRoute.routeType !== headRoute.routeType;
+        const lazyChanged =
+          baseRoute.loadChildren !== headRoute.loadChildren ||
+          baseRoute.loadComponent !== headRoute.loadComponent;
+        const redirectChanged = baseRoute.redirectTo !== headRoute.redirectTo;
+
+        if (guardsChanged || resolversChanged || typeChanged || lazyChanged || redirectChanged) {
+          const changes: string[] = [];
+          if (guardsChanged) changes.push("guards");
+          if (resolversChanged) changes.push("resolvers");
+          if (typeChanged) changes.push("route type");
+          if (lazyChanged) changes.push("lazy loading");
+          if (redirectChanged) changes.push("redirect target");
+
+          const evidence = `Route modified: ${headRoute.path} (${changes.join(", ")} changed)`;
+          const tags = [...new Set([...headRoute.tags, ...diffTags])];
+
+          const finding: RouteChangeFinding = {
+            type: "route-change",
+            kind: "route-change",
+            category: "routes",
+            confidence: "high",
+            evidence: [createEvidence(file.path, evidence)],
+            routeId: headRoute.path,
+            file: file.path,
+            change: "modified",
+            routeType: headRoute.routeType,
+          };
+          if (tags.length > 0) finding.tags = tags;
           findings.push(finding);
         }
       }

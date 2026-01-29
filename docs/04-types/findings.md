@@ -636,9 +636,14 @@ interface AngularComponentChangeFinding {
   type: "angular-component-change";
   file: string;
   change: "added" | "modified" | "deleted";
-  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor";
+  componentType: "component" | "module" | "service" | "directive" | "pipe" | "guard" | "interceptor" | "resolver";
   selector?: string;
   standalone?: boolean;
+  providers?: string[];
+  changeDetection?: "OnPush" | "Default";
+  inputs?: string[];
+  outputs?: string[];
+  tags?: string[];
 }
 ```
 

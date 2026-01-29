@@ -45,6 +45,7 @@ export const HIGHLIGHT_PRIORITY = {
   CLOUDFLARE: 70,
 
   // API surface / config (non-breaking)
+  ANGULAR_COMPONENTS: 60,
   STENCIL_API: 60,
   MONOREPO_CONFIG: 60,
   ENV_VARS: 60,
@@ -304,6 +305,18 @@ export function buildHighlights(findings: Finding[]): string[] {
   // -------------------------------------------------------------------------
   // API surface / config (non-breaking) / env vars
   // -------------------------------------------------------------------------
+
+  // Angular component changes
+  const angularChanges = findings.filter(f => f.type === "angular-component-change") as any[];
+  if (angularChanges.length > 0) {
+    const types = new Set(angularChanges.map((c: any) => c.componentType as string));
+    const inputOutputChanges = angularChanges.filter((c: any) => c.inputs?.length > 0 || c.outputs?.length > 0);
+    let detail = `${angularChanges.length} Angular ${[...types].join("/")} change(s)`;
+    if (inputOutputChanges.length > 0) {
+      detail += ` with @Input/@Output modifications`;
+    }
+    add(detail, HIGHLIGHT_PRIORITY.ANGULAR_COMPONENTS);
+  }
 
   // Stencil component changes (group all Stencil findings)
   const stencilFindings = findings.filter(f =>
