@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.10.0
+
+### Minor Changes
+
+- 8b89454: Comprehensively improve React Router analyzer with route type detection (page, layout, error), feature tags (loader, action, lazy, error-boundary, catch-all, handle, shouldRevalidate, Component, HydrateFallback), createRoutesFromElements support, and richer evidence output
+
 ## 1.9.0
 
 ### Minor Changes
