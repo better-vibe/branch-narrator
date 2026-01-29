@@ -6,25 +6,52 @@
 
 ## Purpose
 
-Detects React Router route changes in React applications, supporting both JSX `<Route>` components and data router configurations (`createBrowserRouter`, `createHashRouter`, `createMemoryRouter`).
+Detects React Router route changes in React applications, supporting both JSX `<Route>` components and data router configurations (`createBrowserRouter`, `createHashRouter`, `createMemoryRouter`, `createRoutesFromElements`).
 
 ## Finding Type
 
 ```typescript
-type RouteType = "page" | "layout" | "endpoint" | "error" | "unknown";
+type RouteType = "page" | "layout" | "endpoint" | "error" | "loading" | "template" | "default" | "metadata" | "unknown";
 
 interface RouteChangeFinding {
   type: "route-change";
   routeId: string;         // e.g., "/dashboard", "/users/:id"
   file: string;            // Full file path
   change: FileStatus;      // "added" | "deleted"
-  routeType: RouteType;    // Always "page" for React Router
+  routeType: RouteType;    // "page", "layout", or "error" for React Router
+  tags?: string[];         // Feature annotations (see Tags section)
 }
 ```
 
+## Route Type Detection
+
+The analyzer classifies routes into three types:
+
+| Route Type | Detection Criteria |
+|------------|-------------------|
+| `page` | Leaf routes (no children), index routes |
+| `layout` | Routes with nested children (wrapper with `<Outlet>`) |
+| `error` | Routes with `errorElement`/`ErrorBoundary`, catch-all (`*`) routes |
+
+## Tags
+
+Routes are annotated with tags for special characteristics:
+
+| Tag | Meaning |
+|-----|---------|
+| `has-loader` | Route defines a `loader` function (data fetching) |
+| `has-action` | Route defines an `action` function (mutations) |
+| `lazy` | Route uses lazy loading via `lazy` property |
+| `error-boundary` | Route has `errorElement` or `ErrorBoundary` |
+| `catch-all` | Catch-all route (`path="*"`) |
+| `has-handle` | Route defines a `handle` object (breadcrumbs, etc.) |
+| `custom-revalidation` | Route defines `shouldRevalidate` |
+| `component-prop` | Route uses `Component` prop instead of `element` |
+| `hydrate-fallback` | Route defines `HydrateFallback` for SSR |
+
 ## Route Detection
 
-The analyzer uses Babel to parse React/JSX/TypeScript files and extract route definitions from two patterns:
+The analyzer uses Babel to parse React/JSX/TypeScript files and extract route definitions from three patterns:
 
 ### 1. JSX Routes
 
@@ -38,15 +65,17 @@ Detects `<Route>` JSX elements:
     <Route index element={<SettingsIndex />} />
   </Route>
   <Route path="/users/:id" element={<User />} />
+  <Route path="*" element={<NotFound />} />
 </Routes>
 ```
 
 Extracted routes:
-- `/`
-- `/settings`
-- `/settings/billing` (nested route)
-- `/settings` (index route)
-- `/users/:id`
+- `/` → page
+- `/settings` → layout (has children)
+- `/settings/billing` → page (nested route)
+- `/settings` → page (index route)
+- `/users/:id` → page
+- `/*` → error (catch-all, tagged `catch-all`)
 
 ### 2. Data Routers
 
@@ -56,24 +85,48 @@ Detects `createBrowserRouter`, `createHashRouter`, and `createMemoryRouter` call
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Home />,
-  },
-  {
-    path: "/account",
-    element: <Account />,
+    element: <Root />,
+    errorElement: <ErrorPage />,
+    loader: rootLoader,
     children: [
-      { index: true, element: <AccountIndex /> },
-      { path: "settings", element: <Settings /> }
-    ]
-  }
+      { index: true, element: <Home />, loader: homeLoader },
+      {
+        path: "contacts/:id",
+        element: <Contact />,
+        loader: contactLoader,
+        action: contactAction,
+      },
+      {
+        path: "settings",
+        lazy: () => import("./routes/settings"),
+      },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
 ]);
 ```
 
 Extracted routes:
-- `/`
-- `/account`
-- `/account` (index route)
-- `/account/settings` (nested child)
+- `/` → error (has `errorElement`), tags: `error-boundary`, `has-loader`
+- `/` → page (index), tags: `has-loader`
+- `/contacts/:id` → page, tags: `has-loader`, `has-action`
+- `/settings` → page, tags: `lazy`
+- `/*` → error, tags: `catch-all`
+
+### 3. createRoutesFromElements
+
+Detects the `createRoutesFromElements` bridge API:
+
+```tsx
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route path="/" element={<Root />}>
+      <Route path="home" element={<Home />} />
+      <Route path="about" element={<About />} />
+    </Route>
+  )
+);
+```
 
 ## Path Handling
 
@@ -107,27 +160,30 @@ Index routes map to their parent path:
 
 Only processes files that:
 1. Have extensions: `.ts`, `.tsx`, `.js`, `.jsx`
-2. Contain React Router patterns in diff:
+2. Contain React Router patterns in content:
    - `react-router`
    - `<Route`
    - `createBrowserRouter`
    - `createHashRouter`
    - `createMemoryRouter`
+   - `createRoutesFromElements`
 
 ## How It Works
 
-1. **File Selection**: Filter changed files by extension and diff content
+1. **File Selection**: Filter changed files by extension
 2. **Content Fetching**: Use `git show` to get file contents at base and head refs
-3. **AST Parsing**: Parse with Babel using `typescript` and `jsx` plugins
-4. **Route Extraction**: 
+3. **Keyword Filtering**: Skip files without router keywords (performance heuristic)
+4. **AST Parsing**: Parse with Babel using `typescript` and `jsx` plugins
+5. **Route Extraction**:
    - Traverse AST to find JSX `<Route>` elements
    - Find data router function calls
-   - Extract paths from route configurations
+   - Find `createRoutesFromElements` calls
+   - Extract paths, route types, and tags from route configurations
    - Handle nesting and index routes
-5. **Diff Calculation**: Compare base vs head routes
+6. **Diff Calculation**: Compare base vs head routes
    - New routes → `added`
    - Removed routes → `deleted`
-6. **Output**: Emit deduplicated and sorted findings
+7. **Output**: Emit deduplicated and sorted findings with tags
 
 ## Limitations
 
@@ -145,7 +201,7 @@ Only processes files that:
   // Detected
   <Route path="/users" />
   <Route path={"/users"} />
-  
+
   // Not detected
   <Route path={USERS_PATH} />
   ```
@@ -160,14 +216,15 @@ Only processes files that:
   "confidence": "high",
   "evidence": [
     {
-      "file": "src/App.tsx",
-      "excerpt": "Route: /users/:id"
+      "file": "src/router.tsx",
+      "excerpt": "Route: /contacts/:id [has-loader, has-action]"
     }
   ],
-  "routeId": "/users/:id",
-  "file": "src/App.tsx",
+  "routeId": "/contacts/:id",
+  "file": "src/router.tsx",
   "change": "added",
-  "routeType": "page"
+  "routeType": "page",
+  "tags": ["has-loader", "has-action"]
 }
 ```
 
@@ -176,28 +233,33 @@ Only processes files that:
 ```markdown
 ## Routes
 
-| Route | Change |
-|-------|--------|
-| `/users/:id` | added |
-| `/settings/billing` | added |
-| `/legacy-path` | deleted |
+| Route | Type | Change |
+|-------|------|--------|
+| `/contacts/:id` | page | added |
+| `/settings` | layout | added |
+| `/*` | error | added |
 ```
 
 ## Data Router Support
-
-Supports all React Router data router functions:
 
 | Function | Supported |
 |----------|-----------|
 | `createBrowserRouter` | ✅ Yes |
 | `createHashRouter` | ✅ Yes |
 | `createMemoryRouter` | ✅ Yes |
+| `createRoutesFromElements` | ✅ Yes |
 
 Also supports:
 - Inline array literals: `createBrowserRouter([...])`
 - Identifier references: `createBrowserRouter(routes)` where `routes = [...]`
 - Nested children via `children` property
 - Index routes via `index: true`
+- Error boundaries via `errorElement` / `ErrorBoundary`
+- Data loading via `loader` / `action`
+- Code splitting via `lazy`
+- Route metadata via `handle`
+- Custom revalidation via `shouldRevalidate`
+- Component prop pattern via `Component` / `HydrateFallback`
 
 ## Testing
 
