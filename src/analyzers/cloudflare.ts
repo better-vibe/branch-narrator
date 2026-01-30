@@ -42,43 +42,11 @@ export function workflowMentionsCloudflare(content: string): boolean {
   return CLOUDFLARE_CI_KEYWORDS.test(content);
 }
 
-/**
- * Check if the project uses Cloudflare based on package.json dependencies.
- */
-function hasCloudflareDependency(changeSet: ChangeSet): boolean {
-  const pkg = changeSet.headPackageJson;
-  if (!pkg) return false;
-  const deps = pkg.dependencies as Record<string, string> | undefined;
-  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
-  const allDeps = { ...deps, ...devDeps };
-  return Boolean(
-    allDeps["wrangler"] ||
-    allDeps["@cloudflare/workers-types"] ||
-    allDeps["@cloudflare/next-on-pages"] ||
-    allDeps["@cloudflare/kv-asset-handler"]
-  );
-}
-
-/**
- * Check if any Cloudflare-related files are in the changeset.
- */
-function hasCloudflareFiles(changeSet: ChangeSet): boolean {
-  return (
-    changeSet.files.some((f) => isWranglerConfig(f.path) || isGitHubWorkflow(f.path)) ||
-    changeSet.diffs.some((d) => isWranglerConfig(d.path) || isGitHubWorkflow(d.path))
-  );
-}
-
 export const cloudflareAnalyzer: Analyzer = {
   name: "cloudflare",
   cache: { includeGlobs: ["**/wrangler.toml", "**/wrangler.json", "**/.github/workflows/**"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
-    // Skip if project doesn't use Cloudflare and no Cloudflare files changed
-    if (!hasCloudflareDependency(changeSet) && !hasCloudflareFiles(changeSet)) {
-      return [];
-    }
-
     const findings: Finding[] = [];
     const areaFilesAndEvidence = new Map<
       CloudflareArea,

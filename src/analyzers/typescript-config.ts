@@ -173,37 +173,11 @@ function getStrictnessChanges(
   return changes;
 }
 
-/**
- * Check if the project uses TypeScript based on package.json dependencies.
- */
-function hasTypeScriptDependency(changeSet: ChangeSet): boolean {
-  const pkg = changeSet.headPackageJson;
-  if (!pkg) return false;
-  const deps = pkg.dependencies as Record<string, string> | undefined;
-  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
-  return Boolean(deps?.["typescript"] || devDeps?.["typescript"]);
-}
-
-/**
- * Check if any TypeScript config files are in the changeset.
- */
-function hasTsConfigFiles(changeSet: ChangeSet): boolean {
-  return (
-    changeSet.files.some((f) => isTsConfig(f.path)) ||
-    changeSet.diffs.some((d) => isTsConfig(d.path))
-  );
-}
-
 export const typescriptConfigAnalyzer: Analyzer = {
   name: "typescript-config",
   cache: { includeGlobs: ["**/tsconfig*.json"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
-    // Skip if project doesn't use TypeScript and no tsconfig files changed
-    if (!hasTypeScriptDependency(changeSet) && !hasTsConfigFiles(changeSet)) {
-      return [];
-    }
-
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {

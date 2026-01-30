@@ -143,37 +143,11 @@ function detectBreakingChanges(
   };
 }
 
-/**
- * Check if the project uses Tailwind based on package.json dependencies.
- */
-function hasTailwindDependency(changeSet: ChangeSet): boolean {
-  const pkg = changeSet.headPackageJson;
-  if (!pkg) return false;
-  const deps = pkg.dependencies as Record<string, string> | undefined;
-  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
-  return Boolean(deps?.["tailwindcss"] || devDeps?.["tailwindcss"]);
-}
-
-/**
- * Check if any Tailwind/PostCSS config files are in the changeset.
- */
-function hasTailwindFiles(changeSet: ChangeSet): boolean {
-  return (
-    changeSet.files.some((f) => isTailwindConfig(f.path) || isPostCSSConfig(f.path)) ||
-    changeSet.diffs.some((d) => isTailwindConfig(d.path) || isPostCSSConfig(d.path))
-  );
-}
-
 export const tailwindAnalyzer: Analyzer = {
   name: "tailwind",
   cache: { includeGlobs: ["**/tailwind.config.*", "**/postcss.config.*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
-    // Skip if project doesn't use Tailwind and no Tailwind files changed
-    if (!hasTailwindDependency(changeSet) && !hasTailwindFiles(changeSet)) {
-      return [];
-    }
-
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {

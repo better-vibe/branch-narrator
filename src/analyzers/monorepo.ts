@@ -154,45 +154,11 @@ function detectImpactfulChanges(
   return impacts;
 }
 
-/**
- * Check if the project uses any monorepo tool based on package.json dependencies.
- */
-function hasMonorepoDependency(changeSet: ChangeSet): boolean {
-  const pkg = changeSet.headPackageJson;
-  if (!pkg) return false;
-  const deps = pkg.dependencies as Record<string, string> | undefined;
-  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
-  const allDeps = { ...deps, ...devDeps };
-  // Check for workspaces field
-  if (pkg.workspaces) return true;
-  return Boolean(
-    allDeps["turbo"] ||
-    allDeps["lerna"] ||
-    allDeps["nx"] ||
-    allDeps["@changesets/cli"]
-  );
-}
-
-/**
- * Check if any monorepo config files are in the changeset.
- */
-function hasMonorepoFiles(changeSet: ChangeSet): boolean {
-  return (
-    changeSet.files.some((f) => detectMonorepoTool(f.path) !== null) ||
-    changeSet.diffs.some((d) => detectMonorepoTool(d.path) !== null)
-  );
-}
-
 export const monorepoAnalyzer: Analyzer = {
   name: "monorepo",
   cache: { includeGlobs: ["**/package.json", "**/pnpm-workspace.*", "**/lerna.json", "**/nx.json", "**/project.json", "**/turbo.json", "**/.changeset/config.json", "**/.yarnrc*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
-    // Skip if project doesn't use monorepo tools and no monorepo files changed
-    if (!hasMonorepoDependency(changeSet) && !hasMonorepoFiles(changeSet)) {
-      return [];
-    }
-
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {
