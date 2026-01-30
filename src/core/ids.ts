@@ -297,6 +297,49 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "prisma-schema": {
+      const file = normalizePathForHash(finding.file);
+      const added = sortForHash(finding.addedModels).join(",");
+      const removed = sortForHash(finding.removedModels).join(",");
+      fingerprint = `prisma-schema:${file}:${finding.isBreaking}:${added}:${removed}`;
+      break;
+    }
+
+    case "jest-config": {
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `jest-config:${file}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
+    case "linter-config": {
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `linter-config:${file}:${finding.tool}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
+    case "playwright-config": {
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `playwright-config:${file}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
+    case "docker-change": {
+      const file = normalizePathForHash(finding.file);
+      const images = sortForHash(finding.baseImageChanges).join(",");
+      fingerprint = `docker-change:${file}:${finding.dockerfileType}:${finding.isBreaking}:${images}`;
+      break;
+    }
+
+    case "turborepo-config": {
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `turborepo-config:${file}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;

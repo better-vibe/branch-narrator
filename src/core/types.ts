@@ -685,6 +685,126 @@ export type RiskyPackageCategory =
   | "native"
   | "payment";
 
+// ============================================================================
+// Prisma Finding Types
+// ============================================================================
+
+export interface PrismaSchemaFinding {
+  type: "prisma-schema";
+  kind: "prisma-schema";
+  category: "database";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  breakingChanges: string[];
+  addedModels: string[];
+  removedModels: string[];
+  modifiedModels: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Jest Finding Types
+// ============================================================================
+
+export interface JestConfigFinding {
+  type: "jest-config";
+  kind: "jest-config";
+  category: "tests";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  affectedSections: string[];
+  isBreaking: boolean;
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// ESLint / Linter Config Finding Types
+// ============================================================================
+
+export type LinterTool = "eslint" | "biome" | "prettier" | "stylelint" | "oxlint";
+
+export interface LinterConfigFinding {
+  type: "linter-config";
+  kind: "linter-config";
+  category: "quality";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  tool: LinterTool;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Playwright Finding Types
+// ============================================================================
+
+export interface PlaywrightConfigFinding {
+  type: "playwright-config";
+  kind: "playwright-config";
+  category: "tests";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  affectedSections: string[];
+  isBreaking: boolean;
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Docker Finding Types
+// ============================================================================
+
+export interface DockerChangeFinding {
+  type: "docker-change";
+  kind: "docker-change";
+  category: "infra";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  dockerfileType: "dockerfile" | "compose" | "dockerignore";
+  isBreaking: boolean;
+  breakingReasons: string[];
+  baseImageChanges: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Turborepo Finding Types
+// ============================================================================
+
+export interface TurborepoConfigFinding {
+  type: "turborepo-config";
+  kind: "turborepo-config";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  affectedSections: string[];
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
 export type Finding =
   | FileSummaryFinding
   | DependencyChangeFinding
@@ -718,7 +838,13 @@ export type Finding =
   | PythonMigrationFinding
   | PythonConfigFinding
   | AngularComponentChangeFinding
-  | NextConfigChangeFinding;
+  | NextConfigChangeFinding
+  | PrismaSchemaFinding
+  | JestConfigFinding
+  | LinterConfigFinding
+  | PlaywrightConfigFinding
+  | DockerChangeFinding
+  | TurborepoConfigFinding;
 
 // ============================================================================
 // Risk Score

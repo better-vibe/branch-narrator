@@ -38,6 +38,12 @@ import type {
   TestChangeFinding,
   TypeScriptConfigFinding,
   ViteConfigFinding,
+  PrismaSchemaFinding,
+  JestConfigFinding,
+  LinterConfigFinding,
+  PlaywrightConfigFinding,
+  DockerChangeFinding,
+  TurborepoConfigFinding,
 } from "../core/types.js";
 import { routeIdToUrlPath } from "../analyzers/route-detector.js";
 import { getCategoryLabel } from "../analyzers/file-category.js";
@@ -1233,6 +1239,215 @@ function renderPythonConfig(configs: PythonConfigFinding[]): string {
 }
 
 /**
+ * Render Prisma schema changes.
+ */
+function renderPrismaSchema(findings: PrismaSchemaFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "### Prisma Schema\n\n";
+
+  for (const finding of findings) {
+    const breakingText = finding.isBreaking ? " (BREAKING)" : "";
+    output += `**File:** \`${finding.file}\` (${finding.status})${breakingText}\n\n`;
+
+    if (finding.addedModels.length > 0) {
+      output += `**Added models:** ${finding.addedModels.join(", ")}\n`;
+    }
+    if (finding.removedModels.length > 0) {
+      output += `**Removed models:** ${finding.removedModels.join(", ")}\n`;
+    }
+    if (finding.modifiedModels.length > 0) {
+      output += `**Modified models:** ${finding.modifiedModels.join(", ")}\n`;
+    }
+    if (finding.breakingChanges.length > 0) {
+      output += "\nBreaking changes:\n";
+      for (const reason of finding.breakingChanges) {
+        output += `- ${reason}\n`;
+      }
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Render Docker changes.
+ */
+function renderDockerChanges(findings: DockerChangeFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "### Docker\n\n";
+
+  for (const finding of findings) {
+    const typeLabel = finding.dockerfileType === "compose" ? "Compose" : finding.dockerfileType === "dockerignore" ? ".dockerignore" : "Dockerfile";
+    const breakingText = finding.isBreaking ? " (BREAKING)" : "";
+    output += `**${typeLabel}:** \`${finding.file}\` (${finding.status})${breakingText}\n\n`;
+
+    if (finding.baseImageChanges.length > 0) {
+      output += "Base image changes:\n";
+      for (const change of finding.baseImageChanges) {
+        output += `- ${change}\n`;
+      }
+      output += "\n";
+    }
+
+    if (finding.breakingReasons.length > 0) {
+      output += "Breaking changes:\n";
+      for (const reason of finding.breakingReasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render Turborepo config changes.
+ */
+function renderTurborepoConfig(findings: TurborepoConfigFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "**Turborepo**\n\n";
+
+  for (const config of findings) {
+    const breakingText = config.isBreaking ? " (BREAKING)" : "";
+    output += `**File:** \`${config.file}\` (${config.status})${breakingText}\n\n`;
+
+    if (config.affectedSections.length > 0) {
+      output += "Affected sections:\n";
+      for (const section of config.affectedSections.slice(0, 5)) {
+        output += `- ${section}\n`;
+      }
+      output += "\n";
+    }
+
+    if (config.breakingReasons.length > 0) {
+      output += "Breaking changes:\n";
+      for (const reason of config.breakingReasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render linter config changes.
+ */
+function renderLinterConfig(findings: LinterConfigFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "### Linter Configuration\n\n";
+
+  // Group by tool
+  const byTool = new Map<string, LinterConfigFinding[]>();
+  for (const finding of findings) {
+    if (!byTool.has(finding.tool)) {
+      byTool.set(finding.tool, []);
+    }
+    byTool.get(finding.tool)!.push(finding);
+  }
+
+  for (const [tool, toolFindings] of byTool) {
+    const toolLabel = tool.charAt(0).toUpperCase() + tool.slice(1);
+    output += `**${toolLabel}**\n\n`;
+
+    for (const config of toolFindings) {
+      const breakingText = config.isBreaking ? " (BREAKING)" : "";
+      output += `- \`${config.file}\` (${config.status})${breakingText}\n`;
+
+      if (config.affectedSections.length > 0) {
+        output += `  Affected: ${config.affectedSections.join(", ")}\n`;
+      }
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Render Jest config changes.
+ */
+function renderJestConfig(findings: JestConfigFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "**Jest Configuration**\n\n";
+
+  for (const config of findings) {
+    const breakingText = config.isBreaking ? " (BREAKING)" : "";
+    output += `**File:** \`${config.file}\` (${config.status})${breakingText}\n\n`;
+
+    if (config.affectedSections.length > 0) {
+      output += "Affected sections:\n";
+      for (const section of config.affectedSections.slice(0, 5)) {
+        output += `- ${section}\n`;
+      }
+      output += "\n";
+    }
+
+    if (config.breakingReasons.length > 0) {
+      output += "Breaking changes:\n";
+      for (const reason of config.breakingReasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Render Playwright config changes.
+ */
+function renderPlaywrightConfig(findings: PlaywrightConfigFinding[]): string {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  let output = "**Playwright Configuration**\n\n";
+
+  for (const config of findings) {
+    const breakingText = config.isBreaking ? " (BREAKING)" : "";
+    output += `**File:** \`${config.file}\` (${config.status})${breakingText}\n\n`;
+
+    if (config.affectedSections.length > 0) {
+      output += "Affected sections:\n";
+      for (const section of config.affectedSections.slice(0, 5)) {
+        output += `- ${section}\n`;
+      }
+      output += "\n";
+    }
+
+    if (config.breakingReasons.length > 0) {
+      output += "Breaking changes:\n";
+      for (const reason of config.breakingReasons) {
+        output += `- ${reason}\n`;
+      }
+      output += "\n";
+    }
+  }
+
+  return output;
+}
+
+/**
  * Render Warnings section (large-diff, lockfile-mismatch).
  */
 function renderWarnings(groups: Map<string, Finding[]>): string {
@@ -1402,6 +1617,30 @@ function renderDetails(
   // Next.js Configuration
   const nextConfigs = getFindings<NextConfigChangeFinding>(groups, "next-config-change");
   detailsContent += renderNextConfig(nextConfigs);
+
+  // Prisma Schema
+  const prismaSchemas = getFindings<PrismaSchemaFinding>(groups, "prisma-schema");
+  detailsContent += renderPrismaSchema(prismaSchemas);
+
+  // Docker
+  const dockerChanges = getFindings<DockerChangeFinding>(groups, "docker-change");
+  detailsContent += renderDockerChanges(dockerChanges);
+
+  // Turborepo
+  const turborepoConfigs = getFindings<TurborepoConfigFinding>(groups, "turborepo-config");
+  detailsContent += renderTurborepoConfig(turborepoConfigs);
+
+  // Linter Configuration
+  const linterConfigs = getFindings<LinterConfigFinding>(groups, "linter-config");
+  detailsContent += renderLinterConfig(linterConfigs);
+
+  // Jest Configuration
+  const jestConfigs = getFindings<JestConfigFinding>(groups, "jest-config");
+  detailsContent += renderJestConfig(jestConfigs);
+
+  // Playwright Configuration
+  const playwrightConfigs = getFindings<PlaywrightConfigFinding>(groups, "playwright-config");
+  detailsContent += renderPlaywrightConfig(playwrightConfigs);
 
   // Cloudflare
   const cloudflare = getFindings<CloudflareChangeFinding>(groups, "cloudflare-change");

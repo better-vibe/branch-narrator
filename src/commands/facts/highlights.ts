@@ -51,13 +51,19 @@ export const HIGHLIGHT_PRIORITY = {
   ENV_VARS: 60,
   NEW_DEPS: 60,
   NON_BREAKING_CONFIG: 60, // TS, Tailwind, GraphQL, Package exports (non-breaking)
+  LINTER_CONFIG: 60,
+  DOCKER_CHANGES: 60,
+  TURBOREPO_CONFIG: 60,
 
   // Database (non-high-risk)
+  PRISMA_SCHEMA: 55,
   DB_MIGRATION: 55,
   CI_WORKFLOW: 55,
 
   // Test coverage
   TEST_CHANGES: 50,
+  JEST_CONFIG: 50,
+  PLAYWRIGHT_CONFIG: 50,
   CONVENTION_VIOLATIONS: 50,
 
   // Fallback / informational
@@ -336,6 +342,72 @@ export function buildHighlights(findings: Finding[]): string[] {
   if (monorepoChanges.length > 0) {
     const tools = [...new Set(monorepoChanges.map(m => m.tool))];
     add(`Monorepo config changed: ${tools.join(", ")}`, HIGHLIGHT_PRIORITY.MONOREPO_CONFIG);
+  }
+
+  // Prisma schema changes
+  const prismaChanges = findings.filter(f => f.type === "prisma-schema");
+  if (prismaChanges.length > 0) {
+    const breaking = prismaChanges.some(p => p.isBreaking);
+    add(
+      breaking ? "Prisma schema changed (breaking)" : "Prisma schema modified",
+      breaking ? HIGHLIGHT_PRIORITY.BREAKING_CONFIG : HIGHLIGHT_PRIORITY.PRISMA_SCHEMA
+    );
+  }
+
+  // Docker changes
+  const dockerFindings = findings.filter(f => f.type === "docker-change");
+  if (dockerFindings.length > 0) {
+    const breaking = dockerFindings.some(d => d.isBreaking);
+    const types = [...new Set(dockerFindings.map(d => d.dockerfileType))];
+    add(
+      breaking
+        ? `Docker ${types.join("/")} changed (breaking)`
+        : `Docker ${types.join("/")} modified`,
+      breaking ? HIGHLIGHT_PRIORITY.BREAKING_CONFIG : HIGHLIGHT_PRIORITY.DOCKER_CHANGES
+    );
+  }
+
+  // Turborepo config changes
+  const turborepoChanges = findings.filter(f => f.type === "turborepo-config");
+  if (turborepoChanges.length > 0) {
+    const breaking = turborepoChanges.some(t => t.isBreaking);
+    add(
+      breaking ? "Turborepo config changed (breaking)" : "Turborepo config modified",
+      breaking ? HIGHLIGHT_PRIORITY.BREAKING_CONFIG : HIGHLIGHT_PRIORITY.TURBOREPO_CONFIG
+    );
+  }
+
+  // Linter config changes
+  const linterChanges = findings.filter(f => f.type === "linter-config");
+  if (linterChanges.length > 0) {
+    const tools = [...new Set(linterChanges.map(l => l.tool))];
+    const breaking = linterChanges.some(l => l.isBreaking);
+    add(
+      breaking
+        ? `${tools.join("/")} config changed (breaking)`
+        : `${tools.join("/")} config modified`,
+      breaking ? HIGHLIGHT_PRIORITY.BREAKING_CONFIG : HIGHLIGHT_PRIORITY.LINTER_CONFIG
+    );
+  }
+
+  // Jest config changes
+  const jestChanges = findings.filter(f => f.type === "jest-config");
+  if (jestChanges.length > 0) {
+    const breaking = jestChanges.some(j => j.isBreaking);
+    add(
+      breaking ? "Jest config changed (breaking)" : "Jest config modified",
+      breaking ? HIGHLIGHT_PRIORITY.BREAKING_CONFIG : HIGHLIGHT_PRIORITY.JEST_CONFIG
+    );
+  }
+
+  // Playwright config changes
+  const playwrightChanges = findings.filter(f => f.type === "playwright-config");
+  if (playwrightChanges.length > 0) {
+    const breaking = playwrightChanges.some(p => p.isBreaking);
+    add(
+      breaking ? "Playwright config changed (breaking)" : "Playwright config modified",
+      breaking ? HIGHLIGHT_PRIORITY.BREAKING_CONFIG : HIGHLIGHT_PRIORITY.PLAYWRIGHT_CONFIG
+    );
   }
 
   // Environment variables

@@ -125,6 +125,33 @@ export function determineMigrationRisk(
   };
 }
 
+/**
+ * Check if the project uses Supabase based on package.json dependencies.
+ */
+function hasSupabaseDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  const allDeps = { ...deps, ...devDeps };
+  return Boolean(
+    allDeps["@supabase/supabase-js"] ||
+    allDeps["supabase"] ||
+    allDeps["@supabase/auth-helpers-nextjs"] ||
+    allDeps["@supabase/auth-helpers-sveltekit"]
+  );
+}
+
+/**
+ * Check if any Supabase files are in the changeset.
+ */
+function hasSupabaseFiles(changeSet: ChangeSet): boolean {
+  return (
+    changeSet.files.some((f) => f.path.startsWith("supabase/")) ||
+    changeSet.diffs.some((d) => d.path.startsWith("supabase/"))
+  );
+}
+
 export const supabaseAnalyzer: Analyzer = {
   name: "supabase",
   cache: {
@@ -132,6 +159,11 @@ export const supabaseAnalyzer: Analyzer = {
   },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use Supabase and no Supabase files changed
+    if (!hasSupabaseDependency(changeSet) && !hasSupabaseFiles(changeSet)) {
+      return [];
+    }
+
     const findings: Finding[] = [];
     const migrationFiles: string[] = [];
     const supabaseFiles: string[] = [];

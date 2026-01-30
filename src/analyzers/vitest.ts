@@ -39,6 +39,27 @@ export function isVitestConfig(path: string): boolean {
   return VITEST_CONFIG_PATTERNS.some((pattern) => pattern.test(path));
 }
 
+/**
+ * Check if the project uses Vitest based on package.json dependencies.
+ */
+function hasVitestDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  return Boolean(deps?.["vitest"] || devDeps?.["vitest"]);
+}
+
+/**
+ * Check if any vitest/test files are in the changeset.
+ */
+function hasVitestFiles(changeSet: ChangeSet): boolean {
+  return (
+    changeSet.files.some((f) => isTestFile(f.path) || isVitestConfig(f.path)) ||
+    changeSet.diffs.some((d) => isTestFile(d.path) || isVitestConfig(d.path))
+  );
+}
+
 export const vitestAnalyzer: Analyzer = {
   name: "vitest",
   cache: {
@@ -46,6 +67,11 @@ export const vitestAnalyzer: Analyzer = {
   },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use Vitest and no test files changed
+    if (!hasVitestDependency(changeSet) && !hasVitestFiles(changeSet)) {
+      return [];
+    }
+
     const testFiles: string[] = [];
     const addedFiles: string[] = [];
     const modifiedFiles: string[] = [];

@@ -19,6 +19,12 @@ import {
   analyzeInfra,
   analyzeAPIContracts,
   graphqlAnalyzer,
+  prismaAnalyzer,
+  jestAnalyzer,
+  linterConfigAnalyzer,
+  playwrightAnalyzer,
+  dockerAnalyzer,
+  turborepoAnalyzer,
 } from "../analyzers/index.js";
 
 /**
@@ -42,5 +48,11 @@ export const defaultProfile: Profile = {
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
+    prismaAnalyzer,
+    jestAnalyzer,
+    linterConfigAnalyzer,
+    playwrightAnalyzer,
+    dockerAnalyzer,
+    turborepoAnalyzer,
   ],
 };
