@@ -116,11 +116,47 @@ function analyzeAdditions(additions: string[]): string[] {
   return addedElements;
 }
 
+/**
+ * Check if the project uses GraphQL based on package.json dependencies.
+ */
+function hasGraphQLDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  const allDeps = { ...deps, ...devDeps };
+  return Boolean(
+    allDeps["graphql"] ||
+    allDeps["@apollo/server"] ||
+    allDeps["@apollo/client"] ||
+    allDeps["apollo-server"] ||
+    allDeps["graphql-yoga"] ||
+    allDeps["@graphql-codegen/cli"] ||
+    allDeps["urql"] ||
+    allDeps["relay-runtime"]
+  );
+}
+
+/**
+ * Check if any GraphQL files are in the changeset.
+ */
+function hasGraphQLFiles(changeSet: ChangeSet): boolean {
+  return (
+    changeSet.files.some((f) => isGraphQLSchema(f.path)) ||
+    changeSet.diffs.some((d) => isGraphQLSchema(d.path))
+  );
+}
+
 export const graphqlAnalyzer: Analyzer = {
   name: "graphql",
   cache: { includeGlobs: ["**/*.graphql", "**/*.gql", "**/*.graphqls", "**/*.sdl"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use GraphQL and no GraphQL files changed
+    if (!hasGraphQLDependency(changeSet) && !hasGraphQLFiles(changeSet)) {
+      return [];
+    }
+
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {

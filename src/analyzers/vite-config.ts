@@ -204,11 +204,37 @@ function detectPluginChanges(
   return plugins;
 }
 
+/**
+ * Check if the project uses Vite based on package.json dependencies.
+ */
+function hasViteDependency(changeSet: ChangeSet): boolean {
+  const pkg = changeSet.headPackageJson;
+  if (!pkg) return false;
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+  return Boolean(deps?.["vite"] || devDeps?.["vite"]);
+}
+
+/**
+ * Check if any Vite config files are in the changeset.
+ */
+function hasViteFiles(changeSet: ChangeSet): boolean {
+  return (
+    changeSet.files.some((f) => isViteConfig(f.path)) ||
+    changeSet.diffs.some((d) => isViteConfig(d.path))
+  );
+}
+
 export const viteConfigAnalyzer: Analyzer = {
   name: "vite-config",
   cache: { includeGlobs: ["**/vite.config.*", "**/vitest.config.*"] },
 
   analyze(changeSet: ChangeSet): Finding[] {
+    // Skip if project doesn't use Vite and no Vite config files changed
+    if (!hasViteDependency(changeSet) && !hasViteFiles(changeSet)) {
+      return [];
+    }
+
     const findings: Finding[] = [];
 
     for (const diff of changeSet.diffs) {
