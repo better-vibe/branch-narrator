@@ -18,6 +18,7 @@ import {
   analyzeCIWorkflows,
   analyzeInfra,
   analyzeAPIContracts,
+  drizzleAnalyzer,
 } from "../analyzers/index.js";
 import { astroRoutesAnalyzer } from "../analyzers/astro-routes.js";
 import { tailwindAnalyzer } from "../analyzers/tailwind.js";
@@ -46,5 +47,6 @@ export const astroProfile: Profile = {
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
+    drizzleAnalyzer,
   ],
 };

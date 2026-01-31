@@ -25,6 +25,7 @@ import {
   playwrightAnalyzer,
   dockerAnalyzer,
   turborepoAnalyzer,
+  drizzleAnalyzer,
 } from "../analyzers/index.js";
 
 /**
@@ -54,5 +55,6 @@ export const defaultProfile: Profile = {
     playwrightAnalyzer,
     dockerAnalyzer,
     turborepoAnalyzer,
+    drizzleAnalyzer,
   ],
 };

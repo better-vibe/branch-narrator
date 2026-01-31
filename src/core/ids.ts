@@ -340,6 +340,78 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "drizzle-schema": {
+      const file = normalizePathForHash(finding.file);
+      const added = sortForHash(finding.addedTables).join(",");
+      const removed = sortForHash(finding.removedTables).join(",");
+      fingerprint = `drizzle-schema:${file}:${finding.isBreaking}:${added}:${removed}`;
+      break;
+    }
+
+    case "tanstack-query": {
+      const file = normalizePathForHash(finding.file);
+      const changes = finding.queryChanges
+        .map((c) => `${c.name}:${c.type}:${c.operation}:${c.isBreaking}`)
+        .join(",");
+      fingerprint = `tanstack-query:${file}:${changes}`;
+      break;
+    }
+
+    case "trpc-router": {
+      const file = normalizePathForHash(finding.file);
+      const routerName = finding.routerName;
+      const procedures = finding.procedureChanges
+        .map((p) => `${p.name}:${p.type}:${p.operation}:${p.isBreaking}`)
+        .join(",");
+      fingerprint = `trpc-router:${file}:${routerName}:${finding.isBreaking}:${procedures}`;
+      break;
+    }
+
+    case "svelte5-runes": {
+      const file = normalizePathForHash(finding.file);
+      const runes = finding.runeChanges
+        .map((r) => `${r.rune}:${r.operation}:${r.variableName || "unknown"}:${r.isBreaking}`)
+        .join(",");
+      fingerprint = `svelte5-runes:${file}:${runes}`;
+      break;
+    }
+
+    case "rsc-boundary": {
+      const file = normalizePathForHash(finding.file);
+      const directiveFrom = finding.directiveChange.from || "none";
+      const directiveTo = finding.directiveChange.to || "none";
+      fingerprint = `rsc-boundary:${file}:${finding.boundaryType}:${directiveFrom}:${directiveTo}:${finding.isBreaking}`;
+      break;
+    }
+
+    case "cypress-config": {
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `cypress-config:${file}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
+    case "i18n-change": {
+      const file = normalizePathForHash(finding.file);
+      const keys = finding.keyChanges.map((k) => `${k.key}:${k.operation}:${k.isBreaking}`).join(",");
+      fingerprint = `i18n-change:${file}:${finding.locale}:${finding.isBreaking}:${keys}`;
+      break;
+    }
+
+    case "websocket-change": {
+      const file = normalizePathForHash(finding.file);
+      const events = finding.eventChanges.map((e) => `${e.eventName}:${e.operation}:${e.isBreaking}`).join(",");
+      fingerprint = `websocket-change:${file}:${finding.library}:${finding.isBreaking}:${events}`;
+      break;
+    }
+
+    case "css-change": {
+      const file = normalizePathForHash(finding.file);
+      const classes = finding.classChanges.map((c) => `${c.className}:${c.operation}:${c.isBreaking}`).join(",");
+      fingerprint = `css-change:${file}:${finding.fileType}:${finding.isBreaking}:${classes}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;

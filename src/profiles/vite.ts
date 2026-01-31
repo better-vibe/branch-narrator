@@ -22,6 +22,7 @@ import {
   analyzeInfra,
   analyzeAPIContracts,
   viteConfigAnalyzer,
+  drizzleAnalyzer,
 } from "../analyzers/index.js";
 import { tailwindAnalyzer } from "../analyzers/tailwind.js";
 import { typescriptConfigAnalyzer } from "../analyzers/typescript-config.js";
@@ -58,5 +59,6 @@ export const viteProfile: Profile = {
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
+    drizzleAnalyzer,
   ],
 };

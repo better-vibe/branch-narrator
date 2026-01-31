@@ -18,6 +18,8 @@ import {
   analyzeCIWorkflows,
   analyzeInfra,
   analyzeAPIContracts,
+  drizzleAnalyzer,
+  trpcRouterAnalyzer,
 } from "../analyzers/index.js";
 import { vueRoutesAnalyzer } from "../analyzers/vue-routes.js";
 import { tailwindAnalyzer } from "../analyzers/tailwind.js";
@@ -46,5 +48,7 @@ export const vueProfile: Profile = {
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
+    drizzleAnalyzer,
+    trpcRouterAnalyzer,
   ],
 };
