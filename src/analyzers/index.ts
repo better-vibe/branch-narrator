@@ -63,3 +63,7 @@ export { tanstackQueryAnalyzer } from "./tanstack-query.js";
 export { trpcRouterAnalyzer } from "./trpc-router.js";
 export { svelte5RunesAnalyzer } from "./svelte5-runes.js";
 export { rscBoundaryAnalyzer } from "./rsc-boundary.js";
+export { websocketAnalyzer } from "./websocket.js";
+export { cypressAnalyzer } from "./cypress.js";
+export { i18nAnalyzer } from "./i18n.js";
+export { cssAnalyzer } from "./css.js";

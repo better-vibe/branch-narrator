@@ -928,6 +928,112 @@ export interface RSCBoundaryFinding {
   findingId?: string;
 }
 
+// ============================================================================
+// Cypress Config Finding Types
+// ============================================================================
+
+export interface CypressConfigFinding {
+  type: "cypress-config";
+  kind: "cypress-config";
+  category: "tests";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  configChanges: string[];
+  testChanges: Array<{
+    file: string;
+    operation: "added" | "removed" | "modified";
+    testCount?: number;
+  }>;
+  fixtureChanges: string[];
+  isBreaking: boolean;
+  affectedSections: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// I18n Change Finding Types
+// ============================================================================
+
+export interface I18nChangeFinding {
+  type: "i18n-change";
+  kind: "i18n-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  locale: string;
+  keyChanges: Array<{
+    key: string;
+    operation: "added" | "removed" | "modified" | "renamed";
+    oldKey?: string;
+    hasInterpolation: boolean;
+    isBreaking: boolean;
+  }>;
+  namespaceChanges: string[];
+  localeAdded?: string[];
+  localeRemoved?: string[];
+  isBreaking: boolean;
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// WebSocket Change Finding Types
+// ============================================================================
+
+export interface WebSocketChangeFinding {
+  type: "websocket-change";
+  kind: "websocket-change";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  library: "socket.io" | "native" | "ws" | "unknown";
+  eventChanges: Array<{
+    eventName: string;
+    operation: "added" | "removed" | "modified";
+    direction: "incoming" | "outgoing" | "bidirectional";
+    isBreaking: boolean;
+  }>;
+  roomChanges: string[];
+  namespaceChanges: string[];
+  isBreaking: boolean;
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// CSS Change Finding Types
+// ============================================================================
+
+export interface CSSChangeFinding {
+  type: "css-change";
+  kind: "css-change";
+  category: "config_env";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  fileType: "css-module" | "styled-component" | "theme" | "global";
+  classChanges: Array<{
+    className: string;
+    operation: "added" | "removed" | "modified";
+    propertiesChanged: string[];
+    isBreaking: boolean;
+  }>;
+  themeChanges: string[];
+  isBreaking: boolean;
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
 export type Finding =
   | FileSummaryFinding
   | DependencyChangeFinding
@@ -972,7 +1078,11 @@ export type Finding =
   | TanStackQueryFinding
   | TRPCRouterFinding
   | Svelte5RunesFinding
-  | RSCBoundaryFinding;
+  | RSCBoundaryFinding
+  | CypressConfigFinding
+  | I18nChangeFinding
+  | WebSocketChangeFinding
+  | CSSChangeFinding;
 
 // ============================================================================
 // Risk Score

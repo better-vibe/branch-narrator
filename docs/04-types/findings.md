@@ -49,7 +49,11 @@ type Finding =
   | PackageExportsFinding
   | PythonMigrationFinding
   | PythonConfigFinding
-  | AngularComponentChangeFinding;
+  | AngularComponentChangeFinding
+  | CypressConfigFinding
+  | I18nChangeFinding
+  | WebSocketChangeFinding
+  | CSSChangeFinding;
 ```
 
 ## Class Diagram
@@ -644,6 +648,120 @@ interface AngularComponentChangeFinding {
   inputs?: string[];
   outputs?: string[];
   tags?: string[];
+}
+```
+
+---
+
+## CypressConfigFinding
+
+```typescript
+interface CypressConfigFinding {
+  type: "cypress-config";
+  kind: "cypress-config";
+  category: "tests";
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  configChanges: string[];
+  testChanges: Array<{
+    file: string;
+    operation: "added" | "removed" | "modified";
+    testCount?: number;
+  }>;
+  fixtureChanges: string[];
+  isBreaking: boolean;
+  affectedSections: string[];
+  tags?: string[];
+  findingId?: string;
+}
+```
+
+---
+
+## I18nChangeFinding
+
+```typescript
+interface I18nChangeFinding {
+  type: "i18n-change";
+  kind: "i18n-change";
+  category: "api";
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  locale: string;
+  keyChanges: Array<{
+    key: string;
+    operation: "added" | "removed" | "modified" | "renamed";
+    oldKey?: string;
+    hasInterpolation: boolean;
+    isBreaking: boolean;
+  }>;
+  namespaceChanges: string[];
+  localeAdded?: string[];
+  localeRemoved?: string[];
+  isBreaking: boolean;
+  tags?: string[];
+  findingId?: string;
+}
+```
+
+---
+
+## WebSocketChangeFinding
+
+```typescript
+interface WebSocketChangeFinding {
+  type: "websocket-change";
+  kind: "websocket-change";
+  category: "api";
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  library: "socket.io" | "native" | "ws" | "unknown";
+  eventChanges: Array<{
+    eventName: string;
+    operation: "added" | "removed" | "modified";
+    direction: "incoming" | "outgoing" | "bidirectional";
+    isBreaking: boolean;
+  }>;
+  roomChanges: string[];
+  namespaceChanges: string[];
+  isBreaking: boolean;
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+```
+
+---
+
+## CSSChangeFinding
+
+```typescript
+interface CSSChangeFinding {
+  type: "css-change";
+  kind: "css-change";
+  category: "config_env";
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  fileType: "css-module" | "styled-component" | "theme" | "global";
+  classChanges: Array<{
+    className: string;
+    operation: "added" | "removed" | "modified";
+    propertiesChanged: string[];
+    isBreaking: boolean;
+  }>;
+  themeChanges: string[];
+  isBreaking: boolean;
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
 }
 ```
 

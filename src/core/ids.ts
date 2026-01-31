@@ -384,6 +384,34 @@ export function buildFindingId(finding: Finding): string {
       break;
     }
 
+    case "cypress-config": {
+      const file = normalizePathForHash(finding.file);
+      const sections = sortForHash(finding.affectedSections).join(",");
+      fingerprint = `cypress-config:${file}:${finding.isBreaking}:${sections}`;
+      break;
+    }
+
+    case "i18n-change": {
+      const file = normalizePathForHash(finding.file);
+      const keys = finding.keyChanges.map((k) => `${k.key}:${k.operation}:${k.isBreaking}`).join(",");
+      fingerprint = `i18n-change:${file}:${finding.locale}:${finding.isBreaking}:${keys}`;
+      break;
+    }
+
+    case "websocket-change": {
+      const file = normalizePathForHash(finding.file);
+      const events = finding.eventChanges.map((e) => `${e.eventName}:${e.operation}:${e.isBreaking}`).join(",");
+      fingerprint = `websocket-change:${file}:${finding.library}:${finding.isBreaking}:${events}`;
+      break;
+    }
+
+    case "css-change": {
+      const file = normalizePathForHash(finding.file);
+      const classes = finding.classChanges.map((c) => `${c.className}:${c.operation}:${c.isBreaking}`).join(",");
+      fingerprint = `css-change:${file}:${finding.fileType}:${finding.isBreaking}:${classes}`;
+      break;
+    }
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = finding;
