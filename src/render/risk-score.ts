@@ -8,6 +8,7 @@ import type {
   FileCategoryFinding,
   FileSummaryFinding,
   Finding,
+  ImpactAnalysisFinding,
   LargeDiffFinding,
   RiskLevel,
   RiskScore,
@@ -298,6 +299,55 @@ export function computeRiskScore(findings: Finding[]): RiskScore {
         explanation: `Core module files modified (types.ts, index.ts): ${coreFilesModified.length} file(s)`,
         evidence: [],
       });
+    }
+  }
+
+  // Check for high blast radius in product code
+  const impactFindings = findings.filter(
+    (f): f is ImpactAnalysisFinding => f.type === "impact-analysis"
+  );
+  
+  if (impactFindings.length > 0) {
+    // Get category finding to determine which files are product code
+    const categoryFinding = findings.find(
+      (f) => f.type === "file-category"
+    ) as FileCategoryFinding | undefined;
+    
+    if (categoryFinding) {
+      // Only consider product code files (not docs, tests, config, etc.)
+      const nonProductCategories: FileCategory[] = ["docs", "tests", "config"];
+      const productFiles = new Set(
+        Object.entries(categoryFinding.categories)
+          .filter(([cat]) => !nonProductCategories.includes(cat as FileCategory))
+          .flatMap(([, files]) => files)
+      );
+
+      for (const impact of impactFindings) {
+        // Only count blast radius if the source file is product code
+        if (productFiles.has(impact.sourceFile)) {
+          if (impact.blastRadius === "high") {
+            const weight = 20;
+            score += weight;
+            evidenceBullets.push(`⚠️ High blast radius: ${impact.sourceFile} (${impact.affectedFiles.length} dependents)`);
+            factors.push({
+              kind: "high-blast-radius",
+              weight,
+              explanation: `High blast radius file modified: ${impact.sourceFile} (${impact.affectedFiles.length} dependents)`,
+              evidence: impact.evidence.slice(0, 3),
+            });
+          } else if (impact.blastRadius === "medium") {
+            const weight = 10;
+            score += weight;
+            evidenceBullets.push(`⚡ Medium blast radius: ${impact.sourceFile} (${impact.affectedFiles.length} dependents)`);
+            factors.push({
+              kind: "medium-blast-radius",
+              weight,
+              explanation: `Medium blast radius file modified: ${impact.sourceFile} (${impact.affectedFiles.length} dependents)`,
+              evidence: impact.evidence.slice(0, 2),
+            });
+          }
+        }
+      }
     }
   }
 

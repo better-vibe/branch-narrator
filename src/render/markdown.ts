@@ -10,13 +10,11 @@ import type {
   CloudflareChangeFinding,
   ConventionViolationFinding,
   DbMigrationFinding,
-  DependencyChangeFinding,
   EnvVarFinding,
   FileCategoryFinding,
   FileSummaryFinding,
   Finding,
   GraphQLChangeFinding,
-  ImpactAnalysisFinding,
   InfraChangeFinding,
   LargeDiffFinding,
   LockfileFinding,
@@ -77,7 +75,7 @@ function renderSummary(
   _context: RenderContext,
   summaryData: ReturnType<typeof buildSummaryData>
 ): string {
-  const { diffstat, reviewAttention, topFindings, hasChangesets } = summaryData;
+  const { diffstat, reviewAttention, changesetFiles } = summaryData;
   const bullets: string[] = [];
 
   // Files line with diffstat
@@ -88,14 +86,10 @@ function renderSummary(
     bullets.push(`Review attention: ${reviewAttention} (blast radius)`);
   }
 
-  // Key highlights from top findings (first 3)
-  for (const finding of topFindings.slice(0, 3)) {
-    bullets.push(finding.description);
-  }
-
-  // Changeset mention
-  if (hasChangesets) {
-    bullets.push("Changeset added");
+  // Changeset mention with count
+  if (changesetFiles.length > 0) {
+    const count = changesetFiles.length;
+    bullets.push(`${count} changeset${count > 1 ? "s" : ""} added`);
   }
 
   return `## Summary\n\n${bullets.map((b) => `- ${b}`).join("\n")}\n\n`;
@@ -216,9 +210,15 @@ function renderWhatChanged(
   // Changesets section (separate from docs)
   if (changesetFiles.length > 0) {
     output += `### Changesets (${changesetFiles.length})\n\n`;
-    for (const file of changesetFiles) {
+    // Show up to 5 changesets, summarize the rest
+    const displayCount = Math.min(changesetFiles.length, 5);
+    for (let i = 0; i < displayCount; i++) {
+      const file = changesetFiles[i];
       const status = fileSummary.added.includes(file) ? " *(new)*" : "";
       output += `- \`${file}\`${status}\n`;
+    }
+    if (changesetFiles.length > 5) {
+      output += `- *...and ${changesetFiles.length - 5} more*\n`;
     }
     output += "\n";
   }
@@ -478,42 +478,6 @@ function renderCloudflare(changes: CloudflareChangeFinding[]): string {
     output += "**Files:**\n";
     for (const file of change.files) {
       output += `- \`${file}\`\n`;
-    }
-    output += "\n";
-  }
-
-  return output;
-}
-
-/**
- * Render Dependencies section.
- */
-function renderDependencies(deps: DependencyChangeFinding[]): string {
-  if (deps.length === 0) {
-    return "";
-  }
-
-  const prodDeps = deps.filter((d) => d.section === "dependencies");
-  const devDeps = deps.filter((d) => d.section === "devDependencies");
-
-  let output = "### Dependencies\n\n";
-
-  if (prodDeps.length > 0) {
-    output += "**Production**\n\n";
-    output += "| Package | From | To | Impact |\n";
-    output += "|---------|------|-----|--------|\n";
-    for (const dep of prodDeps) {
-      output += `| \`${dep.name}\` | ${dep.from ?? "-"} | ${dep.to ?? "-"} | ${dep.impact ?? "-"} |\n`;
-    }
-    output += "\n";
-  }
-
-  if (devDeps.length > 0) {
-    output += "**Dev Dependencies**\n\n";
-    output += "| Package | From | To | Impact |\n";
-    output += "|---------|------|-----|--------|\n";
-    for (const dep of devDeps) {
-      output += `| \`${dep.name}\` | ${dep.from ?? "-"} | ${dep.to ?? "-"} | ${dep.impact ?? "-"} |\n`;
     }
     output += "\n";
   }
@@ -1482,59 +1446,6 @@ function renderWarnings(groups: Map<string, Finding[]>): string {
 }
 
 /**
- * Render Impact Analysis section (trimmed to high/medium only, capped).
- * Low blast radius entries are omitted since they add noise without actionable info.
- * The section is skipped entirely when impact is already represented in Top findings.
- */
-function renderImpactAnalysis(
-  impacts: ImpactAnalysisFinding[]
-): string {
-  if (impacts.length === 0) {
-    return "";
-  }
-
-  // Only show high and medium blast radius - low adds noise
-  const significantImpacts = impacts.filter(
-    (i) => i.blastRadius === "high" || i.blastRadius === "medium"
-  );
-
-  if (significantImpacts.length === 0) {
-    return "";
-  }
-
-  // Sort by blast radius priority: high first, medium second
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  const sortedImpacts = [...significantImpacts].sort(
-    (a, b) => priorityOrder[a.blastRadius] - priorityOrder[b.blastRadius]
-  );
-
-  // Cap the number of entries displayed
-  const MAX_IMPACT_ENTRIES = 5;
-  const MAX_DEPENDENTS_PER_ENTRY = 3;
-  const displayImpacts = sortedImpacts.slice(0, MAX_IMPACT_ENTRIES);
-  const omittedCount = sortedImpacts.length - displayImpacts.length;
-
-  let output = "### Impact Analysis\n\n";
-  for (const impact of displayImpacts) {
-    output += `**\`${impact.sourceFile}\`** - Blast Radius: ${impact.blastRadius.toUpperCase()} (${impact.affectedFiles.length} files)\n\n`;
-    output += "Affected files:\n";
-    for (const f of impact.affectedFiles.slice(0, MAX_DEPENDENTS_PER_ENTRY)) {
-      output += `- \`${f}\`\n`;
-    }
-    if (impact.affectedFiles.length > MAX_DEPENDENTS_PER_ENTRY) {
-      output += `- ...and ${impact.affectedFiles.length - MAX_DEPENDENTS_PER_ENTRY} more\n`;
-    }
-    output += "\n";
-  }
-
-  if (omittedCount > 0) {
-    output += `*...and ${omittedCount} more files with significant blast radius*\n\n`;
-  }
-
-  return output;
-}
-
-/**
  * Render Convention Violations.
  */
 function renderConventionViolations(
@@ -1567,10 +1478,6 @@ function renderDetails(
   groups: Map<string, Finding[]>
 ): string {
   let detailsContent = "";
-
-  // Impact Analysis
-  const impacts = getFindings<ImpactAnalysisFinding>(groups, "impact-analysis");
-  detailsContent += renderImpactAnalysis(impacts);
 
   // Routes / API
   const routes = getFindings<RouteChangeFinding>(groups, "route-change");
@@ -1646,11 +1553,7 @@ function renderDetails(
   const cloudflare = getFindings<CloudflareChangeFinding>(groups, "cloudflare-change");
   detailsContent += renderCloudflare(cloudflare);
 
-  // Dependencies detail table (only if there are deps not fully covered by the
-  // promoted primary section -- we always show the detail table for completeness
-  // since the primary section is a summary and the detail table has full versions)
-  const deps = getFindings<DependencyChangeFinding>(groups, "dependency-change");
-  detailsContent += renderDependencies(deps);
+  // Dependencies are shown in the primary section, skip in details to avoid duplication
 
   // Package API (exports)
   const packageExports = getFindings<PackageExportsFinding>(groups, "package-exports");

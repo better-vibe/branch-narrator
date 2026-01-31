@@ -103,7 +103,7 @@ describe("renderMarkdown", () => {
     expect(markdown).toContain("src/lib/config.ts");
   });
 
-  it("should render dependencies section in details", () => {
+  it("should render dependencies section in primary output", () => {
     const findings: Finding[] = [
       {
         type: "dependency-change",
@@ -125,16 +125,12 @@ describe("renderMarkdown", () => {
 
     const markdown = renderMarkdown(createContext(findings));
 
-    // Dependencies are now in the details section
-    expect(markdown).toContain("<details>");
-    expect(markdown).toContain("### Dependencies");
-    expect(markdown).toContain("**Production**");
+    // Dependencies are now in the primary section, not details
+    expect(markdown).toContain("## Dependencies");
     expect(markdown).toContain("`@sveltejs/kit`");
-    expect(markdown).toContain("^1.0.0");
-    expect(markdown).toContain("^2.0.0");
-    expect(markdown).toContain("major");
-    expect(markdown).toContain("**Dev Dependencies**");
-    expect(markdown).toContain("`vitest`");
+    expect(markdown).toContain("vitest");
+    // Dependencies should not be in details section anymore
+    expect(markdown).not.toContain("<details>");
   });
 
   it("should render test plan", () => {
