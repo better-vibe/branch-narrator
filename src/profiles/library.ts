@@ -16,6 +16,7 @@ import {
   analyzeLockfiles,
   analyzeCIWorkflows,
   analyzeAPIContracts,
+  drizzleAnalyzer,
 } from "../analyzers/index.js";
 import { packageExportsAnalyzer } from "../analyzers/package-exports.js";
 import { typescriptConfigAnalyzer } from "../analyzers/typescript-config.js";
@@ -39,5 +40,6 @@ export const libraryProfile: Profile = {
     analyzeLockfiles,
     analyzeCIWorkflows,
     analyzeAPIContracts,
+    drizzleAnalyzer,
   ],
 };

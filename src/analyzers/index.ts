@@ -58,3 +58,8 @@ export { linterConfigAnalyzer } from "./linter-config.js";
 export { playwrightAnalyzer } from "./playwright.js";
 export { dockerAnalyzer } from "./docker.js";
 export { turborepoAnalyzer } from "./turborepo.js";
+export { drizzleAnalyzer } from "./drizzle.js";
+export { tanstackQueryAnalyzer } from "./tanstack-query.js";
+export { trpcRouterAnalyzer } from "./trpc-router.js";
+export { svelte5RunesAnalyzer } from "./svelte5-runes.js";
+export { rscBoundaryAnalyzer } from "./rsc-boundary.js";

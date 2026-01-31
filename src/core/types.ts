@@ -805,6 +805,129 @@ export interface TurborepoConfigFinding {
   findingId?: string;
 }
 
+// ============================================================================
+// Drizzle ORM Finding Types
+// ============================================================================
+
+export interface DrizzleSchemaFinding {
+  type: "drizzle-schema";
+  kind: "drizzle-schema";
+  category: "database";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  isBreaking: boolean;
+  breakingChanges: string[];
+  addedTables: string[];
+  removedTables: string[];
+  modifiedTables: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// TanStack Query Finding Types
+// ============================================================================
+
+export interface TanStackQueryFinding {
+  type: "tanstack-query";
+  kind: "tanstack-query";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  queryChanges: Array<{
+    name: string;
+    type: "query" | "mutation" | "infinite";
+    operation: "added" | "removed" | "modified";
+    queryKey?: string[];
+    isBreaking: boolean;
+    reason?: string;
+  }>;
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// tRPC Router Finding Types
+// ============================================================================
+
+export interface TRPCRouterFinding {
+  type: "trpc-router";
+  kind: "trpc-router";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  routerName: string;
+  procedureChanges: Array<{
+    name: string;
+    type: "query" | "mutation" | "subscription";
+    operation: "added" | "removed" | "modified";
+    isBreaking: boolean;
+    reason?: string;
+  }>;
+  isBreaking: boolean;
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// Svelte 5 Runes Finding Types
+// ============================================================================
+
+export interface Svelte5RunesFinding {
+  type: "svelte5-runes";
+  kind: "svelte5-runes";
+  category: "api";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  runeChanges: Array<{
+    rune: "$state" | "$derived" | "$effect" | "$props" | "$inspect" | "$bindable";
+    operation: "added" | "removed" | "modified";
+    variableName?: string;
+    isBreaking: boolean;
+  }>;
+  migrationPattern?: {
+    from: "svelte4" | "svelte5";
+    to: "svelte4" | "svelte5";
+  };
+  tags?: string[];
+  findingId?: string;
+}
+
+// ============================================================================
+// React Server Components Finding Types
+// ============================================================================
+
+export interface RSCBoundaryFinding {
+  type: "rsc-boundary";
+  kind: "rsc-boundary";
+  category: "routes";
+  confidence: Confidence;
+  evidence: Evidence[];
+  file: string;
+  status: FileStatus;
+  boundaryType: "server" | "client" | "unknown";
+  directiveChange: {
+    from: "use server" | "use client" | null;
+    to: "use server" | "use client" | null;
+  };
+  imports: {
+    serverOnly: boolean;
+    clientOnly: boolean;
+  };
+  isBreaking: boolean;
+  breakingReasons: string[];
+  tags?: string[];
+  findingId?: string;
+}
+
 export type Finding =
   | FileSummaryFinding
   | DependencyChangeFinding
@@ -844,7 +967,12 @@ export type Finding =
   | LinterConfigFinding
   | PlaywrightConfigFinding
   | DockerChangeFinding
-  | TurborepoConfigFinding;
+  | TurborepoConfigFinding
+  | DrizzleSchemaFinding
+  | TanStackQueryFinding
+  | TRPCRouterFinding
+  | Svelte5RunesFinding
+  | RSCBoundaryFinding;
 
 // ============================================================================
 // Risk Score

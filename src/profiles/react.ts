@@ -1,5 +1,5 @@
 /**
- * React profile - composes analyzers for React projects.
+ * React profile - composes analyzers for React SPA projects.
  */
 
 import type { Profile } from "../core/types.js";
@@ -19,12 +19,15 @@ import {
   analyzeCIWorkflows,
   analyzeInfra,
   analyzeAPIContracts,
+  drizzleAnalyzer,
+  tanstackQueryAnalyzer,
+  trpcRouterAnalyzer,
 } from "../analyzers/index.js";
 import { tailwindAnalyzer } from "../analyzers/tailwind.js";
 import { typescriptConfigAnalyzer } from "../analyzers/typescript-config.js";
 
 /**
- * React profile with all relevant analyzers.
+ * React profile with all relevant analyzers for React SPA projects.
  */
 export const reactProfile: Profile = {
   name: "react",
@@ -46,5 +49,8 @@ export const reactProfile: Profile = {
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
+    drizzleAnalyzer,
+    tanstackQueryAnalyzer,
+    trpcRouterAnalyzer,
   ],
 };

@@ -20,6 +20,9 @@ import {
   analyzeCIWorkflows,
   analyzeInfra,
   analyzeAPIContracts,
+  drizzleAnalyzer,
+  svelte5RunesAnalyzer,
+  trpcRouterAnalyzer,
 } from "../analyzers/index.js";
 import { tailwindAnalyzer } from "../analyzers/tailwind.js";
 
@@ -46,5 +49,8 @@ export const sveltekitProfile: Profile = {
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
+    drizzleAnalyzer,
+    svelte5RunesAnalyzer,
+    trpcRouterAnalyzer,
   ],
 };

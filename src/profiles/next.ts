@@ -18,6 +18,10 @@ import {
   securityFilesAnalyzer,
   vitestAnalyzer,
   impactAnalyzer,
+  drizzleAnalyzer,
+  tanstackQueryAnalyzer,
+  trpcRouterAnalyzer,
+  rscBoundaryAnalyzer,
 } from "../analyzers/index.js";
 import { nextRoutesAnalyzer } from "../analyzers/next-routes.js";
 import { tailwindAnalyzer } from "../analyzers/tailwind.js";
@@ -44,5 +48,9 @@ export const nextProfile: Profile = {
     analyzeCIWorkflows,
     analyzeInfra,
     analyzeAPIContracts,
+    drizzleAnalyzer,
+    tanstackQueryAnalyzer,
+    trpcRouterAnalyzer,
+    rscBoundaryAnalyzer,
   ],
 };
