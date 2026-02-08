@@ -16,6 +16,7 @@
 - [x] Facts command (schema v2.1) with highlights, actions, and changeset warnings
 - [x] Risk report with derived flags, stable IDs, and five-level scale
 - [x] Dump-diff JSON schema v2.0 with chunking and per-file hunks
+- [x] Fix dump-diff --patch-for from subdirectories
 - [x] Zoom, Snap, and Cache commands
 - [x] DOD diff parser and caching for ChangeSet + analyzers
 - [x] Profiles: SvelteKit, Next.js, React, Vue/Nuxt, Astro, Stencil, Angular, Python, Library, Vite

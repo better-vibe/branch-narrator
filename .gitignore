@@ -34,4 +34,4 @@ website/dist/
 
 # branch-narrator cache and data
 .branch-narrator/
-
+.repo-slice/

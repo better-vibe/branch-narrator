@@ -3,6 +3,7 @@
  * Tests diff output in various formats with real git repositories.
  */
 
+import { join } from "node:path";
 import { describe, expect, it, afterEach } from "bun:test";
 import {
   createTestRepo,
@@ -142,6 +143,40 @@ describe("dump-diff command - JSON format", () => {
 
     expect(output.files[0].stats).toBeDefined();
     expect(output.files[0].stats.added).toBeGreaterThan(0);
+  });
+
+  it("should resolve --patch-for from repo root when run in subdir", async () => {
+    currentRepo = await createTestRepo({
+      files: {
+        "docs/05-cli/examples.md": "Example docs content",
+      },
+    });
+
+    const { stdout, exitCode } = await runCli(
+      [
+        "dump-diff",
+        "--format",
+        "json",
+        "--mode",
+        "branch",
+        "--base",
+        currentRepo.base,
+        "--head",
+        currentRepo.head,
+        "--no-timestamp",
+        "--patch-for",
+        "docs/05-cli/examples.md",
+      ],
+      join(currentRepo.cwd, "docs")
+    );
+
+    expect(exitCode).toBe(0);
+
+    const output = JSON.parse(stdout);
+
+    expect(output.files).toHaveLength(1);
+    expect(output.files[0].path).toBe("docs/05-cli/examples.md");
+    expect(output.files[0].patch?.text).toContain("docs/05-cli/examples.md");
   });
 });
 

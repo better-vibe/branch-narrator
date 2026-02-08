@@ -6,6 +6,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { BranchNarratorError } from "../../core/errors.js";
 import { warn, info } from "../../core/logger.js";
+import { getRepoRoot } from "../../git/collector.js";
 import {
   buildDumpDiffJsonV2,
   calculateTotalChars,
@@ -90,6 +91,7 @@ const UNTRACKED_CONCURRENCY_LIMIT = 8;
  */
 export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
+  const gitCwd = await getRepoRoot(cwd);
 
   // Warn if base/head provided with non-branch mode
   if (options.mode !== "branch") {
@@ -104,22 +106,22 @@ export async function executeDumpDiff(options: DumpDiffOptions): Promise<void> {
 
   // Route to specialized handlers for new modes
   if (options.patchFor) {
-    await handlePatchFor(options, cwd);
+    await handlePatchFor(options, gitCwd);
     return;
   }
 
   if (options.nameOnly) {
-    await handleNameOnly(options, cwd);
+    await handleNameOnly(options, gitCwd);
     return;
   }
 
   if (options.stat) {
-    await handleStat(options, cwd);
+    await handleStat(options, gitCwd);
     return;
   }
 
   // Default: full diff mode (original behavior)
-  await handleFullDiff(options, cwd);
+  await handleFullDiff(options, gitCwd);
 }
 
 // ============================================================================
