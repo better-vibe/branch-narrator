@@ -1,5 +1,11 @@
 # @better-vibe/branch-narrator
 
+## 1.14.2
+
+### Patch Changes
+
+- ad7234f: Fix dump-diff --patch-for when run from subdirectories.
+
 ## 1.14.1
 
 ### Patch Changes
