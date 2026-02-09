@@ -2,6 +2,10 @@
   "name": "@better-vibe/branch-narrator",
   "version": "1.14.2",
   "description": "A local-first CLI that reads git diff and generates structured PR descriptions",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/better-vibe/branch-narrator"
+  },
   "type": "module",
   "bin": {
     "branch-narrator": "dist/cli.js"
