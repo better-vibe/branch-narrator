@@ -33,7 +33,6 @@ import {
   getNumStats,
   getUntrackedFileDiff,
   getUntrackedFiles,
-  isBinaryFile,
   isUntrackedBinaryFile,
 } from "./git.js";
 
@@ -638,12 +637,86 @@ async function handleStat(options: DumpDiffOptions, cwd: string): Promise<void> 
   }
 }
 
+export interface PatchTargetResolution {
+  kind: "file" | "directory";
+  targets: FileEntry[];
+}
+
 /**
- * Handle --patch-for mode (single file diff).
+ * Normalize a patch selector path for matching.
+ * Uses repo-relative slash-separated paths.
+ */
+export function normalizePatchSelectorPath(path: string): string {
+  const normalized = path.replaceAll("\\", "/").replace(/^\.\/+/, "");
+  if (normalized === "." || normalized === "") {
+    return ".";
+  }
+  return normalized.replace(/\/+$/, "");
+}
+
+/**
+ * Check whether a file path is within a requested directory selector.
+ */
+export function pathMatchesPatchDirectory(
+  candidatePath: string | undefined,
+  directorySelector: string
+): boolean {
+  if (!candidatePath) {
+    return false;
+  }
+  if (directorySelector === ".") {
+    return true;
+  }
+  return candidatePath === directorySelector || candidatePath.startsWith(`${directorySelector}/`);
+}
+
+/**
+ * Resolve --patch-for selector to one file or a directory set.
+ * Exact file match takes precedence over directory expansion.
+ */
+export function resolvePatchTargets(
+  files: FileEntry[],
+  requestedPath: string
+): PatchTargetResolution | null {
+  const normalizedRequested = normalizePatchSelectorPath(requestedPath);
+  const explicitDirectory = requestedPath.endsWith("/");
+
+  if (!explicitDirectory) {
+    const exactMatch = files.find((file) => {
+      const normalizedPath = normalizePatchSelectorPath(file.path);
+      const normalizedOldPath = file.oldPath
+        ? normalizePatchSelectorPath(file.oldPath)
+        : undefined;
+      return (
+        normalizedPath === normalizedRequested ||
+        normalizedOldPath === normalizedRequested
+      );
+    });
+
+    if (exactMatch) {
+      return { kind: "file", targets: [exactMatch] };
+    }
+  }
+
+  const directoryTargets = files.filter(
+    (file) =>
+      pathMatchesPatchDirectory(file.path, normalizedRequested) ||
+      pathMatchesPatchDirectory(file.oldPath, normalizedRequested)
+  );
+
+  if (directoryTargets.length === 0) {
+    return null;
+  }
+
+  return { kind: "directory", targets: directoryTargets };
+}
+
+/**
+ * Handle --patch-for mode (file or directory diff).
  */
 async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<void> {
   if (!options.patchFor) {
-    throw new BranchNarratorError("--patch-for requires a file path", 1);
+    throw new BranchNarratorError("--patch-for requires a file or folder path", 1);
   }
 
   const requestedPath = options.patchFor;
@@ -668,23 +741,23 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
   }
 
   const combinedFiles = [...allFiles, ...untrackedFiles];
+  const targetResolution = resolvePatchTargets(combinedFiles, requestedPath);
 
-  // Find the file (support both old and new paths for renames)
-  let targetFile = combinedFiles.find(
-    (f) => f.path === requestedPath || f.oldPath === requestedPath
-  );
-
-  if (!targetFile) {
+  if (!targetResolution) {
     throw new BranchNarratorError(
-      `File not found in changes: ${requestedPath}. ` +
+      `File or folder not found in changes: ${requestedPath}. ` +
         `Run 'branch-narrator dump-diff --name-only' to see changed files.`,
       1
     );
   }
 
-  // Check if file is excluded
+  const targetFiles = [...targetResolution.targets].sort((a, b) =>
+    a.path.localeCompare(b.path)
+  );
+
+  // Check if target files are excluded
   const { included, skipped } = filterPaths({
-    files: [targetFile],
+    files: targetFiles,
     includeGlobs: options.include,
     excludeGlobs: options.exclude,
     defaultExcludes: DEFAULT_EXCLUDES,
@@ -692,119 +765,240 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
 
   if (included.length === 0) {
     const skipReason = skipped[0]?.reason || "excluded";
+    const includeHint = targetResolution.kind === "directory"
+      ? `${normalizePatchSelectorPath(requestedPath)}/**`
+      : requestedPath;
     throw new BranchNarratorError(
-      `File is excluded: ${requestedPath} (reason: ${skipReason}). ` +
-        `Use --include "${requestedPath}" to include it.`,
+      `Requested file or folder is excluded: ${requestedPath} (reason: ${skipReason}). ` +
+        `Use --include "${includeHint}" to include it.`,
       1
     );
   }
 
-  // Check if binary
-  let isBinary: boolean;
-  if (targetFile.untracked) {
-    isBinary = await isUntrackedBinaryFile(targetFile.path, cwd);
-  } else {
-    isBinary = await isBinaryFile({
+  const trackedIncluded = included.filter((file) => !file.untracked);
+  const untrackedIncluded = included.filter((file) => file.untracked);
+
+  // Batch stats for tracked files (used for both stats and binary detection).
+  let statsMap: Map<string, import("./git.js").FileStats> = new Map();
+  if (trackedIncluded.length > 0) {
+    statsMap = await getNumStats({
       mode: options.mode,
       base: options.base,
       head: options.head,
-      path: targetFile.path,
       cwd,
     });
   }
 
-  if (isBinary) {
-    // Still report in JSON format
-    if (options.format === "json") {
-      const skippedFiles: SkippedFile[] = [
-        {
-          path: targetFile.path,
-          status: targetFile.status,
-          reason: "binary",
-        },
-      ];
+  const binarySkipped: SkippedEntry[] = [];
+  const textFiles: FileEntry[] = [];
 
-      const output = buildDumpDiffJsonV2(
-        {
-          mode: options.mode,
-          base: options.base,
-          head: options.head,
-          unified: options.unified,
-          include: options.include,
-          exclude: options.exclude,
-          includeUntracked: options.includeUntracked,
-          nameOnly: false,
-          stat: false,
-          patchFor: requestedPath,
-          noTimestamp: options.noTimestamp ?? false,
-        },
-        [],
-        skippedFiles,
-        1
-      );
-
-      const json = renderDumpDiffJson(output, options.pretty);
-      if (options.out) {
-        await writeOutput(options.out, json);
-        info(`Wrote JSON output to ${options.out}`);
-      } else {
-        console.log(json);
-      }
+  for (const file of trackedIncluded) {
+    const fileStats = statsMap.get(file.path);
+    if (fileStats?.binary) {
+      binarySkipped.push({
+        path: file.path,
+        status: file.status,
+        reason: "binary",
+      });
     } else {
+      textFiles.push(file);
+    }
+  }
+
+  if (untrackedIncluded.length > 0) {
+    const untrackedCheckTasks = untrackedIncluded.map((file) => async () => ({
+        file,
+        isBinary: await isUntrackedBinaryFile(file.path, cwd),
+      }));
+
+    const untrackedChecks = await limitConcurrency(
+      untrackedCheckTasks,
+      UNTRACKED_CONCURRENCY_LIMIT
+    );
+
+    for (const result of untrackedChecks) {
+      if (result.isBinary) {
+        binarySkipped.push({
+          path: result.file.path,
+          status: result.file.status,
+          reason: "binary",
+        });
+      } else {
+        textFiles.push(result.file);
+      }
+    }
+  }
+
+  if (textFiles.length === 0) {
+    if (options.format !== "json" && binarySkipped.length > 0) {
+      // Preserve single-file binary behavior for text/markdown mode.
+      if (targetResolution.kind === "file") {
+        throw new BranchNarratorError(`File is binary: ${requestedPath}`, 1);
+      }
       throw new BranchNarratorError(
-        `File is binary: ${requestedPath}`,
+        `Folder contains only binary changes: ${requestedPath}. Use --format json to inspect skipped files.`,
         1
       );
+    }
+
+    const skippedFiles: SkippedFile[] = [...skipped, ...binarySkipped].map((entry) => ({
+      path: entry.path,
+      status: entry.status,
+      reason: entry.reason,
+      note: entry.note,
+    }));
+
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        unified: options.unified,
+        include: options.include,
+        exclude: options.exclude,
+        includeUntracked: options.includeUntracked,
+        nameOnly: false,
+        stat: false,
+        patchFor: requestedPath,
+        noTimestamp: options.noTimestamp ?? false,
+      },
+      [],
+      skippedFiles,
+      targetFiles.length
+    );
+
+    const json = renderDumpDiffJson(output, options.pretty);
+    if (options.out) {
+      await writeOutput(options.out, json);
+      info(`Wrote JSON output to ${options.out}`);
+    } else {
+      console.log(json);
     }
     return;
   }
 
-  // Get diff for the file
-  let diff: string;
-  if (targetFile.untracked) {
-    diff = await getUntrackedFileDiff(targetFile.path, options.unified, cwd);
-  } else {
-    diff = await getFileDiff({
-      mode: options.mode,
-      base: options.base,
-      head: options.head,
-      path: targetFile.path,
-      oldPath: targetFile.oldPath,
-      unified: options.unified,
-      cwd,
+  const sortedTextFiles = [...textFiles].sort((a, b) => a.path.localeCompare(b.path));
+
+  const diffTasks = sortedTextFiles.map((file) => async (): Promise<DiffFileEntry> => {
+      const diff = file.untracked
+        ? await getUntrackedFileDiff(file.path, options.unified, cwd)
+        : await getFileDiff({
+            mode: options.mode,
+            base: options.base,
+            head: options.head,
+            path: file.path,
+            oldPath: file.oldPath,
+            unified: options.unified,
+            cwd,
+          });
+
+      return {
+        path: file.path,
+        oldPath: file.oldPath,
+        status: file.status,
+        untracked: file.untracked,
+        diff,
+      };
     });
+
+  const diffEntries = await limitConcurrency(
+    diffTasks,
+    UNTRACKED_CONCURRENCY_LIMIT
+  );
+
+  const nonEmptyDiffEntries: DiffFileEntry[] = [];
+  const diffEmptySkipped: SkippedFile[] = [];
+  for (const entry of diffEntries) {
+    if (!entry.diff.trim()) {
+      diffEmptySkipped.push({
+        path: entry.path,
+        status: entry.status,
+        reason: "diff-empty",
+      });
+      continue;
+    }
+    nonEmptyDiffEntries.push(entry);
   }
 
-  // Get stats if in JSON format
-  let stats: { added: number; removed: number } | undefined;
-  if (options.format === "json") {
-    const statsMap = await getNumStats({
-      mode: options.mode,
-      base: options.base,
-      head: options.head,
-      cwd,
-    });
-    const fileStats = statsMap.get(targetFile.path);
-    if (fileStats && !fileStats.binary) {
-      stats = { added: fileStats.added, removed: fileStats.removed };
+  if (nonEmptyDiffEntries.length === 0) {
+    if (options.format !== "json") {
+      throw new BranchNarratorError(
+        `No text diff found for requested file or folder: ${requestedPath}.`,
+        1
+      );
     }
+
+    const skippedFiles: SkippedFile[] = [
+      ...skipped,
+      ...binarySkipped,
+      ...diffEmptySkipped,
+    ].map((entry) => ({
+      path: entry.path,
+      status: entry.status,
+      reason: entry.reason,
+      note: entry.note,
+    }));
+
+    const output = buildDumpDiffJsonV2(
+      {
+        mode: options.mode,
+        base: options.base,
+        head: options.head,
+        unified: options.unified,
+        include: options.include,
+        exclude: options.exclude,
+        includeUntracked: options.includeUntracked,
+        nameOnly: false,
+        stat: false,
+        patchFor: requestedPath,
+        noTimestamp: options.noTimestamp ?? false,
+      },
+      [],
+      skippedFiles,
+      targetFiles.length
+    );
+
+    const json = renderDumpDiffJson(output, options.pretty);
+    if (options.out) {
+      await writeOutput(options.out, json);
+      info(`Wrote JSON output to ${options.out}`);
+    } else {
+      console.log(json);
+    }
+    return;
   }
 
   // Output based on format
   if (options.format === "json") {
-    const hunks = parseDiffIntoHunks(diff);
+    const files: DiffFile[] = nonEmptyDiffEntries.map((entry) => {
+      const fileStats = statsMap.get(entry.path);
+      const stats = fileStats && !fileStats.binary
+        ? { added: fileStats.added, removed: fileStats.removed }
+        : undefined;
 
-    // Build file with both patch.text and patch.hunks for --patch-for
-    const files: DiffFile[] = [
-      {
-        path: targetFile.path,
-        oldPath: targetFile.oldPath,
-        status: targetFile.status,
-        untracked: targetFile.untracked,
+      return {
+        path: entry.path,
+        oldPath: entry.oldPath,
+        status: entry.status,
+        untracked: entry.untracked,
         stats,
-        patch: { text: diff, hunks },
-      },
-    ];
+        patch: {
+          text: entry.diff,
+          hunks: parseDiffIntoHunks(entry.diff),
+        },
+      };
+    });
+
+    const skippedFiles: SkippedFile[] = [
+      ...skipped,
+      ...binarySkipped,
+      ...diffEmptySkipped,
+    ].map((entry) => ({
+      path: entry.path,
+      status: entry.status,
+      reason: entry.reason,
+      note: entry.note,
+    }));
 
     const output = buildDumpDiffJsonV2(
       {
@@ -821,8 +1015,8 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
         noTimestamp: options.noTimestamp ?? false,
       },
       files,
-      [],
-      1
+      skippedFiles,
+      targetFiles.length
     );
 
     const json = renderDumpDiffJson(output, options.pretty);
@@ -834,11 +1028,17 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
     }
   } else if (options.format === "md") {
     const lines: string[] = [];
-    lines.push(`# Diff for \`${targetFile.path}\`\n`);
-    lines.push("```diff");
-    lines.push(diff);
-    lines.push("```");
-    const output = lines.join("\n");
+    lines.push(`# Diff for \`${requestedPath}\``);
+    lines.push("");
+    for (const entry of nonEmptyDiffEntries) {
+      lines.push(`## \`${entry.path}\``);
+      lines.push("");
+      lines.push("```diff");
+      lines.push(entry.diff);
+      lines.push("```");
+      lines.push("");
+    }
+    const output = lines.join("\n").trimEnd();
     if (options.out) {
       await writeOutput(options.out, output);
       info(`Wrote markdown output to ${options.out}`);
@@ -847,11 +1047,12 @@ async function handlePatchFor(options: DumpDiffOptions, cwd: string): Promise<vo
     }
   } else {
     // text format
+    const output = renderText(nonEmptyDiffEntries);
     if (options.out) {
-      await writeOutput(options.out, diff);
+      await writeOutput(options.out, output);
       info(`Wrote text output to ${options.out}`);
     } else {
-      console.log(diff);
+      console.log(output);
     }
   }
 }

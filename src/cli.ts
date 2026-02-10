@@ -579,7 +579,7 @@ program
   .option("--dry-run", "Preview what would be included/excluded", false)
   .option("--name-only", "Output only file list (no diffs)", false)
   .option("--stat", "Output file statistics (additions/deletions)", false)
-  .option("--patch-for <path>", "Output diff for a specific file only")
+  .option("--patch-for <path>", "Output diff for a specific file or folder")
   .option("--pretty", "Pretty-print JSON with 2-space indentation", false)
   .option("--no-timestamp", "Omit generatedAt for deterministic output", false)
   .action(async (options) => {

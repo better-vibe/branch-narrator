@@ -8,7 +8,7 @@ branch-narrator/
 │   ├── cli.ts                    # CLI entry point
 │   ├── index.ts                  # Library exports
 │   │
-│   ├── cache/                    # Global caching system
+│   ├── cache/                    # Project-local caching system
 │   │   ├── changeset.ts
 │   │   ├── analyzer.ts
 │   │   └── storage.ts

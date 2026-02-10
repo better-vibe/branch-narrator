@@ -1,6 +1,6 @@
 # Caching System
 
-branch-narrator includes a global caching system that improves performance by persisting intermediate results across executions.
+branch-narrator includes a project-local caching system that improves performance by persisting intermediate results across executions.
 
 ## Overview
 
@@ -9,7 +9,8 @@ The cache stores:
 - **Per-analyzer findings** - Results from individual analyzers
 - **Git ref resolutions** - SHA lookups for branch refs
 
-All cache data is stored locally in `.branch-narrator/cache/` within your project directory.
+All cache data is stored locally in `.branch-narrator/cache/` inside the current working directory where you run the command.
+This is branch-narrator's own cache, not Bun/npm package-manager cache.
 
 ## Cache Location
 
@@ -24,6 +25,32 @@ All cache data is stored locally in `.branch-narrator/cache/` within your projec
     └── git/
         └── refs.json       # Cached git ref resolutions
 ```
+
+## Install Location vs Cache Location
+
+`which branch-narrator` shows where the executable was resolved from (for example, `~/.bun/bin/branch-narrator`).
+It does **not** indicate where branch-narrator stores cache data.
+
+branch-narrator cache paths are derived from `process.cwd()`, so location depends on the directory you run from.
+
+## Cache Location by Invocation Mode
+
+| Invocation mode | Where binary/package is resolved | branch-narrator cache path |
+|-----------------|----------------------------------|----------------------------|
+| Global Bun install (`bun add -g @better-vibe/branch-narrator`) | Binary typically symlinked into `~/.bun/bin/` | `<cwd>/.branch-narrator/cache/` |
+| `bunx @better-vibe/branch-narrator ...` | Package pulled from Bun cache (default `~/.bun/install/cache`) | `<cwd>/.branch-narrator/cache/` |
+| `npx @better-vibe/branch-narrator ...` | Package pulled from npm cache (default `~/.npm` on Posix) | `<cwd>/.branch-narrator/cache/` |
+| Local project install (`node_modules/.bin/branch-narrator`, scripts) | Binary in project `node_modules/.bin` | `<cwd>/.branch-narrator/cache/` |
+
+The same rule applies to snapshot state: `<cwd>/.branch-narrator/snapshots/`.
+
+## Working Directory Edge Cases
+
+- Run from repo root: cache goes to `<repo>/.branch-narrator/cache/`
+- Run from a subdirectory: cache goes to `<subdir>/.branch-narrator/cache/`
+- Different working directories create separate caches, even within the same git repository
+
+If you want a single cache per repository, run commands consistently from repo root.
 
 ## CLI Options
 
@@ -83,11 +110,12 @@ This two-entry limit policy supports undo scenarios while keeping cache size bou
 
 ## Statistics
 
-The cache tracks hit/miss statistics:
+The cache tracks location, hit/miss statistics, and size:
 
 ```bash
 $ branch-narrator cache stats --pretty
 {
+  "location": "/path/to/repo/.branch-narrator/cache",
   "hits": 42,
   "misses": 8,
   "hitRate": 84,
@@ -157,6 +185,7 @@ Use **cache** for:
 ### Atomic Writes
 
 All cache writes use atomic operations (temp file + rename) to prevent corruption from interrupted writes.
+Temporary files are written under the OS temp directory as `branch-narrator-*.tmp`, then moved into `.branch-narrator/cache/`.
 
 ### Concurrent Safety
 

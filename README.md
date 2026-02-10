@@ -128,6 +128,8 @@ See [`CHANGELOG.md`](CHANGELOG.md) for version history and release notes.
 - `--quiet` suppresses non-fatal diagnostics; `--debug` enables timing and
   detector logs.
 - `DEBUG=1` prints stack traces for debugging.
+- Cache and snapshots are stored under `<cwd>/.branch-narrator/` (current
+  working directory), regardless of where the CLI binary is installed.
 
 ### Global flags
 
@@ -301,7 +303,7 @@ branch-narrator dump-diff [options]
 | `--dry-run` | `false` | Preview what would be included/excluded |
 | `--name-only` | `false` | Output only file list (no diff content) |
 | `--stat` | `false` | Output file statistics |
-| `--patch-for <path>` | (none) | Output diff for a specific file only |
+| `--patch-for <path>` | (none) | Output diff for a specific file or folder |
 | `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 

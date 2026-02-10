@@ -294,6 +294,7 @@ Shows file lists, estimated sizes, and chunk counts.
 ## Global Caching Options
 
 These options can be used with any command to control caching behavior.
+The cache itself is project-local and stored at `<cwd>/.branch-narrator/cache/`.
 
 ### --no-cache
 

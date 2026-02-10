@@ -230,6 +230,7 @@ describe("storage utilities", () => {
   describe("getCacheStats", () => {
     it("should return empty stats for empty cache", async () => {
       const stats = await getCacheStats({ cwd: tempDir });
+      expect(stats.location).toBe(getCacheDir(tempDir));
       expect(stats.hits).toBe(0);
       expect(stats.misses).toBe(0);
       expect(stats.entries).toBe(0);

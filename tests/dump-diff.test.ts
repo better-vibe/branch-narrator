@@ -13,8 +13,11 @@ import {
   chunkByBudget,
   DEFAULT_EXCLUDES,
   filterPaths,
+  normalizePatchSelectorPath,
+  pathMatchesPatchDirectory,
   parseNameStatus,
   parseLsFilesOutput,
+  resolvePatchTargets,
   renderDumpDiffJson,
   renderMarkdown,
   renderText,
@@ -57,6 +60,94 @@ function createDiffEntry(
 ): DiffFileEntry {
   return { path, status, diff, oldPath, untracked };
 }
+
+// ============================================================================
+// --patch-for Target Resolution Tests
+// ============================================================================
+
+describe("--patch-for target resolution", () => {
+  it("should normalize patch selector paths", () => {
+    expect(normalizePatchSelectorPath("./src/utils/")).toBe("src/utils");
+    expect(normalizePatchSelectorPath("src\\utils\\file.ts")).toBe("src/utils/file.ts");
+    expect(normalizePatchSelectorPath(".")).toBe(".");
+  });
+
+  it("should match paths inside a directory selector", () => {
+    expect(pathMatchesPatchDirectory("src/a.ts", "src")).toBe(true);
+    expect(pathMatchesPatchDirectory("src/nested/b.ts", "src")).toBe(true);
+    expect(pathMatchesPatchDirectory("other/c.ts", "src")).toBe(false);
+  });
+
+  it("should prefer exact file match over directory expansion", () => {
+    const files: FileEntry[] = [
+      createFileEntry("src", "M"),
+      createFileEntry("src/index.ts", "M"),
+      createFileEntry("src/nested.ts", "M"),
+    ];
+
+    const resolved = resolvePatchTargets(files, "src");
+    expect(resolved).not.toBeNull();
+    expect(resolved?.kind).toBe("file");
+    expect(resolved?.targets).toHaveLength(1);
+    expect(resolved?.targets[0]?.path).toBe("src");
+  });
+
+  it("should resolve directory recursively when selector ends with slash", () => {
+    const files: FileEntry[] = [
+      createFileEntry("src/index.ts", "M"),
+      createFileEntry("src/nested/util.ts", "A"),
+      createFileEntry("docs/readme.md", "M"),
+    ];
+
+    const resolved = resolvePatchTargets(files, "src/");
+    expect(resolved).not.toBeNull();
+    expect(resolved?.kind).toBe("directory");
+    expect(resolved?.targets).toHaveLength(2);
+    expect(resolved?.targets.map((f) => f.path).sort()).toEqual([
+      "src/index.ts",
+      "src/nested/util.ts",
+    ]);
+  });
+
+  it("should resolve directory recursively without trailing slash", () => {
+    const files: FileEntry[] = [
+      createFileEntry("src/index.ts", "M"),
+      createFileEntry("src/nested/util.ts", "A"),
+      createFileEntry("docs/readme.md", "M"),
+    ];
+
+    const resolved = resolvePatchTargets(files, "src");
+    expect(resolved).not.toBeNull();
+    expect(resolved?.kind).toBe("directory");
+    expect(resolved?.targets).toHaveLength(2);
+    expect(resolved?.targets.map((f) => f.path).sort()).toEqual([
+      "src/index.ts",
+      "src/nested/util.ts",
+    ]);
+  });
+
+  it("should match directory selectors against rename oldPath", () => {
+    const files: FileEntry[] = [
+      createFileEntry("new/location.ts", "R", "src/old/location.ts"),
+      createFileEntry("docs/readme.md", "M"),
+    ];
+
+    const resolved = resolvePatchTargets(files, "src/old");
+    expect(resolved).not.toBeNull();
+    expect(resolved?.kind).toBe("directory");
+    expect(resolved?.targets).toHaveLength(1);
+    expect(resolved?.targets[0]?.path).toBe("new/location.ts");
+  });
+
+  it("should return null when no file or directory matches", () => {
+    const files: FileEntry[] = [
+      createFileEntry("src/index.ts", "M"),
+      createFileEntry("docs/readme.md", "M"),
+    ];
+
+    expect(resolvePatchTargets(files, "does-not-exist")).toBeNull();
+  });
+});
 
 // ============================================================================
 // buildNameStatusArgs Tests

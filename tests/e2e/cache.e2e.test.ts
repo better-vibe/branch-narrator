@@ -85,6 +85,7 @@ describe("cache stats", () => {
     const stats = JSON.parse(stdout);
     expect(stats.hits).toBe(0);
     expect(stats.misses).toBe(0);
+    expect(stats.location).toBe(join(cwd, ".branch-narrator", "cache"));
     expect(stats.entries).toBe(0);
     expect(stats.sizeBytes).toBe(0);
     expect(stats.hitRate).toBe(0);
@@ -101,6 +102,7 @@ describe("cache stats", () => {
     expect(stdout.split("\n").length).toBeGreaterThan(1);
     // Should still be valid JSON
     const stats = JSON.parse(stdout);
+    expect(stats.location).toBe(join(cwd, ".branch-narrator", "cache"));
     expect(stats.hits).toBe(0);
   });
 });

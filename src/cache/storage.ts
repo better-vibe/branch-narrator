@@ -312,6 +312,7 @@ export async function getCacheStats(
   options: CacheOptions = {}
 ): Promise<CacheStats> {
   const cwd = options.cwd ?? process.cwd();
+  const cacheDir = getCacheDir(cwd);
   const index = await readIndex(cwd);
 
   // Collect all entries
@@ -335,6 +336,7 @@ export async function getCacheStats(
   const hitRate = total > 0 ? Math.round((index.hits / total) * 100) : 0;
 
   return {
+    location: cacheDir,
     hits: index.hits,
     misses: index.misses,
     hitRate,

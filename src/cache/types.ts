@@ -46,6 +46,8 @@ export interface CacheIndex {
  * Cache statistics returned by getCacheStats().
  */
 export interface CacheStats {
+  /** Cache directory location on disk */
+  location: string;
   /** Total cache hits */
   hits: number;
   /** Total cache misses */

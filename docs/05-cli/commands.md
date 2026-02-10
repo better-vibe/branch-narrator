@@ -371,7 +371,7 @@ branch-narrator dump-diff [options]
 | `--dry-run` | `false` | Preview what would be included/excluded |
 | `--name-only` | `false` | Output only file list (no diff content) |
 | `--stat` | `false` | Output file statistics (additions/deletions) |
-| `--patch-for <path>` | (none) | Output diff for a specific file only |
+| `--patch-for <path>` | (none) | Output diff for a specific file or folder |
 | `--pretty` | `false` | Pretty-print JSON with 2-space indentation |
 | `--no-timestamp` | `false` | Omit `generatedAt` for deterministic output |
 
@@ -452,6 +452,9 @@ branch-narrator dump-diff --patch-for src/index.ts --format json --unified 3
 
 # Agent workflows - get structured hunks for a file
 branch-narrator dump-diff --patch-for src/app.ts --format json
+
+# Agent workflows - get diffs for all changed files in a folder
+branch-narrator dump-diff --patch-for src/ --format json
 
 # Markdown table of file statistics
 branch-narrator dump-diff --stat --format md
@@ -1159,7 +1162,9 @@ See [Snapshots Documentation](../10-snapshots/overview.md) for detailed informat
 
 ## cache
 
-Manage the global cache system.
+Manage the project-local cache system (`<cwd>/.branch-narrator/cache/`).
+
+`which branch-narrator` reports where the executable is installed, not where this cache is stored.
 
 ```bash
 branch-narrator cache <subcommand> [options]
@@ -1169,7 +1174,7 @@ branch-narrator cache <subcommand> [options]
 
 #### cache stats
 
-Show cache statistics including hit/miss counts and size.
+Show cache statistics including cache location, hit/miss counts, and size.
 
 ```bash
 branch-narrator cache stats [--pretty]
@@ -1183,6 +1188,7 @@ branch-narrator cache stats [--pretty]
 
 ```json
 {
+  "location": "/path/to/repo/.branch-narrator/cache",
   "hits": 42,
   "misses": 8,
   "hitRate": 84,

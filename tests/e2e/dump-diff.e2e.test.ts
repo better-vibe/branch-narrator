@@ -178,6 +178,75 @@ describe("dump-diff command - JSON format", () => {
     expect(output.files[0].path).toBe("docs/05-cli/examples.md");
     expect(output.files[0].patch?.text).toContain("docs/05-cli/examples.md");
   });
+
+  it("should support --patch-for with a folder path", async () => {
+    currentRepo = await createTestRepo({
+      files: {
+        "src/index.ts": "export const index = true;",
+        "src/nested/util.ts": "export const util = 1;",
+        "docs/readme.md": "# docs",
+      },
+    });
+
+    const { stdout, exitCode } = await runCli(
+      [
+        "dump-diff",
+        "--format",
+        "json",
+        "--mode",
+        "branch",
+        "--base",
+        currentRepo.base,
+        "--head",
+        currentRepo.head,
+        "--no-timestamp",
+        "--patch-for",
+        "src",
+      ],
+      currentRepo.cwd
+    );
+
+    expect(exitCode).toBe(0);
+
+    const output = JSON.parse(stdout);
+    const paths = output.files.map((f: any) => f.path).sort();
+    expect(paths).toEqual(["src/index.ts", "src/nested/util.ts"]);
+    expect(output.options.patchFor).toBe("src");
+  });
+
+  it("should support --patch-for folder path from subdirectory", async () => {
+    currentRepo = await createTestRepo({
+      files: {
+        "docs/05-cli/examples.md": "Examples docs content",
+        "docs/05-cli/options.md": "Options docs content",
+        "src/index.ts": "export const x = 1;",
+      },
+    });
+
+    const { stdout, exitCode } = await runCli(
+      [
+        "dump-diff",
+        "--format",
+        "json",
+        "--mode",
+        "branch",
+        "--base",
+        currentRepo.base,
+        "--head",
+        currentRepo.head,
+        "--no-timestamp",
+        "--patch-for",
+        "docs/05-cli/",
+      ],
+      join(currentRepo.cwd, "docs")
+    );
+
+    expect(exitCode).toBe(0);
+
+    const output = JSON.parse(stdout);
+    const paths = output.files.map((f: any) => f.path).sort();
+    expect(paths).toEqual(["docs/05-cli/examples.md", "docs/05-cli/options.md"]);
+  });
 });
 
 // ============================================================================
