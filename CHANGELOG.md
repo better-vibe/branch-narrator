@@ -1,5 +1,13 @@
 # @better-vibe/branch-narrator
 
+## 1.15.0
+
+### Minor Changes
+
+- fbfe534: Expand `dump-diff --patch-for` to support folder paths in addition to single files, including recursive matching of changed files under the selected directory.
+
+  Also add `location` to `branch-narrator cache stats` output so users can see the active cache directory, and clarify cache/snapshot storage locations across global, bunx, npx, and local invocation modes.
+
 ## 1.14.2
 
 ### Patch Changes
